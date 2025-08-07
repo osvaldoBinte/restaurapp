@@ -10,6 +10,7 @@ import 'package:quickalert/quickalert.dart';
 import 'dart:convert';
 
 import 'package:restaurapp/common/constants/constants.dart';
+import 'package:restaurapp/common/services/BluetoothPrinterService.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
 
 class OrdersDashboardScreen extends StatelessWidget {
@@ -617,7 +618,8 @@ class TableDetailsModal extends StatefulWidget {
 
 class _TableDetailsModalState extends State<TableDetailsModal> {
   int selectedOrderIndex = -1; // -1 significa "todos los pedidos"
-  
+    final UniversalPrinterService printerService = UniversalPrinterService();
+
   BluetoothConnection? bluetoothConnection;
   bool isBluetoothConnected = false;
   @override
@@ -1540,26 +1542,19 @@ Future<bool> _conectarImpresoraAutomaticamente() async {
       return false;
     }
   }
-Future<void> _pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detalleIds, double totalEstimado) async {
+
+  // ✅ FUNCIÓN MODIFICADA: Usar servicio universal
+  Future<void> _pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detalleIds, double totalEstimado) async {
     final controller = Get.find<OrdersController>();
     final pedidoId = pedido['pedidoId'];
     final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
     
     try {
-      if (detalleIds.isEmpty) {
-        Get.snackbar(
-          'Sin Items',
-          'No hay items válidos para procesar en este pedido',
-          backgroundColor: Colors.orange.withOpacity(0.8),
-          colorText: Colors.white,
-        );
-        return;
-      }
+    
 
-      // ✅ NUEVO: Intentar conectar a impresora antes del pago
-      final impresoraConectada = await _conectarImpresoraAutomaticamente();
+      // ✅ NUEVO: Intentar conectar a impresora (funciona en móvil Y desktop)
+      final impresoraConectada = await printerService.conectarImpresoraAutomaticamente();
       if (!impresoraConectada) {
-        // Mostrar advertencia pero continuar con el pago
         Get.snackbar(
           'Impresora no disponible',
           'Se procesará el pago sin imprimir ticket',
@@ -1586,10 +1581,10 @@ Future<void> _pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detal
       // Cerrar loading
       Get.back();
 
-      // ✅ NUEVO: Imprimir ticket si el pago fue exitoso
+      // ✅ NUEVO: Imprimir ticket universal (móvil o desktop)
       if (fallidos == 0 && impresoraConectada) {
         try {
-          await _imprimirTicketVenta(pedido, totalReal);
+          await printerService.imprimirTicket(pedido, totalReal);
         } catch (e) {
           print('❌ Error en impresión: $e');
           // Continuar sin interrumpir el flujo
@@ -1598,7 +1593,6 @@ Future<void> _pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detal
 
       // Mostrar resultado
       if (fallidos == 0) {
-        // Todos exitosos
         String mensaje = 'Pedido #$pedidoId pagado correctamente\n'
                         'Total: \$${totalReal.toStringAsFixed(2)}';
         
@@ -1614,18 +1608,16 @@ Future<void> _pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detal
           duration: Duration(seconds: 3),
         );
         
-        // Recargar datos
         await controller.refrescarDatos();
         
       } else if (exitosos > 0) {
-        // Parcialmente exitoso
         String mensaje = 'Pedido #$pedidoId procesado parcialmente\n'
                         'Exitosos: $exitosos items\nFallidos: $fallidos items\n'
                         'Total procesado: \${totalReal.toStringAsFixed(2)}';
         
         if (impresoraConectada && exitosos > 0) {
           try {
-            await _imprimirTicketVenta(pedido, totalReal);
+            await printerService.imprimirTicket(pedido, totalReal);
             mensaje += '\n✅ Ticket impreso';
           } catch (e) {
             mensaje += '\n❌ Error en impresión';
@@ -1640,11 +1632,9 @@ Future<void> _pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detal
           duration: Duration(seconds: 4),
         );
         
-        // Recargar datos
         await controller.refrescarDatos();
         
       } else {
-        // Todos fallaron
         Get.snackbar(
           'Error en Pago',
           'No se pudo procesar ningún item del pedido #$pedidoId',
@@ -1655,7 +1645,6 @@ Future<void> _pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detal
       }
 
     } catch (e) {
-      // Cerrar loading si está abierto
       if (Get.isDialogOpen ?? false) {
         Get.back();
       }
@@ -1668,17 +1657,157 @@ Future<void> _pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detal
         duration: Duration(seconds: 3),
       );
     } finally {
-      // ✅ NUEVO: Desconectar impresora al finalizar
-      if (bluetoothConnection != null) {
-        try {
-          await bluetoothConnection!.close();
-          isBluetoothConnected = false;
-          bluetoothConnection = null;
-        } catch (e) {
-          print('❌ Error desconectando impresora: $e');
-        }
-      }
+      // ✅ NUEVO: Desconectar impresora universal
+      await printerService.desconectar();
     }
+  }
+
+  // ✅ FUNCIÓN OPCIONAL: Configurar impresora manualmente
+  void _configurarImpresora() async {
+    try {
+      List<String> impresoras = await printerService.obtenerImpresorasDisponibles();
+      
+      if (impresoras.isEmpty) {
+        Get.snackbar(
+          'Sin Impresoras',
+          'No se encontraron impresoras disponibles',
+          backgroundColor: Colors.orange.withOpacity(0.8),
+          colorText: Colors.white,
+        );
+        return;
+      }
+      
+      // Mostrar diálogo para seleccionar impresora
+      Get.dialog(
+        AlertDialog(
+          title: Text('Seleccionar Impresora'),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: impresoras.length,
+              itemBuilder: (context, index) {
+                final impresora = impresoras[index];
+                return ListTile(
+                  leading: Icon(printerService.isMobile ? Icons.bluetooth : Icons.print),
+                  title: Text(impresora),
+                  subtitle: Text(printerService.isMobile ? 'Bluetooth' : 'Sistema'),
+                  onTap: () async {
+                    Get.back();
+                    
+                    // Aquí puedes implementar conexión manual específica
+                    Get.snackbar(
+                      'Impresora Seleccionada',
+                      'Impresora configurada: $impresora',
+                      backgroundColor: Colors.green.withOpacity(0.8),
+                      colorText: Colors.white,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: Text('Cancelar'),
+            ),
+          ],
+        ),
+      );
+      
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Error al buscar impresoras: $e',
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  // ✅ FUNCIÓN OPCIONAL: Probar impresión
+  void _probarImpresion() async {
+    try {
+      final connected = await printerService.conectarImpresoraAutomaticamente();
+      
+      if (!connected) {
+        Get.snackbar(
+          'Sin Conexión',
+          'No se pudo conectar a ninguna impresora',
+          backgroundColor: Colors.red.withOpacity(0.8),
+          colorText: Colors.white,
+        );
+        return;
+      }
+      
+      // Crear pedido de prueba
+      Map<String, dynamic> pedidoPrueba = {
+        'numeroMesa': 99,
+        'nombreOrden': 'PRUEBA SISTEMA',
+        'pedidoId': 'TEST001',
+        'detalles': [
+          {
+            'nombreProducto': 'Producto de Prueba',
+            'cantidad': 1,
+            'precioUnitario': 1.00,
+            'statusDetalle': 'completado',
+            'observaciones': 'Test de impresión',
+          }
+        ]
+      };
+      
+      await printerService.imprimirTicket(pedidoPrueba, 1.00);
+      
+      Get.snackbar(
+        'Prueba Exitosa',
+        'Ticket de prueba enviado a la impresora',
+        backgroundColor: Colors.green.withOpacity(0.8),
+        colorText: Colors.white,
+      );
+      
+    } catch (e) {
+      Get.snackbar(
+        'Error en Prueba',
+        'Error al probar impresión: $e',
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+      );
+    } finally {
+      await printerService.desconectar();
+    }
+  }
+  
+  // ✅ AGREGAR BOTONES EN TU INTERFAZ
+  Widget _buildPrinterControls() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _configurarImpresora,
+              icon: Icon(Icons.settings, color: Colors.white),
+              label: Text('CONFIGURAR IMPRESORA'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF8B4513),
+                padding: EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: _probarImpresion,
+            icon: Icon(Icons.print, color: Colors.white),
+            label: Text('PROBAR'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF27AE60),
+              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
 
