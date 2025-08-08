@@ -4,6 +4,10 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:restaurapp/common/constants/constants.dart';
+import 'package:restaurapp/page/categoria/listarcategoria/category_list_controller.dart';
+import 'package:restaurapp/page/menu/listarmenu/listar_controller.dart';
+import 'package:restaurapp/page/orders/crear/crear_orden_controller.dart';
+import 'package:restaurapp/page/table/table_controller.dart';
 
 // Modelos para las métricas del dashboard
 class DashboardStats {
@@ -154,6 +158,8 @@ class DashboardController extends GetxController {
         obtenerVentasSemanales(),
         obtenerProductosPopulares(),
         obtenerOrdenesRecientes(),
+        recargardatos(), 
+
       ]);
     } catch (e) {
       _showError('Error al cargar dashboard: $e');
@@ -161,7 +167,21 @@ class DashboardController extends GetxController {
       isLoading.value = false;
     }
   }
+ Future<void> recargardatos() async {
+   //categorias
+  final CategoryListController controller = Get.put(CategoryListController());
+  controller.listarCategorias();
+  //menus
+    final controller2 = Get.find<ListarMenuController>();
+        controller2.refrescarLista();
 
+   final CreateOrderController controller3 = Get.find<CreateOrderController>();
+        await controller3.cargarDatosIniciales();
+        //messas
+          final TablesController controller4 = Get.put(TablesController());
+          controller4.listarMesas();
+
+  }
   /// Obtener estadísticas generales
   Future<void> obtenerEstadisticas() async {
     try {
@@ -331,14 +351,7 @@ class DashboardController extends GetxController {
   /// Refrescar todos los datos manualmente
   Future<void> refrescarTodo() async {
     await cargarDatosDashboard();
-    Get.snackbar(
-      'Actualizado',
-      'Dashboard actualizado correctamente',
-      snackPosition: SnackPosition.BOTTOM,
-      duration: Duration(seconds: 2),
-      backgroundColor: Color(0xFF4CAF50),
-      colorText: Colors.white,
-    );
+
   }
 
   // Métodos de utilidad (mantener del código original)

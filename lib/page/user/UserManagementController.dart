@@ -1173,8 +1173,7 @@ enum UserFilter {
   todos,
   administradores,
   empleados,
-  activos,
-  inactivos,
+  
 }
 
 extension UserFilterExtension on UserFilter {
@@ -1186,10 +1185,7 @@ extension UserFilterExtension on UserFilter {
         return 'Administradores';
       case UserFilter.empleados:
         return 'Empleados';
-      case UserFilter.activos:
-        return 'Activos';
-      case UserFilter.inactivos:
-        return 'Inactivos';
+  
     }
   }
   
@@ -1201,10 +1197,7 @@ extension UserFilterExtension on UserFilter {
         return Icons.admin_panel_settings;
       case UserFilter.empleados:
         return Icons.person;
-      case UserFilter.activos:
-        return Icons.check_circle;
-      case UserFilter.inactivos:
-        return Icons.cancel;
+  
     }
   }
 }

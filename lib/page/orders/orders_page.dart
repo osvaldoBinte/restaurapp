@@ -625,6 +625,7 @@ class _TableDetailsModalState extends State<TableDetailsModal> {
   @override
   Widget build(BuildContext context) {
     final numeroMesa = widget.mesa['numeroMesa'];
+    final idnumeromesa =  widget.mesa['id'] as int? ?? 0;
     final pedidos = widget.mesa['pedidos'] as List;
     final controller = Get.find<OrdersController>();
     final totalMesa = controller.calcularTotalMesa(widget.mesa);
@@ -697,7 +698,7 @@ class _TableDetailsModalState extends State<TableDetailsModal> {
         ),
         
         // Footer con total y botones de acción
-        _buildFooter(pedidos, totalMesa, numeroMesa),
+        _buildFooter(pedidos, totalMesa, numeroMesa,idnumeromesa,),
       ],
     );
   }
@@ -1812,7 +1813,7 @@ Future<bool> _conectarImpresoraAutomaticamente() async {
 
 
   // ✅ NUEVO: Confirmar liberación de mesa
-  void _confirmarLiberarMesa(int numeroMesa) {
+  void _confirmarLiberarMesa(int numeroMesa, int idnumeromesa,) {
     QuickAlert.show(
       context: Get.context!,
       type: QuickAlertType.confirm,
@@ -1824,7 +1825,7 @@ Future<bool> _conectarImpresoraAutomaticamente() async {
       confirmBtnColor: Color(0xFFE74C3C), // Rojo para indicar acción importante
       onConfirmBtnTap: () async {
         Get.back(); // Cerrar diálogo de confirmación
-        await _liberarMesa(numeroMesa);
+        await _liberarMesa(idnumeromesa);
       },
     );
   }
@@ -2086,7 +2087,7 @@ Future<bool> _conectarImpresoraAutomaticamente() async {
     // No lanzar excepción para no interrumpir el flujo de pago
   }
 }
- Widget _buildFooter(List pedidos, double totalMesa, int numeroMesa) {
+ Widget _buildFooter(List pedidos, double totalMesa,int numeroMesa,int idnumeromesa) {
   final currentTotal = selectedOrderIndex == -1 
     ? totalMesa 
     : _calcularTotalPedido(pedidos[selectedOrderIndex]);
@@ -2167,7 +2168,7 @@ Future<bool> _conectarImpresoraAutomaticamente() async {
                 Expanded(
                   flex: 1,
                   child: ElevatedButton.icon(
-                    onPressed: () => _confirmarLiberarMesa(numeroMesa),
+                    onPressed: () => _confirmarLiberarMesa(numeroMesa,idnumeromesa),
                     icon: Icon(
                       Icons.cleaning_services,
                       color: Colors.white,

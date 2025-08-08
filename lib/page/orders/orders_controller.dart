@@ -294,180 +294,183 @@ class OrdersController extends GetxController {
       confirmBtnColor: Color(0xFFE74C3C),
     );
   }
+Future<void> obtenerMesasConPedidosAbiertos() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$defaultApiServer/ordenes/obtenerMesasConPedidosAbiertos/'),
+      headers: {'Content-Type': 'application/json'},
+    );
 
-  Future<void> obtenerMesasConPedidosAbiertos() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$defaultApiServer/ordenes/obtenerMesasConPedidosAbiertos/'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      
+      if (data.containsKey('message') && data['message'].toString().contains('No hay mesas')) {
+        print('ℹ️ Servidor responde: ${data['message']}');
+        mesasConPedidos.clear();
+        pedidosIndividuales.clear();
+        print('✅ Estado limpio: Sin mesas con pedidos activos');
+        return;
+      }
+      
+      if (data.containsKey('success') && data['success'] == true) {
+        mesasConPedidos.clear();
+        pedidosIndividuales.clear();
         
-        // ✅ NUEVO: Manejar caso cuando no hay mesas
-        if (data.containsKey('message') && data['message'].toString().contains('No hay mesas')) {
-          print('ℹ️ Servidor responde: ${data['message']}');
-          
-          // Limpiar listas - estado válido sin mesas
-          mesasConPedidos.clear();
-          pedidosIndividuales.clear();
-          
-          print('✅ Estado limpio: Sin mesas con pedidos activos');
+        if (!data.containsKey('mesasOcupadas')) {
+          print('⚠️ Respuesta sin campo "mesasOcupadas"');
           return;
         }
         
-        // ✅ CORREGIDO: Verificar si existe 'success' antes de acceder
-        if (data.containsKey('success') && data['success'] == true) {
-          // Limpiar listas anteriores
-          mesasConPedidos.clear();
-          pedidosIndividuales.clear();
+        final mesas = data['mesasOcupadas'] as List;
+        
+        if (mesas.isEmpty) {
+          print('ℹ️ Lista de mesasOcupadas vacía');
+          return;
+        }
+        
+        for (var mesa in mesas) {
+          final numeroMesa = mesa['numeroMesa'];
+          final statusMesa = mesa['status'] ?? true;
           
-          // ✅ CORREGIDO: Buscar 'mesasOcupadas' en lugar de 'mesas'
-          if (!data.containsKey('mesasOcupadas')) {
-            print('⚠️ Respuesta sin campo "mesasOcupadas"');
-            return;
-          }
+          // ✅ AGREGAR: Capturar el ID de la mesa del response
+          final idMesa = mesa['id'] as int? ?? 
+                       mesa['idMesa'] as int? ?? 
+                       mesa['mesa_id'] as int? ?? 
+                       mesa['mesaId'] as int? ?? 
+                       numeroMesa; // Usar numeroMesa como fallback
+
+          // 🔍 DEBUG: Ver qué ID está llegando del servidor
+          print('📋 Mesa $numeroMesa - ID capturado: $idMesa');
+          print('📋 Estructura mesa completa: ${mesa.keys.toList()}');
           
-          final mesas = data['mesasOcupadas'] as List;
+          final pedidosMesa = mesa['pedidos'] as List;
           
-          // ✅ NUEVO: Si la lista está vacía, es válido
-          if (mesas.isEmpty) {
-            print('ℹ️ Lista de mesasOcupadas vacía');
-            return;
-          }
+          List<Map<String, dynamic>> pedidosFormateados = [];
           
-          for (var mesa in mesas) {
-            final numeroMesa = mesa['numeroMesa'];
-            final statusMesa = mesa['status'] ?? true;
-            final pedidosMesa = mesa['pedidos'] as List;
+          for (var pedido in pedidosMesa) {
+            final pedidoId = pedido['pedidoId'];
+            final nombreOrden = pedido['nombreOrden'];
+            final fechaPedido = pedido['fechaPedido'];
+            final detalles = pedido['detalles'] as List;
             
-            // ✅ NUEVO: Procesar estructura diferente - pedidos ya vienen agrupados
-            List<Map<String, dynamic>> pedidosFormateados = [];
+            List<Map<String, dynamic>> detallesFormateados = [];
             
-            for (var pedido in pedidosMesa) {
-              final pedidoId = pedido['pedidoId'];
-              final nombreOrden = pedido['nombreOrden'];
-              final fechaPedido = pedido['fechaPedido'];
-              final detalles = pedido['detalles'] as List;
+            for (var detalle in detalles) {
+              String statusDetalle = detalle['statusDetalle'] ?? 'proceso';
               
-              // ✅ NUEVO: Formatear detalles y manejar statusDetalle especial
-              List<Map<String, dynamic>> detallesFormateados = [];
+              if (statusDetalle == 'True') {
+                statusDetalle = 'proceso';
+              } else if (statusDetalle == 'False') {
+                statusDetalle = 'proceso';
+              }
               
-              for (var detalle in detalles) {
-                // ✅ IMPORTANTE: Convertir statusDetalle de "True"/"False" a formato correcto
-                String statusDetalle = detalle['statusDetalle'] ?? 'proceso';
-                
-                // Convertir "True"/"False" string a status apropiado
-                if (statusDetalle == 'True') {
-                  statusDetalle = 'proceso';
-                } else if (statusDetalle == 'False') {
-                  statusDetalle = 'proceso';
-                }
-                
-                detallesFormateados.add({
+              detallesFormateados.add({
+                'detalleId': detalle['detalleId'],
+                'nombreProducto': detalle['nombreProducto'],
+                'cantidad': detalle['cantidad'],
+                'precioUnitario': detalle['precioUnitario'],
+                'observaciones': detalle['observaciones'] ?? '',
+                'statusDetalle': statusDetalle,
+              });
+              
+              if (statusDetalle == 'proceso') {
+                pedidosIndividuales.add({
                   'detalleId': detalle['detalleId'],
+                  'pedidoId': pedidoId,
+                  'numeroMesa': numeroMesa,
+                  'nombreOrden': nombreOrden,
+                  'fecha': fechaPedido,
                   'nombreProducto': detalle['nombreProducto'],
                   'cantidad': detalle['cantidad'],
-                  'precioUnitario': detalle['precioUnitario'],
+                  'precio': detalle['precioUnitario'],
                   'observaciones': detalle['observaciones'] ?? '',
-                  'statusDetalle': statusDetalle,
+                  'status': statusDetalle,
                 });
-                
-                // Agregar a pedidosIndividuales para el carrusel
-                // Solo agregar pedidos en proceso (no cancelados)
-                if (statusDetalle == 'proceso') {
-                  pedidosIndividuales.add({
-                    'detalleId': detalle['detalleId'],
-                    'pedidoId': pedidoId,
-                    'numeroMesa': numeroMesa,
-                    'nombreOrden': nombreOrden,
-                    'fecha': fechaPedido,
-                    'nombreProducto': detalle['nombreProducto'],
-                    'cantidad': detalle['cantidad'],
-                    'precio': detalle['precioUnitario'],
-                    'observaciones': detalle['observaciones'] ?? '',
-                    'status': statusDetalle,
-                  });
-                }
               }
-              
-              // Calcular total del pedido
-              double totalPedido = 0.0;
-              for (var detalle in detallesFormateados) {
-                totalPedido += (detalle['precioUnitario'] * detalle['cantidad']);
-              }
-              
-              // Determinar status del pedido
-              final statusPedido = detallesFormateados.every((d) => d['statusDetalle'] == 'cancelado') 
-                ? 'cancelado' 
-                : detallesFormateados.any((d) => d['statusDetalle'] == 'proceso') 
-                  ? 'proceso' 
-                  : 'completado';
-              
-              pedidosFormateados.add({
-                'pedidoId': pedidoId,
-                'nombreOrden': nombreOrden,
-                'fecha': fechaPedido,
-                'detalles': detallesFormateados,
-                'total': totalPedido,
-                'status': statusPedido,
-              });
             }
             
-            // Solo agregar mesas que tienen pedidos activos (no todos cancelados)
-            final tienePersonasActivos = pedidosFormateados.any((p) => p['status'] != 'cancelado');
-            
-            if (tienePersonasActivos) {
-              mesasConPedidos.add({
-                'numeroMesa': numeroMesa,
-                'statusMesa': statusMesa,
-                'pedidos': pedidosFormateados,
-              });
+            double totalPedido = 0.0;
+            for (var detalle in detallesFormateados) {
+              totalPedido += (detalle['precioUnitario'] * detalle['cantidad']);
             }
-          }
-          
-          // Ordenar pedidos individuales por fecha (más recientes primero)
-          if (pedidosIndividuales.isNotEmpty) {
-            pedidosIndividuales.sort((a, b) {
-              final fechaA = DateTime.parse(a['fecha']);
-              final fechaB = DateTime.parse(b['fecha']);
-              return fechaB.compareTo(fechaA);
+            
+            final statusPedido = detallesFormateados.every((d) => d['statusDetalle'] == 'cancelado') 
+              ? 'cancelado' 
+              : detallesFormateados.any((d) => d['statusDetalle'] == 'proceso') 
+                ? 'proceso' 
+                : 'completado';
+            
+            pedidosFormateados.add({
+              'pedidoId': pedidoId,
+              'nombreOrden': nombreOrden,
+              'fecha': fechaPedido,
+              'detalles': detallesFormateados,
+              'total': totalPedido,
+              'status': statusPedido,
             });
           }
           
-          print('✅ Mesas cargadas: ${mesasConPedidos.length}');
-          print('✅ Pedidos individuales: ${pedidosIndividuales.length}');
+          final tienePersonasActivos = pedidosFormateados.any((p) => p['status'] != 'cancelado');
           
-        } else {
-          final message = data.containsKey('message') ? data['message'] : 'Respuesta inesperada del servidor';
-          print('⚠️ Respuesta del servidor: $message');
-          
-          // Limpiar listas pero no mostrar error
-          mesasConPedidos.clear();
-          pedidosIndividuales.clear();
+          if (tienePersonasActivos) {
+            // ✅ SOLUCIÓN: Agregar el ID a la estructura de mesa
+            mesasConPedidos.add({
+              'numeroMesa': numeroMesa,
+              'id': idMesa,                    // ✅ AGREGAR campo id
+              'idnumeroMesa': idMesa,          // ✅ AGREGAR también con este nombre
+              'mesaId': idMesa,                // ✅ AGREGAR variación adicional
+              'statusMesa': statusMesa,
+              'pedidos': pedidosFormateados,
+            });
+            
+            // 🔍 DEBUG: Confirmar que se agregó correctamente
+            print('✅ Mesa agregada - Número: $numeroMesa, ID: $idMesa');
+          }
+        }
+        
+        if (pedidosIndividuales.isNotEmpty) {
+          pedidosIndividuales.sort((a, b) {
+            final fechaA = DateTime.parse(a['fecha']);
+            final fechaB = DateTime.parse(b['fecha']);
+            return fechaB.compareTo(fechaA);
+          });
+        }
+        
+        print('✅ Mesas cargadas: ${mesasConPedidos.length}');
+        print('✅ Pedidos individuales: ${pedidosIndividuales.length}');
+        
+        // 🔍 DEBUG: Ver estructura final de una mesa
+        if (mesasConPedidos.isNotEmpty) {
+          print('📋 Estructura mesa ejemplo: ${mesasConPedidos.first.keys.toList()}');
+          print('📋 ID de primera mesa: ${mesasConPedidos.first['id']}');
         }
         
       } else {
-        throw Exception('Error del servidor: ${response.statusCode}');
+        final message = data.containsKey('message') ? data['message'] : 'Respuesta inesperada del servidor';
+        print('⚠️ Respuesta del servidor: $message');
+        mesasConPedidos.clear();
+        pedidosIndividuales.clear();
       }
       
-    } catch (e) {
-      print('❌ Error en obtenerMesasConPedidosAbiertos: $e');
-      
-      // ✅ MODIFICADO: Solo mostrar alerta para errores reales si NO es auto-refresh
-      if (!e.toString().contains('No hay mesas') && _autoRefreshTimer?.isActive != true) {
-        QuickAlert.show(
-          context: Get.context!,
-          type: QuickAlertType.error,
-          title: 'Error de Conexión',
-          text: 'No se pudo conectar con el servidor.\n\nPor favor verifica tu conexión a internet.',
-          confirmBtnText: 'Aceptar',
-          confirmBtnColor: Color(0xFF8B4513),
-        );
-      }
+    } else {
+      throw Exception('Error del servidor: ${response.statusCode}');
+    }
+    
+  } catch (e) {
+    print('❌ Error en obtenerMesasConPedidosAbiertos: $e');
+    
+    if (!e.toString().contains('No hay mesas') && _autoRefreshTimer?.isActive != true) {
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.error,
+        title: 'Error de Conexión',
+        text: 'No se pudo conectar con el servidor.\n\nPor favor verifica tu conexión a internet.',
+        confirmBtnText: 'Aceptar',
+        confirmBtnColor: Color(0xFF8B4513),
+      );
     }
   }
+}
 
   /// Mostrar detalles de mesa en modal
   void mostrarDetallesMesa(int numeroMesa) {

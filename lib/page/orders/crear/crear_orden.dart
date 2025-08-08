@@ -1040,4 +1040,5 @@ void _showCart() {
     if (categoriaLower.contains('extra')) return '🥄';
     return '🌮';
   }
+  
 }

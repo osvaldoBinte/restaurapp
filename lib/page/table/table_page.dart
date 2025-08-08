@@ -288,21 +288,7 @@ Widget buildMesaCard(Mesa mesa) {
                 ),
               ),
               SizedBox(height: 4),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: mesa.status ? Color(0xFF4CAF50).withOpacity(0.1) : Color(0xFFFF9800).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  mesa.status ? 'ACTIVA' : 'INACTIVA',
-                  style: TextStyle(
-                    color: mesa.status ? Color(0xFF4CAF50) : Color(0xFFFF9800),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              
             ],
           ),
         ),
@@ -312,23 +298,7 @@ Widget buildMesaCard(Mesa mesa) {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Botón activar/desactivar
-            GestureDetector(
-              onTap: () => controller.confirmarCambioStatus(mesa),
-              child: Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: mesa.status ? Color(0xFFFF9800).withOpacity(0.1) : Color(0xFF4CAF50).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(
-                  mesa.status ? Icons.visibility_off : Icons.visibility,
-                  color: mesa.status ? Color(0xFFFF9800) : Color(0xFF4CAF50),
-                  size: 16,
-                ),
-              ),
-            ),
-            SizedBox(width: 8),
-            // Botón eliminar
+            
             GestureDetector(
               onTap: () => controller.confirmarEliminarMesa(mesa),
               child: Container(
