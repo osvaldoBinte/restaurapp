@@ -113,7 +113,12 @@ class AddProductsToOrderController extends GetxController {
   var selectedCategoryIndex = 0.obs;
 
   String defaultApiServer = AppConstants.serverBase;
-
+ var isSearching = false.obs;
+  var searchQuery = ''.obs;
+  var searchResults = <Producto>[].obs;
+  var showSearchResults = false.obs;
+  var isLoadingSearch = false.obs;
+    var searchText = ''.obs;
   // ✅ Inicializar con el ID del pedido
   void inicializarConPedido(int pedidoIdParam, int numeroMesaParam, String nombreOrdenParam) {
     pedidoId.value = pedidoIdParam;
@@ -127,6 +132,105 @@ class AddProductsToOrderController extends GetxController {
   void onInit() {
     super.onInit();
     // No cargar datos automáticamente - esperar a que se llame inicializarConPedido
+  }
+/// ✅ CORREGIDO: Buscar productos por nombre usando POST con body
+Future<void> buscarProductos(String query) async {
+  try {
+    searchQuery.value = query.trim();
+    
+    // Si la búsqueda está vacía, ocultar resultados
+    if (searchQuery.value.isEmpty) {
+      showSearchResults.value = false;
+      searchResults.clear();
+      return;
+    }
+
+    // Mostrar que estamos buscando
+    isLoadingSearch.value = true;
+    showSearchResults.value = true;
+
+    // Preparar datos para enviar en el body
+    final searchData = {
+      'nombre': searchQuery.value
+    };
+
+    Uri uri = Uri.parse('$defaultApiServer/menu/buscarProductoMenu/');
+    
+    print('🔍 Buscando productos: ${searchQuery.value}');
+    print('📡 URL de búsqueda: $uri');
+    print('📤 Datos de búsqueda en body: $searchData');
+
+    // ✅ OPCIÓN 1: GET con body (no estándar pero funcional)
+    final request = http.Request('GET', uri);
+    request.headers.addAll({
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    });
+    request.body = jsonEncode(searchData);
+    
+    final streamedResponse = await request.send().timeout(Duration(seconds: 15));
+    final response = await http.Response.fromStream(streamedResponse);
+
+    print('📡 Búsqueda - Código: ${response.statusCode}');
+    print('📄 Respuesta: ${response.body}');
+
+    if (response.statusCode == 200) {
+      if (response.body.isEmpty) {
+        searchResults.clear();
+        return;
+      }
+      
+      final dynamic decodedData = jsonDecode(response.body);
+      
+      if (decodedData is! List) {
+        throw Exception('Formato de respuesta inválido - esperaba una lista');
+      }
+      
+      final List<dynamic> data = decodedData;
+      
+      // Parsear productos encontrados
+      searchResults.value = data
+          .map((json) {
+            try {
+              return Producto.fromJson(json);
+            } catch (e) {
+              print('⚠️ Error al parsear producto de búsqueda: $json - Error: $e');
+              return null;
+            }
+          })
+          .where((producto) => producto != null)
+          .cast<Producto>()
+          .toList();
+          
+      print('✅ Productos encontrados: ${searchResults.length}');
+      
+    } else {
+      throw Exception('Error del servidor: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('❌ Error en búsqueda: $e');
+    searchResults.clear();
+    
+   
+  } finally {
+    isLoadingSearch.value = false;
+  }
+}
+  void limpiarBusqueda() {
+    searchQuery.value = '';
+    searchResults.clear();
+    showSearchResults.value = false;
+    isLoadingSearch.value = false;
+  }
+
+  /// ✅ NUEVO: Cerrar búsqueda y volver a categorías
+  void cerrarBusqueda() {
+    limpiarBusqueda();
+    // Recargar productos de la categoría actual
+    if (categorias.isNotEmpty && selectedCategoryIndex.value < categorias.length) {
+      final categoria = categorias[selectedCategoryIndex.value];
+      obtenerProductosPorCategoria(categoria.id);
+    }
   }
 
   /// Cargar todos los datos necesarios

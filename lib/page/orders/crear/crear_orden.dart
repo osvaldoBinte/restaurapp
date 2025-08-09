@@ -7,29 +7,50 @@ import 'package:restaurapp/page/orders/crear/crear_orden_controller.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
 class OrderScreen extends StatelessWidget {
   final controller = Get.find<CreateOrderController>();
+  final TextEditingController _searchController = TextEditingController();
 
   @override
-  Widget build(BuildContext context) {
+   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFFF5F2F0),
       appBar: AppBar(
-  leading: IconButton(
-    icon: Icon(Icons.refresh, color: Colors.white),
-    onPressed: () {
-      controller.cargarDatosIniciales();
-    },
-  ),
-  title: Text(
-    'Gestión de Órdenes',
-    style: TextStyle(
-      fontWeight: FontWeight.bold,
-      color: Colors.white,
-    ),
-  ),
-  backgroundColor: Color(0xFF8B4513),
-  elevation: 0,
-  centerTitle: true,
-),
+        leading: IconButton(
+          icon: Icon(Icons.refresh, color: Colors.white),
+          onPressed: () {
+            controller.cargarDatosIniciales();
+            _searchController.clear();
+            controller.limpiarBusqueda();
+          },
+        ),
+        title: Text(
+          'Gestión de Órdenes',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: Color(0xFF8B4513),
+        elevation: 0,
+        centerTitle: true,
+        // ✅ NUEVO: Botón para alternar búsqueda
+        actions: [
+          Obx(() => IconButton(
+            icon: Icon(
+              controller.showSearchResults.value ? Icons.close : Icons.search,
+              color: Colors.white,
+            ),
+            onPressed: () {
+              if (controller.showSearchResults.value) {
+                _searchController.clear();
+                controller.cerrarBusqueda();
+              } else {
+                // Activar modo búsqueda
+                controller.showSearchResults.value = true;
+              }
+            },
+          )),
+        ],
+      ),
 
       body: Obx(() {
         if (controller.isLoading.value) {
@@ -58,16 +79,21 @@ class OrderScreen extends StatelessWidget {
             // Table Selection
             _buildTableSelection(),
             
-            // Categories
-            _buildCategoriesSection(),
+            // ✅ NUEVO: Buscador (condicional)
+          controller.showSearchResults.value 
+    ? _buildSearchSection() 
+    : _buildCategoriesSection(),
             
-            // Menu Items
+            // Menu Items (búsqueda o por categoría)
             Expanded(
-              child: _buildMenuItems(),
+              child: Obx(() => controller.showSearchResults.value 
+                  ? _buildSearchResults()
+                  : _buildMenuItems()),
             ),
           ],
         );
       }),
+      
       floatingActionButton: Obx(() => controller.cartItems.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: () => _showCart(),
@@ -80,7 +106,262 @@ class OrderScreen extends StatelessWidget {
             )
           : SizedBox.shrink()),
     );
-  }Widget _buildTableSelection() {
+  }
+  
+  
+    Widget _buildSearchSection() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      color: Colors.white,
+      child: Column(
+        children: [
+          // Título de búsqueda
+          Row(
+            children: [
+              Icon(Icons.search, color: Color(0xFF8B4513)),
+              SizedBox(width: 8),
+              Text(
+                'Buscar productos',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3E1F08),
+                ),
+              ),
+              Spacer(),
+              // Contador de resultados
+              Obx(() => controller.searchResults.isNotEmpty
+                  ? Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF8B4513),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${controller.searchResults.length}',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : SizedBox.shrink()),
+            ],
+          ),
+          
+          SizedBox(height: 12),
+          
+       
+Container(
+  height: 45,
+  child: TextField(
+    controller: _searchController,
+    onChanged: (value) {
+      // ✅ AGREGADO: Actualizar la variable observable
+      controller.searchText.value = value;
+      
+      // Buscar con debounce
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (_searchController.text == value) {
+          controller.buscarProductos(value);
+        }
+      });
+    },
+    decoration: InputDecoration(
+      hintText: 'Escribe el nombre del producto...',
+      prefixIcon: Icon(Icons.search, color: Color(0xFF8B4513)),
+      // ✅ CORREGIDO: Usar la variable observable en lugar de _searchController.text
+      suffixIcon: Obx(() => controller.searchText.value.isNotEmpty
+          ? IconButton(
+              icon: Icon(Icons.clear, color: Colors.grey),
+              onPressed: () {
+                _searchController.clear();
+                controller.searchText.value = ''; // ✅ AGREGADO: Limpiar observable
+                controller.limpiarBusqueda();
+              },
+            )
+          : SizedBox.shrink()),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Color(0xFF8B4513)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Color(0xFF8B4513), width: 2),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      filled: true,
+      fillColor: Colors.grey[50],
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    ),
+    style: TextStyle(fontSize: 14),
+  ),
+),
+
+          
+          // Indicador de búsqueda activa
+          Obx(() => controller.searchQuery.value.isNotEmpty
+              ? Container(
+                  margin: EdgeInsets.only(top: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF8B4513).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Color(0xFF8B4513).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.search, size: 16, color: Color(0xFF8B4513)),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Buscando: "${controller.searchQuery.value}"',
+                          style: TextStyle(
+                            color: Color(0xFF8B4513),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (controller.isLoadingSearch.value)
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+              : SizedBox.shrink()),
+        ],
+      ),
+    );
+  }
+
+  /// ✅ NUEVO: Widget para mostrar resultados de búsqueda
+  Widget _buildSearchResults() {
+    return Obx(() {
+      // Estado de carga de búsqueda
+      if (controller.isLoadingSearch.value && controller.searchQuery.value.isNotEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Buscando productos...',
+                style: TextStyle(
+                  color: Color(0xFF8B4513),
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                '"${controller.searchQuery.value}"',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Sin query de búsqueda
+      if (controller.searchQuery.value.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search, size: 64, color: Colors.grey[400]),
+              SizedBox(height: 16),
+              Text(
+                'Escribe para buscar productos',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Busca por nombre de producto',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Sin resultados
+      if (controller.searchResults.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+              SizedBox(height: 16),
+              Text(
+                'Sin resultados',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No se encontraron productos con "${controller.searchQuery.value}"',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () {
+                  _searchController.clear();
+                  controller.cerrarBusqueda();
+                },
+                icon: Icon(Icons.category),
+                label: Text('Ver por categorías'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF8B4513),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Mostrar resultados
+      return ListView.builder(
+        padding: EdgeInsets.all(16),
+        itemCount: controller.searchResults.length,
+        itemBuilder: (context, index) {
+          final producto = controller.searchResults[index];
+          return _buildMenuItem(producto, isSearchResult: true);
+        },
+      );
+    });
+  }
+  
+  Widget _buildTableSelection() {
   return Container(
     padding: EdgeInsets.all(16),
     color: Colors.white,
@@ -352,134 +633,189 @@ void _debugCategorySelection() {
     });
   }
 
-  Widget _buildMenuItem(Producto producto) {
-  return Card(
-    margin: EdgeInsets.only(bottom: 12),
-    elevation: 3,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
+   Widget _buildMenuItem(Producto producto, {bool isSearchResult = false}) {
+    return Card(
+      margin: EdgeInsets.only(bottom: 12),
+      elevation: 3,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        gradient: LinearGradient(
-          colors: [Colors.white, Color(0xFFFAF9F8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
       ),
-      child: Row(
-        children: [
-          // Product image - MODIFICADO para usar Base64ImageperfilWidget
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: 60,
-              height: 60,
-              child: producto.imagen != null && producto.imagen!.isNotEmpty
-                  ? Base64ImageperfilWidget(
-                      base64String: producto.imagen,
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                      errorWidget: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Color(0xFF8B4513).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors: [
+              Colors.white, 
+              isSearchResult ? Color(0xFFF0F9FF) : Color(0xFFFAF9F8)
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          // ✅ NUEVO: Borde especial para resultados de búsqueda
+          border: isSearchResult 
+              ? Border.all(color: Color(0xFF8B4513).withOpacity(0.3), width: 1)
+              : null,
+        ),
+        child: Column(
+          children: [
+            // ✅ NUEVO: Indicador de resultado de búsqueda
+            if (isSearchResult)
+              Container(
+                width: double.infinity,
+                margin: EdgeInsets.only(bottom: 8),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Color(0xFF8B4513).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.search, size: 14, color: Color(0xFF8B4513)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Resultado de búsqueda',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF8B4513),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Spacer(),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF8B4513),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        producto.categoria,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
                         ),
-                        child: Center(
-                          child: Text(
-                            _getProductEmoji(producto.categoria),
-                            style: TextStyle(fontSize: 28),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+            // Contenido del producto (igual que antes)
+            Row(
+              children: [
+                // Product image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    child: producto.imagen != null && producto.imagen!.isNotEmpty
+                        ? Base64ImageperfilWidget(
+                            base64String: producto.imagen,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorWidget: Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: Color(0xFF8B4513).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _getProductEmoji(producto.categoria),
+                                  style: TextStyle(fontSize: 28),
+                                ),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Color(0xFF8B4513).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Text(
+                                _getProductEmoji(producto.categoria),
+                                style: TextStyle(fontSize: 28),
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                SizedBox(width: 16),
+                
+                // Product details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        producto.nombre,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF3E1F08),
+                        ),
+                      ),
+                      if (producto.descripcion.isNotEmpty) ...[
+                        SizedBox(height: 2),
+                        Text(
+                          producto.descripcion,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      SizedBox(height: 4),
+                      Text(
+                        '\$${producto.precioDouble.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF8B4513),
+                        ),
+                      ),
+                      if (producto.tiempoPreparacion > 0) ...[
+                        SizedBox(height: 2),
+                        Text(
+                          '⏱️ ${producto.tiempoPreparacion} min',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[500],
                           ),
                         ),
-                      ),
-                    )
-                  : Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Color(0xFF8B4513).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _getProductEmoji(producto.categoria),
-                          style: TextStyle(fontSize: 28),
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-          SizedBox(width: 16),
-          
-          // Product details - SIN CAMBIOS
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  producto.nombre,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF3E1F08),
+                      ],
+                    ],
                   ),
                 ),
-                if (producto.descripcion.isNotEmpty) ...[
-                  SizedBox(height: 2),
-                  Text(
-                    producto.descripcion,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-                SizedBox(height: 4),
-                Text(
-                  '\$${producto.precioDouble.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                
+                // Add to cart button
+                Container(
+                  decoration: BoxDecoration(
                     color: Color(0xFF8B4513),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: IconButton(
+                    onPressed: () => _showAddToCartDialog(producto),
+                    icon: Icon(Icons.add, color: Colors.white),
                   ),
                 ),
-                if (producto.tiempoPreparacion > 0) ...[
-                  SizedBox(height: 2),
-                  Text(
-                    '⏱️ ${producto.tiempoPreparacion} min',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
               ],
             ),
-          ),
-          
-          // Add to cart button - SIN CAMBIOS
-          Container(
-            decoration: BoxDecoration(
-              color: Color(0xFF8B4513),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              onPressed: () => _showAddToCartDialog(producto),
-              icon: Icon(Icons.add, color: Colors.white),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
 void _showAddToCartDialog(Producto producto) {
   final TextEditingController observacionesController = TextEditingController();
   
