@@ -257,7 +257,7 @@ class AddProductsToOrderController extends GetxController {
       }
     } catch (e) {
       print('❌ Error al obtener menú: $e');
-      _mostrarError('Error al cargar menú', 'No se pudo cargar el menú: $e');
+    //  _mostrarError('Error al cargar menú', 'No se pudo cargar el menú: $e');
     } finally {
       isLoadingProducts.value = false;
     }
