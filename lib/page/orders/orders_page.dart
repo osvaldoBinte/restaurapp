@@ -78,18 +78,7 @@ class OrdersDashboardScreen extends StatelessWidget {
                     ),
                   ),
                   // Auto-refresh status
-                  Obx(() => Row(
-                    children: [
-                      Text(
-                        'Órdenes Activas',
-                        style: TextStyle(
-                          fontSize: isSmallWidth ? 10 : 12, // Font size adaptativo
-                          color: Colors.white70,
-                        ),
-                      ),
-                      
-                    ],
-                  )),
+                 
                 ],
               ),
             ),
