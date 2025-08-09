@@ -616,28 +616,13 @@ class UniversalPrinterService {
         styles: PosStyles(align: PosAlign.center));
     
     // Información del pedido
-    final numeroMesa = pedido['numeroMesa'] ?? 'S/N';
     final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
-    final pedidoId = pedido['pedidoId'] ?? 'S/N';
+    
     final fecha = DateTime.now();
     final fechaStr = '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
     final horaStr = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
     
-    bytes += generator.row([
-      PosColumn(text: 'Mesa:', width: 4),
-      PosColumn(text: '$numeroMesa', width: 8, styles: PosStyles(bold: true)),
-    ]);
-    
-    bytes += generator.row([
-      PosColumn(text: 'Pedido:', width: 4),
-      PosColumn(text: '#$pedidoId', width: 8),
-    ]);
-    
-    bytes += generator.row([
-      PosColumn(text: 'Cliente:', width: 4),
-      PosColumn(text: '$nombreOrden', width: 8),
-    ]);
-    
+  
     // Productos
     bytes += generator.text('--------------------------------');
     final detalles = pedido['detalles'] as List;
@@ -675,7 +660,7 @@ class UniversalPrinterService {
     bytes += generator.text('¡Gracias por su visita!',
         styles: PosStyles(align: PosAlign.center, bold: true));
     
-    bytes += generator.feed(3);
+    bytes += generator.feed(2);
     bytes += generator.cut();
     
     return bytes;
@@ -692,18 +677,14 @@ class UniversalPrinterService {
     ticket.writeln(''.padLeft(32, '='));
     
     // Información del pedido
-    final numeroMesa = pedido['numeroMesa'] ?? 'S/N';
     final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
-    final pedidoId = pedido['pedidoId'] ?? 'S/N';
+ 
     final fecha = DateTime.now();
     final fechaStr = '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
     final horaStr = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
     
     ticket.writeln('TICKET DE VENTA');
     ticket.writeln(''.padLeft(32, '-'));
-    ticket.writeln('Mesa: $numeroMesa');
-    ticket.writeln('Pedido: #$pedidoId');
-    ticket.writeln('Cliente: $nombreOrden');
     ticket.writeln('Fecha: $fechaStr');
     ticket.writeln('Hora: $horaStr');
     ticket.writeln(''.padLeft(32, '='));
