@@ -1,7 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Agregado para textInputAction
 import 'package:get/get.dart';
 import 'package:restaurapp/page/login/LoginController.dart';
-// import 'login_controller.dart'; // Importa el controller
 
 class LoginPage extends StatefulWidget {
   @override
@@ -9,19 +10,26 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
-  // Instancia del controller con tag único para evitar recreación
   late final LoginController controller;
   
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  // Agregados FocusNodes para mejor control del foco
+  final FocusNode _emailFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
+
   @override
   void initState() {
     super.initState();
-    // Inicializar controller con tag único para evitar duplicados
     controller = Get.put(LoginController(), tag: 'login_controller');
     _setupAnimations();
+    
+    // Configuración adicional para escritorio
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupDesktopOptimizations();
+    });
   }
 
   void _setupAnimations() {
@@ -49,10 +57,24 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     _animationController.forward();
   }
 
+  void _setupDesktopOptimizations() {
+    // Asegurar que el primer campo tenga foco en desktop
+    if (Theme.of(context).platform == TargetPlatform.macOS ||
+        Theme.of(context).platform == TargetPlatform.windows ||
+        Theme.of(context).platform == TargetPlatform.linux) {
+      Future.delayed(Duration(milliseconds: 100), () {
+        if (mounted) {
+          FocusScope.of(context).requestFocus(_emailFocusNode);
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
-    // No eliminar el controller aquí para evitar problemas
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -124,7 +146,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Icon(
-                                  Icons.person,
+                                  Icons.restaurant,
                                   size: 60,
                                   color: customColors[500],
                                 );
@@ -207,13 +229,26 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             key: controller.formKey,
                             child: Column(
                               children: [
-                                // Campo de email
+                                // Campo de email - MEJORADO
                                 TextFormField(
                                   controller: controller.emailController,
+                                  focusNode: _emailFocusNode,
                                   keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  autocorrect: false,
+                                  enableSuggestions: false,
+                                  autofillHints: [AutofillHints.email],
+                                  onFieldSubmitted: (_) {
+                                    FocusScope.of(context).requestFocus(_passwordFocusNode);
+                                  },
                                   decoration: InputDecoration(
                                     labelText: 'Correo electrónico',
+                                    hintText: 'ejemplo@correo.com',
                                     labelStyle: TextStyle(fontSize: isTablet ? 16 : 14),
+                                    hintStyle: TextStyle(
+                                      fontSize: isTablet ? 14 : 12,
+                                      color: Colors.grey[400],
+                                    ),
                                     prefixIcon: Icon(
                                       Icons.email_outlined,
                                       color: customColors[500],
@@ -223,9 +258,21 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: customColors[200]!),
                                     ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: customColors[200]!),
+                                    ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: customColors[500]!, width: 2),
+                                    ),
+                                    errorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.red, width: 1),
+                                    ),
+                                    focusedErrorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.red, width: 2),
                                     ),
                                     filled: true,
                                     fillColor: customColors[50]!.withOpacity(0.5),
@@ -240,13 +287,28 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                 
                                 SizedBox(height: isTablet ? 24 : 20),
                                 
-                                // Campo de contraseña
+                                // Campo de contraseña - MEJORADO
                                 Obx(() => TextFormField(
                                   controller: controller.passwordController,
+                                  focusNode: _passwordFocusNode,
                                   obscureText: controller.obscurePassword.value,
+                                  textInputAction: TextInputAction.done,
+                                  autocorrect: false,
+                                  enableSuggestions: false,
+                                  autofillHints: [AutofillHints.password],
+                                  onFieldSubmitted: (_) {
+                                    if (!controller.isLoading.value) {
+                                      controller.login();
+                                    }
+                                  },
                                   decoration: InputDecoration(
                                     labelText: 'Contraseña',
+                                    hintText: 'Ingresa tu contraseña',
                                     labelStyle: TextStyle(fontSize: isTablet ? 16 : 14),
+                                    hintStyle: TextStyle(
+                                      fontSize: isTablet ? 14 : 12,
+                                      color: Colors.grey[400],
+                                    ),
                                     prefixIcon: Icon(
                                       Icons.lock_outlined,
                                       color: customColors[500],
@@ -261,14 +323,29 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                         size: isTablet ? 24 : 20,
                                       ),
                                       onPressed: controller.togglePasswordVisibility,
+                                      tooltip: controller.obscurePassword.value 
+                                          ? 'Mostrar contraseña' 
+                                          : 'Ocultar contraseña',
                                     ),
                                     border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: customColors[200]!),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: customColors[200]!),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: BorderSide(color: customColors[500]!, width: 2),
+                                    ),
+                                    errorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.red, width: 1),
+                                    ),
+                                    focusedErrorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.red, width: 2),
                                     ),
                                     filled: true,
                                     fillColor: customColors[50]!.withOpacity(0.5),
@@ -283,24 +360,29 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                 
                                 SizedBox(height: isTablet ? 20 : 16),
                                 
-                                // ¿Olvidaste tu contraseña?
-                                
+                                // Enlace "¿Olvidaste tu contraseña?"
+                               
                                 
                                 SizedBox(height: isTablet ? 32 : 24),
                                 
-                                // Botón de iniciar sesión
+                                // Botón de iniciar sesión - MEJORADO
                                 Obx(() => SizedBox(
                                   width: double.infinity,
                                   height: isTablet ? 64 : 56,
                                   child: ElevatedButton(
-                                    onPressed: controller.isLoading.value ? null : controller.login,
+                                    onPressed: controller.isLoading.value ? null : () async {
+                                      // Ocultar teclado antes de enviar
+                                      FocusScope.of(context).unfocus();
+                                      await controller.login();
+                                    },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: customColors[500],
                                       foregroundColor: Colors.white,
+                                      disabledBackgroundColor: customColors[300],
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      elevation: 3,
+                                      elevation: controller.isLoading.value ? 0 : 3,
                                     ),
                                     child: controller.isLoading.value
                                         ? SizedBox(
@@ -320,10 +402,36 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                           ),
                                   ),
                                 )),
+                                
+                                // Información adicional para desarrollo/debug
+                                if (kDebugMode) ...[
+                                  SizedBox(height: 20),
+                                  Text(
+                                    'Plataforma: ${Theme.of(context).platform}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
                         ),
+                        
+                        SizedBox(height: 20),
+                        
+                        // Información de soporte en desktop
+                        if (isTablet) ...[
+                          Text(
+                            'Usa Tab para navegar entre campos',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: customColors[600]!.withOpacity(0.7),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ],
                     ),
                   ),

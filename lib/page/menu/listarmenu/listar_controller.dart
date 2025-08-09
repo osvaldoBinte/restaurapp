@@ -166,14 +166,7 @@ class ListarMenuController extends GetxController {
         
         print('✅ ${menus.length} menús cargados exitosamente');
       } else {
-        QuickAlert.show(
-          context: Get.context!,
-          type: QuickAlertType.warning,
-          title: 'Error al Cargar Menús',
-          text: 'No se pudieron obtener los menús (${response.statusCode})',
-          confirmBtnText: 'OK',
-          confirmBtnColor: Color(0xFFF39C12),
-        );
+       
       }
 
     } catch (e) {
