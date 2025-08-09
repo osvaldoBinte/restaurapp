@@ -160,14 +160,7 @@ class CategoryController extends GetxController {
         final List<dynamic> data = jsonDecode(response.body);
         categories.value = data.cast<Map<String, dynamic>>();
       } else {
-        QuickAlert.show(
-          context: Get.context!,
-          type: QuickAlertType.warning,
-          title: 'Error al Cargar',
-          text: 'No se pudieron obtener las categorías',
-          confirmBtnText: 'OK',
-          confirmBtnColor: Color(0xFFF39C12),
-        );
+       
       }
 
     } catch (e) {

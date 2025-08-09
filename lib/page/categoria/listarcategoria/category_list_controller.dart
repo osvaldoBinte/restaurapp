@@ -78,18 +78,6 @@ class CategoryListController extends GetxController {
 
         message.value = errorMessage;
         
-        QuickAlert.show(
-          context: Get.context!,
-          type: QuickAlertType.error,
-          title: 'Error al Cargar',
-          text: errorMessage,
-          confirmBtnText: 'Reintentar',
-          confirmBtnColor: Color(0xFFE74C3C),
-          onConfirmBtnTap: () {
-            Get.back();
-            listarCategorias();
-          },
-        );
       }
 
     } catch (e) {

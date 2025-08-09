@@ -212,14 +212,7 @@ class MenuController extends GetxController {
  void mostrarErrorCategorias(BuildContext context, String mensaje) {
     if (!context.mounted) return; // ✅ Verificar que el context esté activo
     
-    QuickAlert.show(
-      context: context, // ✅ Usar el context del widget
-      type: QuickAlertType.warning,
-      title: 'Error al Cargar Categorías',
-      text: mensaje,
-      confirmBtnText: 'OK',
-      confirmBtnColor: Color(0xFFF39C12),
-    );
+    
   }
   /// Método para establecer la categoría seleccionada - MEJORADO
   void setSelectedCategory(int? categoryId) {
