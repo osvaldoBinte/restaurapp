@@ -162,7 +162,7 @@ class DashboardController extends GetxController {
 
       ]);
     } catch (e) {
-      _showError('Error al cargar dashboard: $e');
+    //  _showError('Error al cargar dashboard: $e');
     } finally {
       isLoading.value = false;
     }
@@ -208,7 +208,7 @@ final controller3 = Get.find<CreateOrderController>();
       
     } catch (e) {
       print('Error al obtener estadísticas: $e');
-      _showError('Error al cargar estadísticas');
+     // _showError('Error al cargar estadísticas');
     } finally {
       isLoadingStats.value = false;
     }
@@ -238,7 +238,7 @@ final controller3 = Get.find<CreateOrderController>();
       
     } catch (e) {
       print('Error al obtener ventas semanales: $e');
-      _showError('Error al cargar gráfica de ventas');
+      //_showError('Error al cargar gráfica de ventas');
     } finally {
       isLoadingCharts.value = false;
     }
@@ -289,7 +289,7 @@ final controller3 = Get.find<CreateOrderController>();
       
     } catch (e) {
       print('Error al obtener productos populares: $e');
-      _showError('Error al cargar productos populares');
+    //  _showError('Error al cargar productos populares');
     }
   }
 
@@ -318,7 +318,7 @@ final controller3 = Get.find<CreateOrderController>();
       
     } catch (e) {
       print('Error al obtener órdenes recientes: $e');
-      _showError('Error al cargar órdenes recientes');
+     // _showError('Error al cargar órdenes recientes');
     } finally {
       isLoadingRecientes.value = false;
     }

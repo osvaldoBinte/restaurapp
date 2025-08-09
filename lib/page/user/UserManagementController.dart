@@ -149,12 +149,12 @@ Future<void> loadUsers() async {
       }
     } else {
       print('❌ Error HTTP: ${response.statusCode}');
-      _showError('Error al cargar usuarios (${response.statusCode})');
+     // _showError('Error al cargar usuarios (${response.statusCode})');
     }
 
   } catch (e) {
     print('❌ Error al cargar usuarios: $e');
-    _showError('Error de conexión al cargar usuarios');
+  //  _showError('Error de conexión al cargar usuarios');
   } finally {
     isLoading.value = false;
   }
