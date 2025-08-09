@@ -2,12 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
 import 'package:quickalert/quickalert.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:typed_data';
-import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -60,8 +56,6 @@ class MenuController extends GetxController {
   var isUpdating = false.obs;
   var categories = <Categoria>[].obs;
   var message = ''.obs;
-    var selectedImageBytes = Rxn<Uint8List>(); // Para web
-  var selectedImagePath = Rxn<String>(); // Para móvil/desktop
   
   // Variables observables para el formulario
   var selectedCategoryId = Rxn<int>();
@@ -138,7 +132,7 @@ class MenuController extends GetxController {
   }
 
   /// Método para obtener categorías disponibles - MEJORADO
-  Future<void> obtenerCategorias() async {
+  Future<void> obtenerCategorias({BuildContext? context}) async {
     try {
       isLoading.value = true;
       
@@ -185,13 +179,17 @@ class MenuController extends GetxController {
         _validarCategoriaSeleccionada();
         
       } else {
-        print('⚠️ Error al cargar categorías: ${response.statusCode}');
-        _mostrarErrorCategorias('No se pudieron obtener las categorías disponibles');
+         print('⚠️ Error al cargar categorías: ${response.statusCode}');
+        if (context?.mounted == true) {
+          mostrarErrorCategorias(context!, 'No se pudieron obtener las categorías disponibles');
+        }
       }
       
     } catch (e) {
       print('🚨 Error al obtener categorías: $e');
-      _mostrarErrorCategorias('No se pudo conectar para obtener las categorías');
+        if (context?.mounted == true) {
+        mostrarErrorCategorias(context!, 'No se pudo conectar para obtener las categorías');
+      }
     } finally {
       isLoading.value = false;
     }
@@ -211,9 +209,11 @@ class MenuController extends GetxController {
   }
 
   // ✅ NUEVO: Método auxiliar para mostrar errores de categorías
-  void _mostrarErrorCategorias(String mensaje) {
+ void mostrarErrorCategorias(BuildContext context, String mensaje) {
+    if (!context.mounted) return; // ✅ Verificar que el context esté activo
+    
     QuickAlert.show(
-      context: Get.context!,
+      context: context, // ✅ Usar el context del widget
       type: QuickAlertType.warning,
       title: 'Error al Cargar Categorías',
       text: mensaje,
@@ -221,7 +221,6 @@ class MenuController extends GetxController {
       confirmBtnColor: Color(0xFFF39C12),
     );
   }
-
   /// Método para establecer la categoría seleccionada - MEJORADO
   void setSelectedCategory(int? categoryId) {
     print('📋 Estableciendo categoría: $categoryId');
@@ -271,86 +270,88 @@ class MenuController extends GetxController {
     updatePreview();
   }
 
-  Future<bool> crearMenuConFilePicker({
+  /// Método para crear un nuevo menú
+  Future<bool> crearMenu({
     required String nombre,
     required String descripcion,
     required double precio,
     int? tiempoPreparacion,
+    File? imagenFile,
     required int categoriaId,
+        required BuildContext context, // ✅ Agregar context como parámetro
+
   }) async {
     try {
       isCreating.value = true;
+      message.value = '';
       
       Uri uri = Uri.parse('$defaultApiServer/menu/crearMenu/');
+      
+      print('🌐 Enviando POST a: $uri');
+      
       var request = http.MultipartRequest('POST', uri);
       
-      // Campos del formulario
       request.fields['nombre'] = nombre.trim();
       request.fields['descripcion'] = descripcion.trim();
       request.fields['precio'] = precio.toString();
       request.fields['tiempoPreparacion'] = (tiempoPreparacion ?? 0).toString();
       request.fields['categoriaId'] = categoriaId.toString();
       
-      // Manejar imagen según la plataforma
-      if (kIsWeb && selectedImageBytes.value != null) {
-        // Web: usar bytes
-        var multipartFile = http.MultipartFile.fromBytes(
-          'imagen',
-          selectedImageBytes.value!,
-          filename: selectedImagePath.value ?? 'imagen.jpg',
-        );
-        request.files.add(multipartFile);
-        print('📸 Imagen agregada (Web): ${selectedImagePath.value}');
-      } else if (!kIsWeb && selectedImagePath.value != null) {
-        // Móvil/Desktop: usar archivo
+      if (imagenFile != null) {
         var multipartFile = await http.MultipartFile.fromPath(
           'imagen',
-          selectedImagePath.value!,
+          imagenFile.path,
         );
         request.files.add(multipartFile);
-        print('📸 Imagen agregada (Nativo): ${selectedImagePath.value}');
+        print('📸 Imagen agregada: ${imagenFile.path}');
+      } else {
+        request.fields['imagen'] = "";
       }
+      
+      print('📝 Datos enviados como form-data (CREATE):');
+      print('   - nombre: "${request.fields['nombre']}"');
+      print('   - descripcion: "${request.fields['descripcion']}"');
+      print('   - precio: "${request.fields['precio']}"');
+      print('   - tiempoPreparacion: "${request.fields['tiempoPreparacion']}"');
+      print('   - categoriaId: "${request.fields['categoriaId']}"');
+      print('   - imagen: ${imagenFile != null ? "Archivo adjunto" : "Sin imagen"}');
       
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
       
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        _limpiarImagenSeleccionada();
-         QuickAlert.show(
-        context: Get.context!,
-        type: QuickAlertType.success,
-        title: '¡Éxito',
-        text: 'Menú "$nombre" creado correctamente',
-        confirmBtnText: 'OK',
-        confirmBtnColor: Color.fromARGB(255, 47, 197, 10),
-      );
+      print('📡 Código de respuesta: ${response.statusCode}');
+      print('📄 Respuesta del servidor: ${response.body}');
+      
+       if (response.statusCode == 200 || response.statusCode == 201) {
+        message.value = 'Menú creado exitosamente';
+        final controller2 = Get.find<CreateOrderController>();
+        controller2.cargarDatosIniciales();
+        
+        // ✅ VERIFICAR: Context antes de mostrar alert
+        if (context.mounted) {
+          QuickAlert.show(
+            context: context, // ✅ Usar context del widget
+            type: QuickAlertType.success,
+            title: '¡Éxito!',
+            text: 'Menú "$nombre" creado correctamente',
+            confirmBtnText: 'OK',
+            confirmBtnColor: Color(0xFF8B4513),
+            autoCloseDuration: Duration(seconds: 3),
+          );
+        }
+        
         return true;
+        
       } else {
-        return _handleErrorResponse(response, request);
+        return _handleErrorResponse(response, request, imagenFile, context);
       }
       
     } catch (e) {
-      return _handleException(e, 'crearMenu');
+      return _handleException(e, 'crearMenu',context);
     } finally {
       isCreating.value = false;
     }
   }
-
-  /// Limpiar imagen seleccionada
-  void _limpiarImagenSeleccionada() {
-    selectedImageBytes.value = null;
-    selectedImagePath.value = null;
-    updatePreview();
-  }
-
-  /// Obtener File para compatibilidad (solo móvil/desktop)
-  File? get selectedImageFile {
-    if (!kIsWeb && selectedImagePath.value != null) {
-      return File(selectedImagePath.value!);
-    }
-    return null;
-  }
-
 
   /// Método para actualizar un menú existente
   Future<bool> actualizarMenu({
@@ -361,6 +362,8 @@ class MenuController extends GetxController {
     int? tiempoPreparacion,
     File? imagenFile,
     required int categoriaId,
+        required BuildContext context, // ✅ Agregar context como parámetro
+
   }) async {
     try {
       isUpdating.value = true;
@@ -409,108 +412,104 @@ class MenuController extends GetxController {
       
       if (response.statusCode == 200 || response.statusCode == 201) {
         message.value = 'Menú actualizado exitosamente';
-        final CreateOrderController controller2 = Get.put(CreateOrderController());
+       final controller2 = Get.find<CreateOrderController>();
          controller2.cargarDatosIniciales();
-        QuickAlert.show(
-          context: Get.context!,
-          type: QuickAlertType.success,
-          title: '¡Éxito!',
-          text: 'Menú "$nombre" actualizado correctamente',
-          confirmBtnText: 'OK',
-          confirmBtnColor: Color(0xFF8B4513),
-          autoCloseDuration: Duration(seconds: 3),
-        );
-        
+        if (context.mounted) {
+          QuickAlert.show(
+            context: context, // ✅ Usar context del widget
+            type: QuickAlertType.success,
+            title: '¡Éxito!',
+            text: 'Menú "$nombre" actualizado correctamente',
+            confirmBtnText: 'OK',
+            confirmBtnColor: Color(0xFF8B4513),
+            autoCloseDuration: Duration(seconds: 3),
+          );
+        }
         return true;
         
       } else {
-        return _handleErrorResponse(response, request, imagenFile);
+        return _handleErrorResponse(response, request, imagenFile, context);
       }
       
     } catch (e) {
-      return _handleException(e, 'actualizarMenu');
+      return _handleException(e, 'actualizarMenu', context);
     } finally {
       isUpdating.value = false;
     }
   }
 
   /// Método unificado para manejar errores de respuesta
-  bool _handleErrorResponse(http.Response response, http.MultipartRequest request, [File? imagenFile]) {
-  if (response.statusCode == 400) {
-    String errorMessage = 'Error en los datos enviados';
-    
-    try {
-      final errorData = jsonDecode(response.body);
-      if (errorData is String) {
-        errorMessage = errorData;
-      } else {
-        errorMessage = errorData['message'] ?? errorData['error'] ?? 'Todos los campos son obligatorios';
+  bool _handleErrorResponse(http.Response response, http.MultipartRequest request, File? imagenFile,BuildContext context, ) {
+        if (!context.mounted) return false; // ✅ Verificar context
+
+    if (response.statusCode == 400) {
+      String errorMessage = 'Error en los datos enviados';
+      
+      try {
+        final errorData = jsonDecode(response.body);
+        if (errorData is String) {
+          errorMessage = errorData;
+        } else {
+          errorMessage = errorData['message'] ?? errorData['error'] ?? 'Todos los campos son obligatorios';
+        }
+      } catch (e) {
+        errorMessage = response.body.replaceAll('"', '');
       }
-    } catch (e) {
-      errorMessage = response.body.replaceAll('"', '');
-    }
-    
-    message.value = errorMessage;
-    
-    // 🔧 CORREGIDO: Determinar estado de imagen según file_picker
-    String imagenEstado;
-    if (kIsWeb) {
-      imagenEstado = selectedImageBytes.value != null ? "Imagen web adjunta (${selectedImagePath.value})" : "Sin imagen";
+      
+      message.value = errorMessage;
+      
+     QuickAlert.show(
+        context: context, // ✅ Usar context del widget
+        type: QuickAlertType.error,
+        title: 'Error de Validación (400)',
+        text: '$errorMessage\n\nDatos enviados como form-data:\n'
+              '• nombre: "${request.fields['nombre']}"\n'
+              '• descripcion: "${request.fields['descripcion']}"\n'
+              '• precio: "${request.fields['precio']}"\n'
+              '• tiempoPreparacion: "${request.fields['tiempoPreparacion']}"\n'
+              '• categoriaId: "${request.fields['categoriaId']}"\n'
+              '• imagen: ${imagenFile != null ? "Archivo adjunto" : "Sin imagen"}',
+        confirmBtnText: 'Revisar',
+        confirmBtnColor: Color(0xFFE74C3C),
+      );
+      
+      return false;
+      
     } else {
-      imagenEstado = selectedImagePath.value != null ? "Archivo adjunto (${selectedImagePath.value})" : "Sin imagen";
+      String errorMessage = 'Error del servidor (${response.statusCode})';
+      
+      try {
+        final errorData = jsonDecode(response.body);
+        errorMessage = errorData['message'] ?? errorData['error'] ?? errorMessage;
+      } catch (e) {
+        errorMessage = 'Error: ${response.reasonPhrase}';
+      }
+      
+      message.value = errorMessage;
+      
+        QuickAlert.show(
+        context: context, // ✅ Usar context del widget
+        type: QuickAlertType.error,
+        title: 'Error del Servidor',
+        text: 'Error del servidor',
+        confirmBtnText: 'OK',
+        confirmBtnColor: Color(0xFFE74C3C),
+      );
+      return false;
     }
-    
-    QuickAlert.show(
-      context: Get.context!,
-      type: QuickAlertType.error,
-      title: 'Error de Validación (400)',
-      text: '$errorMessage\n\nDatos enviados como form-data:\n'
-            '• nombre: "${request.fields['nombre']}"\n'
-            '• descripcion: "${request.fields['descripcion']}"\n'
-            '• precio: "${request.fields['precio']}"\n'
-            '• tiempoPreparacion: "${request.fields['tiempoPreparacion']}"\n'
-            '• categoriaId: "${request.fields['categoriaId']}"\n'
-            '• imagen: $imagenEstado',
-      confirmBtnText: 'Revisar',
-      confirmBtnColor: Color(0xFFE74C3C),
-    );
-    
-    return false;
-    
-  } else {
-    String errorMessage = 'Error del servidor (${response.statusCode})';
-    
-    try {
-      final errorData = jsonDecode(response.body);
-      errorMessage = errorData['message'] ?? errorData['error'] ?? errorMessage;
-    } catch (e) {
-      errorMessage = 'Error: ${response.reasonPhrase}';
-    }
-    
-    message.value = errorMessage;
-    
-    QuickAlert.show(
-      context: Get.context!,
-      type: QuickAlertType.error,
-      title: 'Error del Servidor',
-      text: errorMessage,
-      confirmBtnText: 'OK',
-      confirmBtnColor: Color(0xFFE74C3C),
-    );
-    
-    return false;
   }
-}
 
   /// Método unificado para manejar excepciones
-  bool _handleException(dynamic e, String methodName) {
+   bool _handleException(dynamic e, String methodName, BuildContext context) {
+    if (!context.mounted) return false; // ✅ Verificar context
+    
     String errorMessage = 'Error de conexión: ${e.toString()}';
     message.value = errorMessage;
     
     print('🚨 Error en $methodName: $e');
     
     QuickAlert.show(
-      context: Get.context!,
+      context: context, // ✅ Usar context del widget
       type: QuickAlertType.error,
       title: 'Error de Conexión',
       text: 'No se pudo conectar al servidor.\nVerifica tu conexión a internet.',
@@ -527,10 +526,13 @@ class MenuController extends GetxController {
     required String descripcion,
     required String precio,
     required int? categoriaId,
+    required BuildContext context, // ✅ Agregar context
   }) {
+    if (!context.mounted) return false; // ✅ Verificar context
+    
     if (nombre.isEmpty) {
       QuickAlert.show(
-        context: Get.context!,
+        context: context, // ✅ Usar context del widget
         type: QuickAlertType.warning,
         title: 'Campo Requerido',
         text: 'El nombre del menú es requerido',
@@ -542,7 +544,7 @@ class MenuController extends GetxController {
     
     if (descripcion.isEmpty) {
       QuickAlert.show(
-        context: Get.context!,
+        context: context,
         type: QuickAlertType.warning,
         title: 'Campo Requerido',
         text: 'La descripción es requerida',
@@ -554,7 +556,7 @@ class MenuController extends GetxController {
     
     if (precio.isEmpty) {
       QuickAlert.show(
-        context: Get.context!,
+        context: context,
         type: QuickAlertType.warning,
         title: 'Campo Requerido',
         text: 'El precio es requerido',
@@ -567,7 +569,7 @@ class MenuController extends GetxController {
     final precioValue = double.tryParse(precio);
     if (precioValue == null || precioValue <= 0) {
       QuickAlert.show(
-        context: Get.context!,
+        context: context,
         type: QuickAlertType.warning,
         title: 'Precio Inválido',
         text: 'Ingresa un precio válido mayor a 0',
@@ -579,7 +581,7 @@ class MenuController extends GetxController {
     
     if (categoriaId == null) {
       QuickAlert.show(
-        context: Get.context!,
+        context: context,
         type: QuickAlertType.warning,
         title: 'Categoría Requerida',
         text: 'Selecciona una categoría para el menú',
@@ -593,53 +595,55 @@ class MenuController extends GetxController {
   }
 
   /// Método conveniente que combina validación y creación/actualización
-  Future<bool> guardarMenuConValidacion({
-  required String nombre,
-  required String descripcion,
-  required String precio,
-  String? tiempoPreparacion,
-  File? imagenFile,
-  required int? categoriaId,
-}) async {
-  if (!validarDatos(
-    nombre: nombre,
-    descripcion: descripcion,
-    precio: precio,
-    categoriaId: categoriaId,
-  )) {
-    return false;
-  }
-  
-  final precioValue = double.parse(precio);
-  final tiempoValue = tiempoPreparacion?.isNotEmpty == true 
-      ? int.tryParse(tiempoPreparacion!) 
-      : null;
-  
-  if (isEditMode.value && editingMenuId.value != null) {
-    // Modo actualización
-    return await actualizarMenu(
-      menuId: editingMenuId.value!,
+   Future<bool> guardarMenuConValidacion({
+    required String nombre,
+    required String descripcion,
+    required String precio,
+    String? tiempoPreparacion,
+    File? imagenFile,
+    required int? categoriaId,
+    required BuildContext context, // ✅ Agregar context
+  }) async {
+    if (!validarDatos(
       nombre: nombre,
       descripcion: descripcion,
-      precio: precioValue,
-      tiempoPreparacion: tiempoValue,
-      imagenFile: imagenFile,
-      categoriaId: categoriaId!,
-    );
-  } else {
-    // 🔧 CAMBIAR ESTA LÍNEA:
-    // return await crearMenu(  // ❌ Este método no existe
-    return await crearMenuConFilePicker(  // ✅ Este sí existe
-      nombre: nombre,
-      descripcion: descripcion,
-      precio: precioValue,
-      tiempoPreparacion: tiempoValue,
-      // imagenFile: imagenFile,  // ❌ Este parámetro no existe en crearMenuConFilePicker
-      categoriaId: categoriaId!,
-    );
+      precio: precio,
+      categoriaId: categoriaId,
+      context: context, // ✅ Pasar context
+    )) {
+      return false;
+    }
+    
+    final precioValue = double.parse(precio);
+    final tiempoValue = tiempoPreparacion?.isNotEmpty == true 
+        ? int.tryParse(tiempoPreparacion!) 
+        : null;
+    
+    if (isEditMode.value && editingMenuId.value != null) {
+      // Modo actualización
+      return await actualizarMenu(
+        menuId: editingMenuId.value!,
+        nombre: nombre,
+        descripcion: descripcion,
+        precio: precioValue,
+        tiempoPreparacion: tiempoValue,
+        imagenFile: imagenFile,
+        categoriaId: categoriaId!,
+        context: context, // ✅ Pasar context
+      );
+    } else {
+      // Modo creación
+      return await crearMenu(
+        nombre: nombre,
+        descripcion: descripcion,
+        precio: precioValue,
+        tiempoPreparacion: tiempoValue,
+        imagenFile: imagenFile,
+        categoriaId: categoriaId!,
+        context: context, // ✅ Pasar context
+      );
+    }
   }
-}
-
 
   /// Método legacy para mantener compatibilidad
   Future<bool> crearMenuConValidacion({
@@ -649,6 +653,7 @@ class MenuController extends GetxController {
     String? tiempoPreparacion,
     File? imagenFile,
     required int? categoriaId,
+    required BuildContext context, // ✅ Agregar context
   }) async {
     return await guardarMenuConValidacion(
       nombre: nombre,
@@ -657,142 +662,132 @@ class MenuController extends GetxController {
       tiempoPreparacion: tiempoPreparacion,
       imagenFile: imagenFile,
       categoriaId: categoriaId,
+      context: context, // ✅ Usar context de GetX
     );
   }
 
-  /// Método para seleccionar imagen desde la galería
-  Future<void> seleccionarImagen() async {
+  Future<File?> seleccionarImagenGaleria(BuildContext context) async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-        withData: kIsWeb, // Solo cargar bytes en web
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
       );
-
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        
-        if (kIsWeb) {
-          // Para web: usar bytes
-          selectedImageBytes.value = file.bytes;
-          selectedImagePath.value = file.name;
-          print('✅ Imagen seleccionada (Web): ${file.name}');
-        } else {
-          // Para móvil/desktop: usar path
-          selectedImagePath.value = file.path;
-          selectedImageBytes.value = null;
-          print('✅ Imagen seleccionada (Nativo): ${file.path}');
-        }
-        
-        updatePreview();
+      
+      if (image != null) {
+        return File(image.path);
       }
+      return null;
     } catch (e) {
-      print('❌ Error al seleccionar imagen: $e');
-       QuickAlert.show(
-        context: Get.context!,
-        type: QuickAlertType.error,
-        title: 'Error',
-        text: 'No se pudo seleccionar la imagen',
-        confirmBtnText: 'OK',
-        confirmBtnColor: Color(0xFFE74C3C),
-      );
+      print('Error al seleccionar imagen: $e');
+      if (context.mounted) {
+        QuickAlert.show(
+          context: context,
+          type: QuickAlertType.error,
+          title: 'Error',
+          text: 'No se pudo seleccionar la imagen',
+          confirmBtnText: 'OK',
+          confirmBtnColor: Color(0xFFE74C3C),
+        );
+      }
+      return null;
     }
   }
 
-  /// Método para tomar foto con la cámara
-void mostrarOpcionesImagen() {
-  QuickAlert.show(
-    context: Get.context!,
-    type: QuickAlertType.custom,
-    title: 'Seleccionar Imagen',
-    text: '¿Cómo quieres agregar la imagen?',
-    widget: Column(
-      children: [
-        SizedBox(height: 20),
-        
-        // 🔧 OPCIÓN 1: Solo galería/archivos (RECOMENDADA para file_picker)
-        ElevatedButton.icon(
-          onPressed: () async {
-            Get.back();
-            await seleccionarImagen(); // 🔧 Ya no retorna nada, maneja internamente
-          },
-          icon: Icon(Icons.photo_library),
-          label: Text('Seleccionar desde Galería/Archivos'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF8B4513),
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            minimumSize: Size(double.infinity, 48),
-          ),
-        ),
-        
-        // 🔧 OPCIONAL: Mantener cámara solo para móviles
-        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ...[
-          SizedBox(height: 12),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Get.back();
-              final image = await tomarFotoCamara();
-              if (image != null) {
-                // 🔧 CORREGIDO: Actualizar las variables correctas
-                if (kIsWeb) {
-                  // En web, convertir File a bytes (aunque no debería llegar aquí)
-                  final bytes = await image.readAsBytes();
-                  selectedImageBytes.value = bytes;
-                  selectedImagePath.value = image.path.split('/').last;
-                } else {
-                  // En móvil, usar el path
-                  selectedImagePath.value = image.path;
-                  selectedImageBytes.value = null;
-                }
-                updatePreview();
-              }
-            },
-            icon: Icon(Icons.camera_alt),
-            label: Text('Tomar Foto'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF3498DB),
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              minimumSize: Size(double.infinity, 48),
-            ),
+   Future<File?> tomarFotoCamara(BuildContext context) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        return File(image.path);
+      }
+      return null;
+    } catch (e) {
+      print('Error al tomar foto: $e');
+      if (context.mounted) {
+        QuickAlert.show(
+          context: context,
+          type: QuickAlertType.error,
+          title: 'Error',
+          text: 'No se pudo tomar la foto',
+          confirmBtnText: 'OK',
+          confirmBtnColor: Color(0xFFE74C3C),
+        );
+      }
+      return null;
+    }
+  }
+
+  /// Método actualizado para mostrar opciones de imagen
+   void mostrarOpcionesImagen(BuildContext context) {
+    if (!context.mounted) return; // ✅ Verificar context
+    
+    QuickAlert.show(
+      context: context, // ✅ Usar context del widget
+      type: QuickAlertType.custom,
+      title: 'Seleccionar Imagen',
+      text: '¿Cómo quieres agregar la imagen?',
+      widget: Column(
+        children: [
+          SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Get.back();
+                    final image = await seleccionarImagenGaleria(context);
+                    if (image != null) {
+                      selectedImage.value = image;
+                      updatePreview();
+                    }
+                  },
+                  icon: Icon(Icons.photo_library),
+                  label: Text('Galería'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF8B4513),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Get.back();
+                    final image = await tomarFotoCamara(context);
+                    if (image != null) {
+                      selectedImage.value = image;
+                      updatePreview();
+                    }
+                  },
+                  icon: Icon(Icons.camera_alt),
+                  label: Text('Cámara'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF3498DB),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
-      ],
-    ),
-    confirmBtnText: 'Cancelar',
-    confirmBtnColor: Colors.grey,
-  );
-}
-Future<File?> tomarFotoCamara() async {
-  try {
-    // ⚠️ NOTA: Necesitas mantener image_picker para la cámara
-    // o usar una alternativa como camera plugin
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(
-      source: ImageSource.camera,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
+      ),
+      confirmBtnText: 'Cancelar',
+      confirmBtnColor: Colors.grey,
     );
-    
-    if (image != null) {
-      return File(image.path);
-    }
-    return null;
-  } catch (e) {
-    print('Error al tomar foto: $e');
-    QuickAlert.show(
-      context: Get.context!,
-      type: QuickAlertType.error,
-      title: 'Error',
-      text: 'No se pudo tomar la foto: $e',
-      confirmBtnText: 'OK',
-      confirmBtnColor: Color(0xFFE74C3C),
-    );
-    return null;
   }
-}
+
   /// Getters para el estado de loading
   bool get isProcessing => isCreating.value || isUpdating.value;
   

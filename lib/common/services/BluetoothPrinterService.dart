@@ -1,25 +1,4 @@
-// pubspec.yaml - Agregar estas dependencias:
-/*
-dependencies:
-  flutter:
-    sdk: flutter
-  
-  # Para móvil (Android/iOS)
-  flutter_bluetooth_serial: ^0.4.0
-  esc_pos_utils: ^1.1.0
-  image: ^3.0.2
-  
-  # Para desktop (Windows/Mac/Linux)
-  win32: ^5.0.0  # Solo Windows
-  ffi: ^2.0.1
-  path: ^1.8.0
-  
-  # Detección de plataforma
-  universal_io: ^2.2.0
-  
-  # Para impresión por red (IP)
-  ping_discover_network: ^0.1.1
-*/
+// ✅ CÓDIGO CORREGIDO para detectar tu impresora POS-58 en Windows
 
 import 'dart:io';
 import 'dart:typed_data';
@@ -33,10 +12,6 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
     if (dart.library.html) 'package:restaurapp/stubs/bluetooth_stub.dart';
 import 'package:esc_pos_utils/esc_pos_utils.dart';
 
-// Imports para desktop
-import 'package:ffi/ffi.dart' if (dart.library.html) 'package:restaurapp/stubs/ffi_stub.dart';
-import 'package:win32/win32.dart' if (dart.library.html) 'package:restaurapp/stubs/win32_stub.dart';
-
 class UniversalPrinterService {
   // Variables para móvil
   BluetoothConnection? bluetoothConnection;
@@ -49,8 +24,6 @@ class UniversalPrinterService {
   // Detectar plataforma
   bool get isMobile => Platform.isAndroid || Platform.isIOS;
   bool get isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
-  
-  // ===== FUNCIONES PÚBLICAS =====
   
   /// Conectar automáticamente a impresora según plataforma
   Future<bool> conectarImpresoraAutomaticamente() async {
@@ -194,26 +167,35 @@ class UniversalPrinterService {
     }
   }
   
-  // ===== FUNCIONES DESKTOP (USB/SERIAL/RED) =====
+  // ===== FUNCIONES DESKTOP CORREGIDAS =====
   
   Future<bool> _conectarImpresoraDesktop() async {
     try {
       List<String> impresoras = await _obtenerImpresorasDesktop();
+      
+      print('🖨️ Impresoras encontradas: $impresoras');
       
       if (impresoras.isEmpty) {
         print('❌ No se encontraron impresoras en desktop');
         return false;
       }
       
-      // Buscar impresora POS o térmica
+      // ✅ MEJORADO: Buscar específicamente tu impresora POS-58
       String? impresoraPOS;
       for (String impresora in impresoras) {
         final nombreLower = impresora.toLowerCase();
-        if (nombreLower.contains('pos') || 
+        print('🔍 Analizando impresora: $impresora');
+        
+        if (nombreLower.contains('pos-58') || 
+            nombreLower.contains('pos 58') ||
+            nombreLower.contains('pos58') ||
+            nombreLower.contains('pos') || 
             nombreLower.contains('thermal') ||
             nombreLower.contains('receipt') ||
-            nombreLower.contains('ticket')) {
+            nombreLower.contains('ticket') ||
+            nombreLower.contains('series')) {
           impresoraPOS = impresora;
+          print('✅ Impresora POS encontrada: $impresora');
           break;
         }
       }
@@ -249,30 +231,123 @@ class UniversalPrinterService {
     return impresoras;
   }
   
-  // WINDOWS - Usando Win32 API
+  // ✅ WINDOWS CORREGIDO - Múltiples métodos para detectar impresoras
   Future<List<String>> _obtenerImpresorasWindows() async {
     List<String> impresoras = [];
     
     try {
       if (Platform.isWindows) {
-        // Usar comando PowerShell para obtener impresoras
-        ProcessResult result = await Process.run(
-          'powershell',
-          ['-Command', 'Get-Printer | Select-Object -ExpandProperty Name'],
-          runInShell: true,
-        );
+        print('🔍 Buscando impresoras en Windows...');
         
-        if (result.exitCode == 0) {
-          String output = result.stdout.toString();
-          impresoras = output.split('\n')
-              .map((s) => s.trim())
-              .where((s) => s.isNotEmpty)
-              .toList();
+        // ✅ MÉTODO 1: PowerShell Get-Printer (más confiable)
+        try {
+          ProcessResult result = await Process.run(
+            'powershell',
+            ['-Command', 'Get-Printer | Select-Object -ExpandProperty Name'],
+            runInShell: true,
+          );
+          
+          print('📡 Resultado PowerShell Get-Printer: ${result.stdout}');
+          print('📡 Código de salida: ${result.exitCode}');
+          
+          if (result.exitCode == 0) {
+            String output = result.stdout.toString();
+            List<String> printers = output.split('\n')
+                .map((s) => s.trim())
+                .where((s) => s.isNotEmpty)
+                .toList();
+            
+            impresoras.addAll(printers);
+            print('✅ Impresoras encontradas con Get-Printer: $printers');
+          }
+        } catch (e) {
+          print('❌ Error con Get-Printer: $e');
+        }
+        
+        // ✅ MÉTODO 2: WMI (Windows Management Instrumentation)
+        if (impresoras.isEmpty) {
+          try {
+            ProcessResult result = await Process.run(
+              'wmic',
+              ['printer', 'get', 'name', '/format:list'],
+              runInShell: true,
+            );
+            
+            print('📡 Resultado WMIC: ${result.stdout}');
+            
+            if (result.exitCode == 0) {
+              String output = result.stdout.toString();
+              RegExp regex = RegExp(r'Name=(.+)');
+              Iterable<RegExpMatch> matches = regex.allMatches(output);
+              
+              List<String> printers = matches
+                  .map((match) => match.group(1)!.trim())
+                  .where((name) => name.isNotEmpty && name != 'Name=')
+                  .toList();
+              
+              impresoras.addAll(printers);
+              print('✅ Impresoras encontradas con WMIC: $printers');
+            }
+          } catch (e) {
+            print('❌ Error con WMIC: $e');
+          }
+        }
+        
+        // ✅ MÉTODO 3: Comando simple print /? para verificar
+        if (impresoras.isEmpty) {
+          try {
+            ProcessResult result = await Process.run(
+              'cmd',
+              ['/c', 'wmic printer get name /value'],
+              runInShell: true,
+            );
+            
+            print('📡 Resultado CMD: ${result.stdout}');
+            
+            if (result.exitCode == 0) {
+              String output = result.stdout.toString();
+              List<String> lines = output.split('\n');
+              
+              for (String line in lines) {
+                if (line.startsWith('Name=') && line.length > 5) {
+                  String printerName = line.substring(5).trim();
+                  if (printerName.isNotEmpty) {
+                    impresoras.add(printerName);
+                  }
+                }
+              }
+              print('✅ Impresoras encontradas con CMD: $impresoras');
+            }
+          } catch (e) {
+            print('❌ Error con CMD: $e');
+          }
+        }
+        
+        // ✅ MÉTODO 4: Agregar manualmente la POS-58 si no se detecta
+        if (impresoras.isEmpty) {
+          print('⚠️ No se detectaron impresoras automáticamente');
+          print('🔧 Agregando impresoras comunes de POS...');
+          
+          // Agregar nombres comunes de impresoras POS
+          List<String> impresorasComunes = [
+            'POS-58 Series Printer',
+            'POS-80 Series Printer', 
+            'Thermal Printer',
+            'Receipt Printer',
+            'Generic / Text Only',
+          ];
+          
+          impresoras.addAll(impresorasComunes);
+          print('✅ Impresoras agregadas manualmente: $impresorasComunes');
         }
       }
     } catch (e) {
       print('❌ Error Windows impresoras: $e');
     }
+    
+    // Eliminar duplicados
+    impresoras = impresoras.toSet().toList();
+    print('🖨️ Lista final de impresoras Windows: $impresoras');
     
     return impresoras;
   }
@@ -341,15 +416,22 @@ class UniversalPrinterService {
     }
 
     try {
-      // Generar contenido del ticket en texto plano para desktop
-      String contenidoTicket = _generarTicketTextoPlano(pedido, total);
+      print('🖨️ Iniciando impresión en: $selectedPrinterName');
       
-      if (Platform.isWindows) {
-        await _imprimirWindows(contenidoTicket);
-      } else if (Platform.isMacOS) {
-        await _imprimirMac(contenidoTicket);
-      } else if (Platform.isLinux) {
-        await _imprimirLinux(contenidoTicket);
+      // ✅ NUEVO: Para impresoras POS, usar comandos ESC/POS en lugar de texto plano
+      if (_esPimpresotaPOS(selectedPrinterName!)) {
+        await _imprimirPOSDesktop(pedido, total);
+      } else {
+        // Generar contenido del ticket en texto plano para impresoras normales
+        String contenidoTicket = _generarTicketTextoPlano(pedido, total);
+        
+        if (Platform.isWindows) {
+          await _imprimirWindows(contenidoTicket);
+        } else if (Platform.isMacOS) {
+          await _imprimirMac(contenidoTicket);
+        } else if (Platform.isLinux) {
+          await _imprimirLinux(contenidoTicket);
+        }
       }
       
       print('✅ Ticket desktop impreso correctamente');
@@ -360,19 +442,87 @@ class UniversalPrinterService {
     }
   }
   
+  // ✅ NUEVA FUNCIÓN: Detectar si es impresora POS
+  bool _esPimpresotaPOS(String nombreImpresora) {
+    final nombre = nombreImpresora.toLowerCase();
+    return nombre.contains('pos') || 
+           nombre.contains('thermal') ||
+           nombre.contains('receipt') ||
+           nombre.contains('ticket') ||
+           nombre.contains('series');
+  }
+  
+  // ✅ NUEVA FUNCIÓN: Imprimir en impresora POS desde desktop
+  Future<void> _imprimirPOSDesktop(Map<String, dynamic> pedido, double total) async {
+    try {
+      // Generar comandos ESC/POS como bytes
+      final profile = await CapabilityProfile.load();
+      final generator = Generator(PaperSize.mm58, profile);
+      List<int> bytes = _generarComandosESCPOS(generator, pedido, total);
+      
+      // Crear archivo temporal con comandos ESC/POS
+      final tempDir = Directory.systemTemp;
+      final tempFile = File('${tempDir.path}/ticket_pos_${DateTime.now().millisecondsSinceEpoch}.bin');
+      await tempFile.writeAsBytes(bytes);
+      
+      if (Platform.isWindows) {
+        // Enviar archivo binario directamente a la impresora
+        ProcessResult result = await Process.run(
+          'copy',
+          ['/B', tempFile.path, selectedPrinterName!],
+          runInShell: true,
+        );
+        
+        print('📡 Resultado copy: ${result.exitCode}');
+        print('📡 Salida: ${result.stdout}');
+        print('📡 Error: ${result.stderr}');
+        
+        if (result.exitCode != 0) {
+          // Método alternativo: usar print command
+          ProcessResult result2 = await Process.run(
+            'print',
+            ['/D:$selectedPrinterName', tempFile.path],
+            runInShell: true,
+          );
+          
+          if (result2.exitCode != 0) {
+            throw Exception('Error imprimiendo POS: ${result2.stderr}');
+          }
+        }
+      }
+      
+      // Limpiar archivo temporal
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+      
+    } catch (e) {
+      print('❌ Error impresión POS desktop: $e');
+      rethrow;
+    }
+  }
+  
   Future<void> _imprimirWindows(String contenido) async {
     try {
+      print('🖨️ Imprimiendo en Windows con: $selectedPrinterName');
+      
       // Crear archivo temporal
       final tempDir = Directory.systemTemp;
       final tempFile = File('${tempDir.path}/ticket_${DateTime.now().millisecondsSinceEpoch}.txt');
       await tempFile.writeAsString(contenido, encoding: utf8);
       
-      // Imprimir usando comando print de Windows
+      print('📄 Archivo temporal creado: ${tempFile.path}');
+      
+      // ✅ MÉTODO MEJORADO: Usar comando print de Windows
       ProcessResult result = await Process.run(
         'print',
-        ['/D:$selectedPrinterName', tempFile.path],
+        ['/D:"$selectedPrinterName"', tempFile.path],
         runInShell: true,
       );
+      
+      print('📡 Resultado print: ${result.exitCode}');
+      print('📡 Salida: ${result.stdout}');
+      print('📡 Error: ${result.stderr}');
       
       // Limpiar archivo temporal
       if (await tempFile.exists()) {
@@ -449,7 +599,7 @@ class UniversalPrinterService {
   
   // ===== FUNCIONES AUXILIARES =====
   
-  /// Generar comandos ESC/POS para impresoras térmicas móviles
+  /// Generar comandos ESC/POS para impresoras térmicas
   List<int> _generarComandosESCPOS(Generator generator, Map<String, dynamic> pedido, double total) {
     List<int> bytes = [];
     
@@ -515,7 +665,7 @@ class UniversalPrinterService {
     // Total
     bytes += generator.text('--------------------------------');
     bytes += generator.row([
-      PosColumn(text: 'SUBTOTAL:', width: 8, 
+      PosColumn(text: 'TOTAL:', width: 8, 
           styles: PosStyles(bold: true, height: PosTextSize.size2)),
       PosColumn(text: '\$${subtotal.toStringAsFixed(2)}', width: 4, 
           styles: PosStyles(align: PosAlign.right, bold: true, height: PosTextSize.size2)),
@@ -531,7 +681,7 @@ class UniversalPrinterService {
     return bytes;
   }
   
-  /// Generar ticket en texto plano para impresoras desktop
+  /// Generar ticket en texto plano para impresoras normales
   String _generarTicketTextoPlano(Map<String, dynamic> pedido, double total) {
     StringBuffer ticket = StringBuffer();
     
@@ -590,7 +740,7 @@ class UniversalPrinterService {
     
     // Total
     ticket.writeln(''.padLeft(32, '-'));
-    ticket.writeln('SUBTOTAL:               \$${subtotal.toStringAsFixed(2)}');
+    ticket.writeln('TOTAL:                  \$${subtotal.toStringAsFixed(2)}');
     ticket.writeln(''.padLeft(32, '='));
     ticket.writeln('');
     ticket.writeln('      ¡Gracias por su visita!');

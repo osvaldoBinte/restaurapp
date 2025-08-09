@@ -3,8 +3,8 @@ import 'package:get/get.dart';
 import 'package:restaurapp/page/table/table_controller.dart';
 
 class TablesScreen extends StatelessWidget {
-  final TablesController controller = Get.put(TablesController());
 
+        final controller = Get.find<TablesController>();
   @override
   Widget build(BuildContext context) {
     return Scaffold(

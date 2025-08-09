@@ -143,8 +143,7 @@ class CategoryListController extends GetxController {
         categories.removeWhere((categoria) => categoria['id'] == id);
         
         message.value = 'Categoría eliminada exitosamente';
-        
-          final OrdersController controller3 = Get.put(OrdersController());
+        final controller3 = Get.find<OrdersController>();
           controller3.cargarDatos();
         QuickAlert.show(
           context: Get.context!,

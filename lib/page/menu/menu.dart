@@ -9,6 +9,7 @@ import 'package:quickalert/quickalert.dart';
 import 'dart:convert';
 
 import 'package:restaurapp/common/constants/constants.dart';
+import 'package:restaurapp/common/widgets/base64.dart';
 import 'package:restaurapp/page/menu/menu_controller.dart';
 // ✅ MODIFICACIÓN 1: Cambiar CreateEditMenuScreen a StatefulWidget
 class CreateEditMenuScreen extends StatefulWidget {
@@ -399,43 +400,32 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
           ),
         );
       } else if (menuController.currentImageUrl.value != null && 
-                 menuController.currentImageUrl.value!.isNotEmpty) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            '${AppConstants.serverBase}${menuController.currentImageUrl.value}',
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                      : null,
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.broken_image,
-                    size: 48,
-                    color: Colors.grey[400],
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Error al cargar imagen',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                ],
-              );
-            },
+         menuController.currentImageUrl.value!.isNotEmpty) {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(12),
+    child: Base64ImageperfilWidget(
+      base64String: menuController.currentImageUrl.value,
+      width: double.infinity, // O el ancho que necesites
+      height: 200, // O la altura que necesites
+      fit: BoxFit.cover,
+      errorWidget: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.broken_image,
+            size: 48,
+            color: Colors.grey[400],
           ),
-        );
-      } else {
+          SizedBox(height: 8),
+          Text(
+            'Error al cargar imagen',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    ),
+  );
+}else {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -472,7 +462,7 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
       children: [
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => menuController.mostrarOpcionesImagen(),
+            onPressed: () => menuController.mostrarOpcionesImagen(context),
             icon: Obx(() => Icon(
               menuController.selectedImage.value != null || 
               (menuController.currentImageUrl.value?.isNotEmpty == true)
@@ -820,7 +810,7 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     menuController.clearForm();
   }
 
-  void _saveMenu() async {
+void _saveMenu() async {
     if (_formKey.currentState!.validate() && menuController.selectedCategoryId.value != null) {
       final success = await menuController.guardarMenuConValidacion(
         nombre: _nameController.text.trim(),
@@ -829,26 +819,21 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
         tiempoPreparacion: _timeController.text.trim(),
         imagenFile: menuController.selectedImage.value,
         categoriaId: menuController.selectedCategoryId.value,
+        context: context, // ✅ Pasar context del widget
       );
       
-      // Si fue exitoso y estamos en modo creación, limpiar el formulario
       if (success && !menuController.isEditMode.value) {
-        if (widget.isModal) {
-          // Si es modal, cerrar con resultado exitoso
-          Navigator.pop(Get.context!, true);
-        } else {
-          // Si es pantalla completa, limpiar formulario
+        if (!widget.isModal) {
           _clearForm();
         }
       }
       
-      // Si fue exitoso y estamos en modo edición, regresar a la pantalla anterior
       if (success && menuController.isEditMode.value) {
-        Navigator.pop(Get.context!, true); // true indica que se actualizó
+       
       }
     } else if (menuController.selectedCategoryId.value == null) {
       QuickAlert.show(
-        context: Get.context!,
+        context: context, // ✅ Usar context del widget
         type: QuickAlertType.warning,
         title: 'Categoría Requerida',
         text: 'Por favor selecciona una categoría',
@@ -857,4 +842,5 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
       );
     }
   }
+
 }

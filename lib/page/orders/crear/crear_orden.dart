@@ -2,10 +2,11 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:restaurapp/common/widgets/base64.dart';
 import 'package:restaurapp/page/orders/crear/crear_orden_controller.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
 class OrderScreen extends StatelessWidget {
-  final CreateOrderController controller = Get.put(CreateOrderController());
+  final controller = Get.find<CreateOrderController>();
 
   @override
   Widget build(BuildContext context) {
@@ -79,8 +80,7 @@ class OrderScreen extends StatelessWidget {
             )
           : SizedBox.shrink()),
     );
-  }
-Widget _buildTableSelection() {
+  }Widget _buildTableSelection() {
   return Container(
     padding: EdgeInsets.all(16),
     color: Colors.white,
@@ -125,6 +125,20 @@ Widget _buildTableSelection() {
               );
             }
 
+            // ✅ SOLUCIÓN: Ordenar las mesas ascendentemente
+            List<Mesa> mesasOrdenadas = List<Mesa>.from(controller.mesas);
+            mesasOrdenadas.sort((a, b) {
+              // Primero intentamos comparar como números
+              try {
+                int numeroA = int.parse(a.numeroMesa.toString());
+                int numeroB = int.parse(b.numeroMesa.toString());
+                return numeroA.compareTo(numeroB);
+              } catch (e) {
+                // Si no son números, comparamos como strings
+                return a.numeroMesa.toString().compareTo(b.numeroMesa.toString());
+              }
+            });
+
             return Container(
               padding: EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
@@ -140,7 +154,8 @@ Widget _buildTableSelection() {
                     maxLines: 1,
                   ),
                   isExpanded: true,
-                  items: controller.mesas
+                  // ✅ CAMBIO: Usar la lista ordenada en lugar de controller.mesas
+                  items: mesasOrdenadas
                       .map((mesa) => DropdownMenuItem<Mesa?>(
                             value: mesa,
                             child: Text(
@@ -164,6 +179,8 @@ Widget _buildTableSelection() {
     ),
   );
 }
+
+
 Widget _buildCategoriesSection() {
   return Container(
     height: 80,
@@ -186,70 +203,102 @@ Widget _buildCategoriesSection() {
         );
       }
 
-      // ✅ SOLUCIÓN: ScrollConfiguration para desktop
       return ScrollConfiguration(
         behavior: ScrollConfiguration.of(Get.context!).copyWith(
           dragDevices: {
-            PointerDeviceKind.touch,    // Táctil (móvil)
-            PointerDeviceKind.mouse,    // Mouse (desktop)
-            PointerDeviceKind.trackpad, // Trackpad (laptop)
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.trackpad,
           },
-          scrollbars: false, // Sin scrollbar para categorías (más limpio)
+          scrollbars: false,
         ),
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          physics: BouncingScrollPhysics(), // ✅ AGREGADO: Scroll suave
+          physics: BouncingScrollPhysics(),
           padding: EdgeInsets.symmetric(horizontal: 8),
           itemCount: controller.categorias.length,
           itemBuilder: (context, index) {
             final categoria = controller.categorias[index];
-            final isSelected = controller.selectedCategoryIndex.value == index;
             
-            return GestureDetector(
-              onTap: () => controller.cambiarCategoria(index),
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: 4),
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? Color(0xFF8B4513) : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      _getCategoryIcon(categoria.nombreCategoria),
-                      color: isSelected ? Colors.white : Color(0xFF8B4513),
-                      size: 18,
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      categoria.nombreCategoria,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Color(0xFF8B4513),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
+            // ✅ SOLUCIÓN: Usar un Obx separado para cada item
+            return Obx(() {
+              final isSelected = controller.selectedCategoryIndex.value == index;
+              
+              return GestureDetector(
+                onTap: () {
+                  print('📱 Categoría seleccionada: $index'); // Debug
+                  controller.cambiarCategoria(index);
+                },
+                child: AnimatedContainer(
+                  // ✅ AGREGADO: AnimatedContainer para transiciones suaves
+                  duration: Duration(milliseconds: 200),
+                  margin: EdgeInsets.symmetric(horizontal: 4),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Color(0xFF8B4513) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    // ✅ MEJORADO: Sombra más visible para el estado seleccionado
+                    boxShadow: [
+                      BoxShadow(
+                        color: isSelected ? Colors.black26 : Colors.black12,
+                        blurRadius: isSelected ? 6 : 4,
+                        offset: Offset(0, isSelected ? 3 : 2),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    ],
+                    // ✅ AGREGADO: Borde para mejor definición
+                    border: Border.all(
+                      color: isSelected ? Color(0xFF8B4513) : Colors.grey[300]!,
+                      width: isSelected ? 2 : 1,
                     ),
-                  ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedSwitcher(
+                        // ✅ AGREGADO: Animación para el ícono
+                        duration: Duration(milliseconds: 200),
+                        child: Icon(
+                          _getCategoryIcon(categoria.nombreCategoria),
+                          key: ValueKey('icon_${isSelected}_$index'),
+                          color: isSelected ? Colors.white : Color(0xFF8B4513),
+                          size: 18,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      AnimatedDefaultTextStyle(
+                        // ✅ AGREGADO: Animación para el texto
+                        duration: Duration(milliseconds: 200),
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Color(0xFF8B4513),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                        child: Text(
+                          categoria.nombreCategoria,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
+              );
+            });
           },
         ),
       );
     }),
   );
 }
+
+// ✅ MÉTODO ADICIONAL: Para verificar el estado del controlador
+void _debugCategorySelection() {
+  print('🔍 Estado actual del controlador:');
+  print('   - selectedCategoryIndex: ${controller.selectedCategoryIndex.value}');
+  print('   - Total categorías: ${controller.categorias.length}');
+  print('   - Categorías: ${controller.categorias.map((c) => c.nombreCategoria).join(', ')}');
+}
+
   Widget _buildMenuItems() {
     return Obx(() {
       if (controller.isLoadingProducts.value) {
@@ -304,105 +353,133 @@ Widget _buildCategoriesSection() {
   }
 
   Widget _buildMenuItem(Producto producto) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 12),
-      elevation: 3,
-      shape: RoundedRectangleBorder(
+  return Card(
+    margin: EdgeInsets.only(bottom: 12),
+    elevation: 3,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            colors: [Colors.white, Color(0xFFFAF9F8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+        gradient: LinearGradient(
+          colors: [Colors.white, Color(0xFFFAF9F8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Row(
-          children: [
-            // Product image/emoji
-            Container(
+      ),
+      child: Row(
+        children: [
+          // Product image - MODIFICADO para usar Base64ImageperfilWidget
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
               width: 60,
               height: 60,
-              decoration: BoxDecoration(
-                color: Color(0xFF8B4513).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  _getProductEmoji(producto.categoria),
-                  style: TextStyle(fontSize: 28),
+              child: producto.imagen != null && producto.imagen!.isNotEmpty
+                  ? Base64ImageperfilWidget(
+                      base64String: producto.imagen,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorWidget: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Color(0xFF8B4513).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _getProductEmoji(producto.categoria),
+                            style: TextStyle(fontSize: 28),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Color(0xFF8B4513).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          _getProductEmoji(producto.categoria),
+                          style: TextStyle(fontSize: 28),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          SizedBox(width: 16),
+          
+          // Product details - SIN CAMBIOS
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  producto.nombre,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3E1F08),
+                  ),
                 ),
-              ),
-            ),
-            SizedBox(width: 16),
-            
-            // Product details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                if (producto.descripcion.isNotEmpty) ...[
+                  SizedBox(height: 2),
                   Text(
-                    producto.nombre,
+                    producto.descripcion,
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF3E1F08),
+                      fontSize: 12,
+                      color: Colors.grey[600],
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  if (producto.descripcion.isNotEmpty) ...[
-                    SizedBox(height: 2),
-                    Text(
-                      producto.descripcion,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  SizedBox(height: 4),
-                  Text(
-                    '\$${producto.precioDouble.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF8B4513),
-                    ),
-                  ),
-                  if (producto.tiempoPreparacion > 0) ...[
-                    SizedBox(height: 2),
-                    Text(
-                      '⏱️ ${producto.tiempoPreparacion} min',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
                 ],
-              ),
+                SizedBox(height: 4),
+                Text(
+                  '\$${producto.precioDouble.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8B4513),
+                  ),
+                ),
+                if (producto.tiempoPreparacion > 0) ...[
+                  SizedBox(height: 2),
+                  Text(
+                    '⏱️ ${producto.tiempoPreparacion} min',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ],
             ),
-            
-            // Add to cart button
-            Container(
-              decoration: BoxDecoration(
-                color: Color(0xFF8B4513),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: IconButton(
-                onPressed: () => _showAddToCartDialog(producto),
-                icon: Icon(Icons.add, color: Colors.white),
-              ),
+          ),
+          
+          // Add to cart button - SIN CAMBIOS
+          Container(
+            decoration: BoxDecoration(
+              color: Color(0xFF8B4513),
+              borderRadius: BorderRadius.circular(8),
             ),
-          ],
-        ),
+            child: IconButton(
+              onPressed: () => _showAddToCartDialog(producto),
+              icon: Icon(Icons.add, color: Colors.white),
+            ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 void _showAddToCartDialog(Producto producto) {
   final TextEditingController observacionesController = TextEditingController();
   
@@ -644,7 +721,7 @@ void _showCart() {
                       TextButton(
                         onPressed: () {
                           controller.limpiarCarrito();
-                          final OrdersController controller2 = Get.put(OrdersController());
+                         final controller2 = Get.find<OrdersController>();
                           controller2.cargarDatos();
                           Get.back();
                         },
@@ -689,59 +766,73 @@ void _showCart() {
                 SizedBox(height: 8),
                 
                 // Dropdown de mesa en el modal
-                Obx(() {
-                  if (controller.isLoadingMesas.value) {
-                    return Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: Color(0xFF8B4513)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text('Cargando mesas...'),
-                    );
-                  }
+             Obx(() {
+  if (controller.isLoadingMesas.value) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Color(0xFF8B4513)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text('Cargando mesas...'),
+    );
+  }
 
-                  return Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Color(0xFF8B4513)),
-                      borderRadius: BorderRadius.circular(8),
+  // ✅ SOLUCIÓN: Ordenar las mesas ascendentemente
+  List<Mesa> mesasOrdenadas = List<Mesa>.from(controller.mesas);
+  mesasOrdenadas.sort((a, b) {
+    // Primero intentamos comparar como números
+    try {
+      int numeroA = int.parse(a.numeroMesa.toString());
+      int numeroB = int.parse(b.numeroMesa.toString());
+      return numeroA.compareTo(numeroB);
+    } catch (e) {
+      // Si no son números, comparamos como strings
+      return a.numeroMesa.toString().compareTo(b.numeroMesa.toString());
+    }
+  });
+
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: 12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: Color(0xFF8B4513)),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<Mesa?>(
+        value: controller.selectedMesa.value,
+        hint: Text(
+          'Seleccionar mesa para esta orden',
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
+          ),
+        ),
+        isExpanded: true,
+        // ✅ CAMBIO: Usar la lista ordenada en lugar de controller.mesas
+        items: mesasOrdenadas
+            .map((mesa) => DropdownMenuItem<Mesa?>(
+                  value: mesa,
+                  child: Text(
+                    'Mesa ${mesa.numeroMesa}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<Mesa?>(
-                        value: controller.selectedMesa.value,
-                        hint: Text(
-                          'Seleccionar mesa para esta orden',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                        isExpanded: true,
-                        items: controller.mesas
-                            .map((mesa) => DropdownMenuItem<Mesa?>(
-                                  value: mesa,
-                                  child: Text(
-                                    'Mesa ${mesa.numeroMesa}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ))
-                            .toList(),
-                        onChanged: (mesa) {
-                          if (mesa != null) {
-                            controller.seleccionarMesa(mesa);
-                          }
-                        },
-                      ),
-                    ),
-                  );
-                }),
-                
+                  ),
+                ))
+            .toList(),
+        onChanged: (mesa) {
+          if (mesa != null) {
+            controller.seleccionarMesa(mesa);
+          }
+        },
+      ),
+    ),
+  );
+}),
                 // ✅ NUEVO: Mensaje de advertencia si no hay mesa seleccionada
                 Obx(() => controller.selectedMesa.value == null
                     ? Container(

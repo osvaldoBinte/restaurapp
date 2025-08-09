@@ -169,16 +169,16 @@ class DashboardController extends GetxController {
   }
  Future<void> recargardatos() async {
    //categorias
-  final CategoryListController controller = Get.put(CategoryListController());
+ final controller = Get.find<CategoryListController>();
   controller.listarCategorias();
   //menus
     final controller2 = Get.find<ListarMenuController>();
         controller2.refrescarLista();
+final controller3 = Get.find<CreateOrderController>();
 
-   final CreateOrderController controller3 = Get.find<CreateOrderController>();
         await controller3.cargarDatosIniciales();
         //messas
-          final TablesController controller4 = Get.put(TablesController());
+        final controller4 = Get.find<TablesController>();
           controller4.listarMesas();
 
   }

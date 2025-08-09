@@ -214,8 +214,7 @@ class ListarMenuController extends GetxController {
         // Eliminar de la lista local
         menus.removeWhere((menu) => menu.id == menuId);
         filtrarMenus();
-        
-          final OrdersController controller3 = Get.put(OrdersController());
+        final controller3 = Get.find<OrdersController>();
           controller3.cargarDatos();
         QuickAlert.show(
           context: Get.context!,
@@ -320,8 +319,7 @@ class ListarTodoMenuPage extends StatelessWidget {
   }
 
   Widget _buildEmbeddedVersion() {
-    final ListarMenuController controller = Get.put(ListarMenuController());
-    
+     final controller = Get.find<ListarMenuController>();
     return Column(
       children: [
         // Header compacto con búsqueda
@@ -379,8 +377,8 @@ class ListarTodoMenuPage extends StatelessWidget {
   }
 
   Widget _buildFullScreenVersion() {
-    final ListarMenuController controller = Get.put(ListarMenuController());
     
+    final controller = Get.find<ListarMenuController>();
     return Scaffold(
       backgroundColor: Color(0xFFF5F2F0),
       appBar: AppBar(
@@ -1035,7 +1033,7 @@ class ListarTodoMenuPage extends StatelessWidget {
 
   // Modal para crear menú
   void _showCreateMenuModal() {
-      final CreateOrderController controller2 = Get.put(CreateOrderController());
+   final controller2 = Get.find<CreateOrderController>();
     showDialog(
       context: Get.context!,
       barrierDismissible: false,
@@ -1090,8 +1088,7 @@ class ListarTodoMenuPage extends StatelessWidget {
         final controller = Get.find<ListarMenuController>();
         controller2.cargarDatosIniciales();
         controller.refrescarLista();
-
-          final OrdersController controller3 = Get.put(OrdersController());
+final controller3 = Get.find<OrdersController>();
           controller3.cargarDatos();
         if (onMenuUpdated != null) {
           onMenuUpdated!();
@@ -1182,7 +1179,7 @@ class ListarTodoMenuPage extends StatelessWidget {
         final controller = Get.find<ListarMenuController>();
         controller.refrescarLista();
 
-          final OrdersController controller3 = Get.put(OrdersController());
+          final controller3 = Get.find<OrdersController>();
           controller3.cargarDatos();
         if (onMenuUpdated != null) {
           onMenuUpdated!();

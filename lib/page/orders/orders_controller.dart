@@ -7,6 +7,7 @@ import 'dart:async'; // ✅ AGREGADO: Import para Timer
 
 import 'package:restaurapp/common/constants/constants.dart';
 import 'package:restaurapp/page/orders/OrderStatusModal.dart';
+import 'package:restaurapp/page/orders/TableDetailsModal.dart';
 import 'package:restaurapp/page/orders/orders_page.dart';
 
 // Controller GetX para órdenes - ACTUALIZADO CON AUTO-REFRESH

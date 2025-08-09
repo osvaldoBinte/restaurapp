@@ -1,3 +1,4 @@
+// add_products_to_order_controller.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -7,7 +8,7 @@ import 'dart:convert';
 import 'package:restaurapp/common/constants/constants.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
 
-// Modelos para las entidades
+// Reutilizar las clases existentes
 class Category {
   final int id;
   final String nombreCategoria;
@@ -26,26 +27,6 @@ class Category {
       id: json['id'] ?? 0,
       nombreCategoria: json['nombreCategoria'] ?? '',
       descripcion: json['descripcion'] ?? '',
-      status: json['status'] ?? false,
-    );
-  }
-}
-
-class Mesa {
-  final int id;
-  final int numeroMesa;
-  final bool status;
-
-  Mesa({
-    required this.id,
-    required this.numeroMesa,
-    required this.status,
-  });
-
-  factory Mesa.fromJson(Map<String, dynamic> json) {
-    return Mesa(
-      id: json['id'] ?? 0,
-      numeroMesa: json['numeroMesa'] ?? 0,
       status: json['status'] ?? false,
     );
   }
@@ -75,17 +56,15 @@ class Producto {
       id: json['id'] ?? 0,
       nombre: json['nombre'] ?? '',
       descripcion: json['descripcion'] ?? '',
-      precio: json['precio']?.toString() ?? '0', // ✅ Convertir a string si no lo es
+      precio: json['precio']?.toString() ?? '0',
       tiempoPreparacion: json['tiempoPreparacion'] ?? 0,
-      imagen: json['imagen']?.toString() ?? '', // ✅ Manejar null y convertir a string
-      categoria: json['categoria']?.toString() ?? '', // ✅ Manejar null
+      imagen: json['imagen']?.toString() ?? '',
+      categoria: json['categoria']?.toString() ?? '',
     );
   }
 
   double get precioDouble => double.tryParse(precio) ?? 0.0;
-  
   bool get tieneImagen => imagen.isNotEmpty;
-  
   String get imagenSegura => imagen.isEmpty ? 'assets/images/no-image.png' : imagen;
 }
 
@@ -106,44 +85,61 @@ class CartItem {
     return {
       'productoId': producto.id,
       'cantidad': cantidad,
-      'observaciones': observaciones.isEmpty ? '' : observaciones, // ✅ Asegurar que no sea null
+      'observaciones': observaciones.isEmpty ? '' : observaciones,
     };
   }
 }
 
-// Controller GetX para crear órdenes
-class CreateOrderController extends GetxController {
+// ✅ NUEVO CONTROLLER PARA AGREGAR PRODUCTOS A PEDIDO EXISTENTE
+class AddProductsToOrderController extends GetxController {
+  // Variables observables
   var isLoading = false.obs;
   var isLoadingCategories = false.obs;
   var isLoadingProducts = false.obs;
-  var isLoadingMesas = false.obs;
-  var isCreatingOrder = false.obs;
+  var isAddingProducts = false.obs;
 
+  // Datos del pedido actual
+  var pedidoId = 0.obs;
+  var numeromesa = 0.obs;
+  var nombreOrden = ''.obs;
+
+  // Listas de datos
   var categorias = <Category>[].obs;
-  var mesas = <Mesa>[].obs;
   var todosLosProductos = <Producto>[].obs;
   var productosPorCategoria = <Producto>[].obs;
   var cartItems = <CartItem>[].obs;
 
+  // Índice de categoría seleccionada
   var selectedCategoryIndex = 0.obs;
-  var selectedMesa = Rx<Mesa?>(null);
-  var nombreOrden = ''.obs;
 
   String defaultApiServer = AppConstants.serverBase;
+
+  // ✅ Inicializar con el ID del pedido
+  void inicializarConPedido(int pedidoIdParam, int numeroMesaParam, String nombreOrdenParam) {
+    pedidoId.value = pedidoIdParam;
+    numeromesa.value = numeroMesaParam;
+    nombreOrden.value = nombreOrdenParam;
+    cartItems.clear(); // Limpiar carrito al cambiar de pedido
+    cargarDatosIniciales();
+  }
 
   @override
   void onInit() {
     super.onInit();
-    cargarDatosIniciales();
+    // No cargar datos automáticamente - esperar a que se llame inicializarConPedido
   }
 
-  /// Cargar todos los datos necesarios al inicializar
+  /// Cargar todos los datos necesarios
   Future<void> cargarDatosIniciales() async {
+    if (pedidoId.value == 0) {
+      print('⚠️ No se puede cargar datos sin pedidoId');
+      return;
+    }
+
     isLoading.value = true;
     try {
       await Future.wait([
         obtenerCategorias(),
-        obtenerMesas(),
         obtenerTodosLosProductos(),
       ]);
       
@@ -153,7 +149,7 @@ class CreateOrderController extends GetxController {
       }
     } catch (e) {
       print('❌ Error en cargarDatosIniciales: $e');
-      _mostrarError('Error de Inicialización', 'No se pudieron cargar los datos iniciales: $e');
+      _mostrarError('Error de Inicialización', 'No se pudieron cargar los datos: $e');
     } finally {
       isLoading.value = false;
     }
@@ -172,22 +168,19 @@ class CreateOrderController extends GetxController {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-      ).timeout(Duration(seconds: 30)); // ✅ Agregar timeout
+      ).timeout(Duration(seconds: 30));
 
       print('📡 Categorías - Código: ${response.statusCode}');
-      print('📄 Respuesta: ${response.body}');
 
       if (response.statusCode == 200) {
-        // ✅ Verificar que la respuesta no esté vacía
         if (response.body.isEmpty) {
           throw Exception('Respuesta vacía del servidor');
         }
         
         final dynamic decodedData = jsonDecode(response.body);
         
-        // ✅ Verificar que sea una lista
         if (decodedData is! List) {
-          throw Exception('Formato de respuesta inválido - esperaba una lista');
+          throw Exception('Formato de respuesta inválido');
         }
         
         final List<dynamic> data = decodedData;
@@ -196,11 +189,11 @@ class CreateOrderController extends GetxController {
               try {
                 return Category.fromJson(json);
               } catch (e) {
-                print('⚠️ Error al parsear categoría: $json - Error: $e');
+                print('⚠️ Error al parsear categoría: $e');
                 return null;
               }
             })
-            .where((cat) => cat != null && cat.status) // Solo categorías activas y válidas
+            .where((cat) => cat != null && cat.status)
             .cast<Category>()
             .toList();
       } else {
@@ -214,62 +207,7 @@ class CreateOrderController extends GetxController {
     }
   }
 
-  /// Obtener todas las mesas
-  Future<void> obtenerMesas() async {
-    try {
-      isLoadingMesas.value = true;
-      
-      Uri uri = Uri.parse('$defaultApiServer/mesas/listarMesas/');
-      
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(Duration(seconds: 30)); // ✅ Agregar timeout
-
-      print('📡 Mesas - Código: ${response.statusCode}');
-      print('📄 Respuesta: ${response.body}');
-
-      if (response.statusCode == 200) {
-        // ✅ Verificar que la respuesta no esté vacía
-        if (response.body.isEmpty) {
-          throw Exception('Respuesta vacía del servidor');
-        }
-        
-        final dynamic decodedData = jsonDecode(response.body);
-        
-        // ✅ Verificar que sea una lista
-        if (decodedData is! List) {
-          throw Exception('Formato de respuesta inválido - esperaba una lista');
-        }
-        
-        final List<dynamic> data = decodedData;
-        mesas.value = data
-            .map((json) {
-              try {
-                return Mesa.fromJson(json);
-              } catch (e) {
-                print('⚠️ Error al parsear mesa: $json - Error: $e');
-                return null;
-              }
-            })
-            .where((mesa) => mesa != null && mesa.status) // Solo mesas activas y válidas
-            .cast<Mesa>()
-            .toList();
-      } else {
-        throw Exception('Error del servidor: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('❌ Error al obtener mesas: $e');
-      _mostrarError('Error al cargar mesas', 'No se pudieron cargar las mesas: $e');
-    } finally {
-      isLoadingMesas.value = false;
-    }
-  }
-
-  /// Obtener todo el menú - 🔧 CORREGIDO para manejar null
+  /// Obtener todo el menú
   Future<void> obtenerTodosLosProductos() async {
     try {
       isLoadingProducts.value = true;
@@ -282,54 +220,50 @@ class CreateOrderController extends GetxController {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-      ).timeout(Duration(seconds: 30)); // ✅ Agregar timeout
+      ).timeout(Duration(seconds: 30));
 
       print('📡 Todo el menú - Código: ${response.statusCode}');
-      print('📄 Respuesta: ${response.body}');
 
       if (response.statusCode == 200) {
-        // ✅ Verificar que la respuesta no esté vacía
         if (response.body.isEmpty) {
           throw Exception('Respuesta vacía del servidor');
         }
         
         final dynamic decodedData = jsonDecode(response.body);
         
-        // ✅ Verificar que sea una lista
         if (decodedData is! List) {
-          throw Exception('Formato de respuesta inválido - esperaba una lista');
+          throw Exception('Formato de respuesta inválido');
         }
         
         final List<dynamic> data = decodedData;
         
-        // 🔧 SOLUCIÓN: Filtrar y manejar productos con campos null
         todosLosProductos.value = data
             .map((json) {
               try {
                 return Producto.fromJson(json);
               } catch (e) {
-                print('⚠️ Error al parsear producto: $json - Error: $e');
-                return null; // Retornar null si hay error en el parsing
+                print('⚠️ Error al parsear producto: $e');
+                return null;
               }
             })
-            .where((producto) => producto != null) // Filtrar productos null
-            .cast<Producto>() // Cast seguro después del filtrado
+            .where((producto) => producto != null)
+            .cast<Producto>()
             .toList();
             
-        print('✅ Productos cargados correctamente: ${todosLosProductos.length}');
+        print('✅ Productos cargados: ${todosLosProductos.length}');
         
       } else {
         throw Exception('Error del servidor: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error al obtener todo el menú: $e');
+      print('❌ Error al obtener menú: $e');
       _mostrarError('Error al cargar menú', 'No se pudo cargar el menú: $e');
     } finally {
       isLoadingProducts.value = false;
     }
   }
 
-  /// Obtener productos por categoría - 🔧 CORREGIDO para manejar null
+  /// Obtener productos por categoría
   Future<void> obtenerProductosPorCategoria(int categoriaId) async {
     try {
       isLoadingProducts.value = true;
@@ -342,33 +276,29 @@ class CreateOrderController extends GetxController {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-      ).timeout(Duration(seconds: 30)); // ✅ Agregar timeout
+      ).timeout(Duration(seconds: 30));
 
       print('📡 Productos por categoría $categoriaId - Código: ${response.statusCode}');
-      print('📄 Respuesta: ${response.body}');
 
       if (response.statusCode == 200) {
-        // ✅ Verificar que la respuesta no esté vacía
         if (response.body.isEmpty) {
           throw Exception('Respuesta vacía del servidor');
         }
         
         final dynamic decodedData = jsonDecode(response.body);
         
-        // ✅ Verificar que sea una lista
         if (decodedData is! List) {
-          throw Exception('Formato de respuesta inválido - esperaba una lista');
+          throw Exception('Formato de respuesta inválido');
         }
         
         final List<dynamic> data = decodedData;
         
-        // 🔧 SOLUCIÓN: Mismo manejo de null que en obtenerTodosLosProductos
         productosPorCategoria.value = data
             .map((json) {
               try {
                 return Producto.fromJson(json);
               } catch (e) {
-                print('⚠️ Error al parsear producto por categoría: $json - Error: $e');
+                print('⚠️ Error al parsear producto por categoría: $e');
                 return null;
               }
             })
@@ -377,19 +307,18 @@ class CreateOrderController extends GetxController {
             .toList();
             
       } else {
-        // Si falla, usar productos de esa categoría del listado completo
+        // Fallback: filtrar del listado completo
         _filtrarProductosPorCategoria(categoriaId);
       }
     } catch (e) {
       print('❌ Error al obtener productos por categoría: $e');
-      // Si falla, usar productos de esa categoría del listado completo
       _filtrarProductosPorCategoria(categoriaId);
     } finally {
       isLoadingProducts.value = false;
     }
   }
 
-  /// Filtrar productos por categoría del listado completo (fallback)
+  /// Filtrar productos por categoría (fallback)
   void _filtrarProductosPorCategoria(int categoriaId) {
     try {
       final categoria = categorias.firstWhereOrNull((cat) => cat.id == categoriaId);
@@ -419,16 +348,8 @@ class CreateOrderController extends GetxController {
     }
   }
 
-  /// Seleccionar mesa
-  void seleccionarMesa(Mesa? mesa) {
-    try {
-      selectedMesa.value = mesa;
-    } catch (e) {
-      print('❌ Error en seleccionarMesa: $e');
-    }
-  }
-
-  void agregarAlCarrito(Producto producto, {String observaciones = '', bool cerrarDialog = false}) {
+  /// Agregar producto al carrito temporal
+  void agregarAlCarrito(Producto producto, {String observaciones = ''}) {
     try {
       final existingItemIndex = cartItems.indexWhere(
         (item) => item.producto.id == producto.id && item.observaciones == observaciones
@@ -444,17 +365,14 @@ class CreateOrderController extends GetxController {
         ));
       }
 
-      // Cerrar dialog si se especifica
-      if (cerrarDialog && Get.isDialogOpen == true) {
-        Get.back();
-      }
+      print('✅ Producto agregado al carrito: ${producto.nombre}');
     } catch (e) {
       print('❌ Error en agregarAlCarrito: $e');
       _mostrarError('Error', 'No se pudo agregar el producto al carrito');
     }
   }
 
-  /// Aumentar cantidad de un item en el carrito
+  /// Aumentar cantidad de un item
   void aumentarCantidad(int index) {
     try {
       if (index < cartItems.length && index >= 0) {
@@ -466,7 +384,7 @@ class CreateOrderController extends GetxController {
     }
   }
 
-  /// Disminuir cantidad de un item en el carrito
+  /// Disminuir cantidad de un item
   void disminuirCantidad(int index) {
     try {
       if (index < cartItems.length && index >= 0) {
@@ -482,23 +400,10 @@ class CreateOrderController extends GetxController {
     }
   }
 
-  /// Remover item del carrito
-  void removerDelCarrito(int index) {
-    try {
-      if (index < cartItems.length && index >= 0) {
-        cartItems.removeAt(index);
-      }
-    } catch (e) {
-      print('❌ Error en removerDelCarrito: $e');
-    }
-  }
-
   /// Limpiar carrito
   void limpiarCarrito() {
     try {
       cartItems.clear();
-      nombreOrden.value = '';
-      selectedMesa.value = null;
     } catch (e) {
       print('❌ Error en limpiarCarrito: $e');
     }
@@ -514,36 +419,14 @@ class CreateOrderController extends GetxController {
     }
   }
 
-  /// Obtener cantidad total de items en el carrito
-  int get cantidadTotalItems {
+  /// ✅ FUNCIÓN PRINCIPAL: Agregar productos al pedido existente
+  Future<bool> agregarProductosAPedido() async {
     try {
-      return cartItems.fold(0, (sum, item) => sum + item.cantidad);
-    } catch (e) {
-      print('❌ Error en cantidadTotalItems: $e');
-      return 0;
-    }
-  }
-
-  /// Generar nombre de orden por defecto
-  String _generarNombreOrdenPorDefecto() {
-    try {
-      final now = DateTime.now();
-      return 'Orden Mesa ${selectedMesa.value?.numeroMesa ?? 'Sin Mesa'}';
-    } catch (e) {
-      print('❌ Error en _generarNombreOrdenPorDefecto: $e');
-      return 'Orden Sin Nombre';
-    }
-  }
-
-  // ✅ FUNCIÓN PRINCIPAL CORREGIDA
-  Future<bool> crearOrden({String? nombreOrdenCustom}) async {
-    try {
-      // ✅ Validaciones mejoradas
-      if (selectedMesa.value == null) {
+      if (pedidoId.value == 0) {
         await _mostrarAlertaAsync(
           QuickAlertType.warning,
-          'Mesa requerida',
-          'Por favor selecciona una mesa antes de continuar',
+          'Error de configuración',
+          'ID de pedido no válido',
           'Entendido',
           Color(0xFFFF9800),
         );
@@ -554,55 +437,25 @@ class CreateOrderController extends GetxController {
         await _mostrarAlertaAsync(
           QuickAlertType.warning,
           'Carrito vacío',
-          'Agrega productos al carrito antes de crear la orden',
+          'Agrega productos antes de continuar',
           'Entendido',
           Color(0xFFFF9800),
         );
         return false;
       }
 
-      isCreatingOrder.value = true;
+      isAddingProducts.value = true;
 
-      // ✅ Manejo seguro del nombre
-      String nombreFinal;
-      try {
-        nombreFinal = (nombreOrdenCustom?.isNotEmpty == true) 
-            ? nombreOrdenCustom! 
-            : _generarNombreOrdenPorDefecto();
-      } catch (e) {
-        print('⚠️ Error generando nombre, usando por defecto');
-        nombreFinal = 'Orden ${DateTime.now().millisecondsSinceEpoch}';
-      }
-
-      // ✅ Construcción segura del orderData
-      final orderData = <String, dynamic>{
-        'nombreOrden': nombreFinal,
-        'mesaId': selectedMesa.value!.id,
-        'productos': cartItems.map((item) {
-          try {
-            return item.toJson();
-          } catch (e) {
-            print('⚠️ Error serializando item: $e');
-            // Versión manual como fallback
-            return {
-              'productoId': item.producto.id,
-              'cantidad': item.cantidad,
-              'observaciones': item.observaciones ?? '',
-            };
-          }
-        }).toList(),
-        'status': 'proceso',
+      // ✅ Construir el JSON según tu especificación
+      final requestData = {
+        'pedidoId': pedidoId.value,
+        'productos': cartItems.map((item) => item.toJson()).toList(),
       };
 
-      print('📤 Creando orden: ${jsonEncode(orderData)}');
+      print('📤 Agregando productos al pedido: ${jsonEncode(requestData)}');
 
-      // ✅ Validar URL del servidor
-      if (defaultApiServer.isEmpty) {
-        throw Exception('URL del servidor no configurada');
-      }
-
-      Uri uri = Uri.parse('$defaultApiServer/ordenes/crearOrden/');
-      print('📡 URL de creación: $uri');
+      Uri uri = Uri.parse('$defaultApiServer/ordenes/agregarProductosAPedido/');
+      print('📡 URL: $uri');
 
       final response = await http.post(
         uri,
@@ -610,36 +463,28 @@ class CreateOrderController extends GetxController {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: jsonEncode(orderData),
-      ).timeout(Duration(seconds: 30)); // ✅ Timeout
+        body: jsonEncode(requestData),
+      ).timeout(Duration(seconds: 30));
 
-      print('📡 Crear orden - Código: ${response.statusCode}');
+      print('📡 Agregar productos - Código: ${response.statusCode}');
       print('📄 Respuesta: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // ✅ Manejo seguro de la respuesta
-        try {
-          final responseData = response.body.isNotEmpty 
-              ? jsonDecode(response.body) 
-              : <String, dynamic>{};
-          print('✅ Orden creada exitosamente: $responseData');
-        } catch (e) {
-          print('⚠️ Error decodificando respuesta exitosa: $e');
-          // Continuamos porque la orden se creó correctamente
-        }
-        
         // Limpiar carrito
         limpiarCarrito();
         
-        // Esperar un momento antes de mostrar el alert
-        await Future.delayed(Duration(milliseconds: 300));
+        // Refrescar datos de órdenes
+        try {
+          final OrdersController ordersController = Get.find<OrdersController>();
+          ordersController.refrescarDatos();
+        } catch (e) {
+          print('⚠️ No se pudo refrescar OrdersController: $e');
+        }
         
-          final controller2 = Get.find<OrdersController>();
-          controller2.cargarDatos();
         await _mostrarAlertaAsync(
           QuickAlertType.success,
-          '¡Orden Creada Exitosamente!',
-          'La orden "$nombreFinal"  ha sido enviada a cocina.',
+          '¡Productos Agregados!',
+          'Los productos han sido agregados exitosamente al pedido #${pedidoId.value}',
           'Perfecto',
           Color(0xFF4CAF50),
         );
@@ -647,7 +492,6 @@ class CreateOrderController extends GetxController {
         return true;
 
       } else {
-        // ✅ Manejo mejorado de errores del servidor
         String errorMessage = 'Error desconocido del servidor';
         try {
           if (response.body.isNotEmpty) {
@@ -656,15 +500,15 @@ class CreateOrderController extends GetxController {
                           errorData['error']?.toString() ?? 
                           'Error del servidor (${response.statusCode})';
           } else {
-            errorMessage = 'Error del servidor (${response.statusCode}) - Sin mensaje';
+            errorMessage = 'Error del servidor (${response.statusCode})';
           }
         } catch (e) {
-          errorMessage = 'Error del servidor (${response.statusCode}) - Respuesta inválida';
+          errorMessage = 'Error del servidor (${response.statusCode})';
         }
         
         await _mostrarAlertaAsync(
           QuickAlertType.error,
-          'Error al crear orden',
+          'Error al agregar productos',
           errorMessage,
           'OK',
           Color(0xFFE74C3C),
@@ -673,17 +517,15 @@ class CreateOrderController extends GetxController {
       }
 
     } catch (e) {
-      print('❌ Error crítico al crear orden: $e');
+      print('❌ Error crítico al agregar productos: $e');
       
       String errorMessage = 'Error de conexión desconocido';
       if (e.toString().contains('TimeoutException')) {
-        errorMessage = 'Tiempo de espera agotado. Verifica tu conexión a internet.';
+        errorMessage = 'Tiempo de espera agotado. Verifica tu conexión.';
       } else if (e.toString().contains('SocketException')) {
-        errorMessage = 'No se puede conectar al servidor. Verifica la conexión.';
-      } else if (e.toString().contains('FormatException')) {
-        errorMessage = 'Error en el formato de datos del servidor.';
+        errorMessage = 'No se puede conectar al servidor.';
       } else {
-        errorMessage = 'Error de conexión: ${e.toString()}';
+        errorMessage = 'Error: ${e.toString()}';
       }
       
       await _mostrarAlertaAsync(
@@ -695,11 +537,11 @@ class CreateOrderController extends GetxController {
       );
       return false;
     } finally {
-      isCreatingOrder.value = false;
+      isAddingProducts.value = false;
     }
   }
 
-  // ✅ NUEVA FUNCIÓN: Mostrar alertas de forma asíncrona y segura
+  /// Mostrar alertas de forma asíncrona
   Future<void> _mostrarAlertaAsync(
     QuickAlertType type,
     String title,
@@ -726,16 +568,6 @@ class CreateOrderController extends GetxController {
     }
   }
 
-  /// Refrescar todos los datos
-  Future<void> refrescarDatos() async {
-    try {
-      await cargarDatosIniciales();
-    } catch (e) {
-      print('❌ Error en refrescarDatos: $e');
-      _mostrarError('Error', 'No se pudieron refrescar los datos');
-    }
-  }
-
   /// Mostrar error con QuickAlert
   void _mostrarError(String titulo, String mensaje) {
     try {
@@ -749,22 +581,32 @@ class CreateOrderController extends GetxController {
           confirmBtnColor: Color(0xFFE74C3C),
         );
       } else {
-        print('⚠️ No se puede mostrar error - contexto no disponible: $titulo - $mensaje');
+        print('⚠️ No se puede mostrar error: $titulo - $mensaje');
       }
     } catch (e) {
       print('❌ Error mostrando mensaje de error: $e');
     }
   }
 
-  /// Validar si se puede crear la orden
-  bool get puedeCrearOrden {
+  /// Validar si se pueden agregar productos
+  bool get puedeAgregarProductos {
     try {
-      return selectedMesa.value != null && 
+      return pedidoId.value > 0 && 
              cartItems.isNotEmpty && 
-             !isCreatingOrder.value;
+             !isAddingProducts.value;
     } catch (e) {
-      print('❌ Error en puedeCrearOrden: $e');
+      print('❌ Error en puedeAgregarProductos: $e');
       return false;
+    }
+  }
+
+  /// Refrescar datos
+  Future<void> refrescarDatos() async {
+    try {
+      await cargarDatosIniciales();
+    } catch (e) {
+      print('❌ Error en refrescarDatos: $e');
+      _mostrarError('Error', 'No se pudieron refrescar los datos');
     }
   }
 }

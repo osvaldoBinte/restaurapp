@@ -11,7 +11,8 @@ import 'package:restaurapp/page/categoria/listarcategoria/category_list_controll
 import 'package:restaurapp/page/orders/crear/crear_orden_controller.dart';
 
 class CategoryListScreen extends StatelessWidget {
-  final CategoryListController controller = Get.put(CategoryListController());
+  final controller = Get.find<CategoryListController>();
+
   final TextEditingController _searchController = TextEditingController();
 
   CategoryListScreen({Key? key}) : super(key: key);
@@ -842,7 +843,7 @@ class CategoryController extends GetxController {
         if (responseData['success'] == true || response.statusCode == 201) {
           // Éxito - mostrar mensaje
           _mostrarExito('Categoría creada exitosamente');
-            final CategoryListController controller = Get.put(CategoryListController());
+            final controller = Get.find<CategoryListController>();
 
           controller.listarCategorias();
           // Recargar datos del menú si existe CreateOrderController

@@ -137,7 +137,7 @@ class TablesController extends GetxController {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
 
-          final OrdersController controller3 = Get.put(OrdersController());
+         final controller3 = Get.find<OrdersController>();
           controller3.cargarDatos();
         QuickAlert.show(
           context: Get.context!,
@@ -201,7 +201,7 @@ Future<bool> modificarStatusMesa(int mesaId) async {
     if (response.statusCode == 200) {
       final mesa = mesas.firstWhereOrNull((m) => m.id == mesaId);
       
-          final OrdersController controller3 = Get.put(OrdersController());
+          final controller3 = Get.find<OrdersController>();
           controller3.cargarDatos();
       QuickAlert.show(
         context: Get.context!,
@@ -257,7 +257,7 @@ Future<bool> modificarStatusMesa(int mesaId) async {
       if (response.statusCode == 200) {
         final mesa = mesas.firstWhereOrNull((m) => m.id == mesaId);
         
-          final OrdersController controller3 = Get.put(OrdersController());
+          final controller3 = Get.find<OrdersController>();
           controller3.cargarDatos();
         QuickAlert.show(
           context: Get.context!,
@@ -294,7 +294,7 @@ Future<bool> modificarStatusMesa(int mesaId) async {
   /// Mostrar modal para crear mesa
   void mostrarModalCrearMesa() {
     final TextEditingController numeroController = TextEditingController();
-  final CreateOrderController controller = Get.put(CreateOrderController());
+  final controller = Get.find<CreateOrderController>();
     Get.dialog(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
