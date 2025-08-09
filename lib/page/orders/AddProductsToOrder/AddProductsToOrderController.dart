@@ -201,7 +201,7 @@ class AddProductsToOrderController extends GetxController {
       }
     } catch (e) {
       print('❌ Error al obtener categorías: $e');
-      _mostrarError('Error al cargar categorías', 'No se pudieron cargar las categorías: $e');
+     // _mostrarError('Error al cargar categorías', 'No se pudieron cargar las categorías: $e');
     } finally {
       isLoadingCategories.value = false;
     }

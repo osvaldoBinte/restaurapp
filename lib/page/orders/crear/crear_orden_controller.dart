@@ -208,7 +208,7 @@ class CreateOrderController extends GetxController {
       }
     } catch (e) {
       print('❌ Error al obtener categorías: $e');
-      _mostrarError('Error al cargar categorías', 'No se pudieron cargar las categorías: $e');
+     // _mostrarError('Error al cargar categorías', 'No se pudieron cargar las categorías: $e');
     } finally {
       isLoadingCategories.value = false;
     }
@@ -263,7 +263,7 @@ class CreateOrderController extends GetxController {
       }
     } catch (e) {
       print('❌ Error al obtener mesas: $e');
-      _mostrarError('Error al cargar mesas', 'No se pudieron cargar las mesas: $e');
+     // _mostrarError('Error al cargar mesas', 'No se pudieron cargar las mesas: $e');
     } finally {
       isLoadingMesas.value = false;
     }
@@ -323,7 +323,7 @@ class CreateOrderController extends GetxController {
       }
     } catch (e) {
       print('❌ Error al obtener todo el menú: $e');
-      _mostrarError('Error al cargar menú', 'No se pudo cargar el menú: $e');
+    //  _mostrarError('Error al cargar menú', 'No se pudo cargar el menú: $e');
     } finally {
       isLoadingProducts.value = false;
     }
