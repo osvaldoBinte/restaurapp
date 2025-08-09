@@ -56,6 +56,7 @@ class CategoryListScreen extends StatelessWidget {
       ),
       SizedBox(width: 8),
       // Botón crear categoría compacto
+
       GestureDetector(
         onTap: () => _showCreateCategoryModal(context), // Ajusta según tu método
         child: Container(
@@ -70,6 +71,28 @@ class CategoryListScreen extends StatelessWidget {
       ),
       SizedBox(width: 8),
       // Contador de categorías
+      Obx(() => GestureDetector(
+            onTap: controller.isLoading.value ? null : () => controller.refrescarLista(),
+            child: Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: controller.isLoading.value ? Colors.grey[400] : Color(0xFF2196F3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: controller.isLoading.value
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Icon(Icons.refresh, color: Colors.white, size: 20),
+            ),
+          )),
+          SizedBox(width: 8),
       Obx(() => Container(
         height: 40,
         padding: EdgeInsets.symmetric(horizontal: 12),
@@ -284,129 +307,152 @@ class CategoryListScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryCard(Map<String, dynamic> categoria) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 12),
-      elevation: 3,
-      shape: RoundedRectangleBorder(
+  return Card(
+    margin: EdgeInsets.only(bottom: 12),
+    elevation: 3,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            colors: [Colors.white, Color(0xFFFAF9F8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+        gradient: LinearGradient(
+          colors: [Colors.white, Color(0xFFFAF9F8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                // Ícono de la categoría
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Color(0xFF8B4513).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Color(0xFF8B4513).withOpacity(0.3),
-                      width: 2,
-                    ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.category,
-                      color: Color(0xFF8B4513),
-                      size: 24,
-                    ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Ícono de la categoría
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Color(0xFF8B4513).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Color(0xFF8B4513).withOpacity(0.3),
+                    width: 2,
                   ),
                 ),
-                SizedBox(width: 16),
-                
-                // Información de la categoría
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        categoria['nombreCategoria'] ?? 'Sin nombre',
+                child: Center(
+                  child: Icon(
+                    Icons.category,
+                    color: Color(0xFF8B4513),
+                    size: 24,
+                  ),
+                ),
+              ),
+              SizedBox(width: 16),
+              
+              // Información de la categoría
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      categoria['nombreCategoria'] ?? 'Sin nombre',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3E1F08),
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF8B4513).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'ID: ${categoria['id']}',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF3E1F08),
+                          color: Color(0xFF8B4513),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      SizedBox(height: 4),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Color(0xFF8B4513).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // ✅ NUEVO: Botón de editar
+              Obx(() => IconButton(
+                onPressed: controller.isUpdating.value 
+                    ? null 
+                    : () => controller.mostrarModalEdicion(categoria),
+                icon: controller.isUpdating.value
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
                         ),
-                        child: Text(
-                          'ID: ${categoria['id']}',
-                          style: TextStyle(
-                            color: Color(0xFF8B4513),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                      )
+                    : Icon(
+                        Icons.edit,
+                        color: Color(0xFF8B4513),
+                        size: 24,
                       ),
-                    ],
-                  ),
-                ),
-                
-                // Botón de eliminar
-                Obx(() => IconButton(
-                  onPressed: controller.isDeleting.value 
-                      ? null 
-                      : () => controller.confirmarEliminacion(categoria),
-                  icon: controller.isDeleting.value
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
-                          ),
-                        )
-                      : Icon(
-                          Icons.delete,
-                          color: Colors.red,
-                          size: 24,
+                tooltip: 'Editar categoría',
+              )),
+              
+              // Botón de eliminar
+              Obx(() => IconButton(
+                onPressed: controller.isDeleting.value 
+                    ? null 
+                    : () => controller.confirmarEliminacion(categoria),
+                icon: controller.isDeleting.value
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
                         ),
-                )),
-              ],
+                      )
+                    : Icon(
+                        Icons.delete,
+                        color: Colors.red,
+                        size: 24,
+                      ),
+                tooltip: 'Eliminar categoría',
+              )),
+            ],
+          ),
+          
+          SizedBox(height: 12),
+          
+          // Descripción
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Color(0xFFF5F2F0),
+              borderRadius: BorderRadius.circular(8),
             ),
-            
-            SizedBox(height: 12),
-            
-            // Descripción
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Color(0xFFF5F2F0),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                categoria['descripcion'] ?? 'Sin descripción',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                  height: 1.4,
-                ),
+            child: Text(
+              categoria['descripcion'] ?? 'Sin descripción',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+                height: 1.4,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ✅ MODIFICACIÓN 1: Cambiar a StatefulWidget

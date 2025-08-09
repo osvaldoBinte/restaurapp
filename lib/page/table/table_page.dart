@@ -3,8 +3,8 @@ import 'package:get/get.dart';
 import 'package:restaurapp/page/table/table_controller.dart';
 
 class TablesScreen extends StatelessWidget {
+  final controller = Get.find<TablesController>();
 
-        final controller = Get.find<TablesController>();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -17,13 +17,19 @@ class TablesScreen extends StatelessWidget {
 
         return Column(
           children: [
-            
             // Filtros y búsqueda
             _buildFiltersAndSearch(),
             
-            // Lista de mesas
+            // ✅ AGREGADO: RefreshIndicator envolviendo la lista de mesas
             Expanded(
-              child: _buildMesasList(),
+              child: RefreshIndicator(
+                onRefresh: controller.refrescarDatos, // ✅ Método que necesitas agregar al controller
+                color: Color(0xFF8B4513),
+                backgroundColor: Colors.white,
+                displacement: 40.0,
+                strokeWidth: 3.0,
+                child: _buildMesasList(),
+              ),
             ),
           ],
         );
@@ -46,6 +52,14 @@ class TablesScreen extends StatelessWidget {
             style: TextStyle(
               color: Color(0xFF8B4513),
               fontSize: 16,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Obteniendo datos del servidor',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
             ),
           ),
         ],
@@ -143,72 +157,95 @@ class TablesScreen extends StatelessWidget {
     );
   }
 
- Widget _buildFiltersAndSearch() {
-  return Container(
-    padding: EdgeInsets.all(16),
-    child: Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 40,
-            child: TextField(
-              onChanged: (value) => controller.buscarMesas(value),
-              decoration: InputDecoration(
-                hintText: 'Buscar por número de mesa...',
-                prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF8B4513)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+  Widget _buildFiltersAndSearch() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 40,
+              child: TextField(
+                onChanged: (value) => controller.buscarMesas(value),
+                decoration: InputDecoration(
+                  hintText: 'Buscar por número de mesa...',
+                  prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF8B4513)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Color(0xFF8B4513)),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  fillColor: Color(0xFFF5F2F0),
+                  filled: true,
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Color(0xFF8B4513)),
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                fillColor: Color(0xFFF5F2F0),
-                filled: true,
+                style: TextStyle(fontSize: 14),
               ),
-              style: TextStyle(fontSize: 14),
             ),
           ),
-        ),
-        SizedBox(width: 8),
-        // Botón crear compacto
-        GestureDetector(
-          onTap: () => controller.mostrarModalCrearMesa(),
-          child: Container(
+          SizedBox(width: 8),
+          // Botón crear compacto
+          GestureDetector(
+            onTap: () => controller.mostrarModalCrearMesa(),
+            child: Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: Color(0xFF8B4513),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.add, color: Colors.white),
+            ),
+          ),
+          SizedBox(width: 8),
+          // ✅ MEJORADO: Botón de refresh manual
+          Obx(() => GestureDetector(
+            onTap: controller.isLoading.value ? null : () => controller.refrescarDatos(),
+            child: Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: controller.isLoading.value ? Colors.grey[400] : Color(0xFF2196F3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: controller.isLoading.value
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Icon(Icons.refresh, color: Colors.white, size: 20),
+            ),
+          )),
+          SizedBox(width: 8),
+          // Contador de mesas
+          Obx(() => Container(
             height: 40,
-            width: 40,
+            padding: EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: Color(0xFF8B4513),
+              color: Color(0xFF3498DB),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.add, color: Colors.white),
-          ),
-        ),
-        SizedBox(width: 8),
-        // Contador de mesas (opcional - puedes usar el observable que tengas)
-        Obx(() => Container(
-          height: 40,
-          padding: EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Color(0xFF3498DB),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Text(
-              '${controller.mesas.length}', // Ajusta según tu observable
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+            child: Center(
+              child: Text(
+                '${controller.mesas.length}',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
-          ),
-        )),
-      ],
-    ),
-  );
-}
+          )),
+        ],
+      ),
+    );
+  }
 
   Widget _buildMesasList() {
     return Obx(() {
@@ -216,8 +253,9 @@ class TablesScreen extends StatelessWidget {
         return _buildEmptyState();
       }
 
-      // Lista simple sin RefreshIndicator y sin GridView
+      // ✅ MODIFICADO: ListView con physics para permitir pull-to-refresh
       return ListView.builder(
+        physics: AlwaysScrollableScrollPhysics(), // ✅ IMPORTANTE: Permite scroll incluso con pocos elementos
         padding: EdgeInsets.all(16),
         itemCount: controller.filteredMesas.length,
         itemBuilder: (context, index) {
@@ -230,153 +268,227 @@ class TablesScreen extends StatelessWidget {
       );
     });
   }
-Widget buildMesaCard(Mesa mesa) {
-  return Container(
-    margin: EdgeInsets.only(bottom: 8),
-    padding: EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: Colors.grey[300]!),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 3,
-          offset: Offset(0, 1),
-        ),
-      ],
-    ),
-    child: Row(
-      children: [
-        // Icono de mesa
-        Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: Color(0xFF8B4513).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.table_restaurant,
-            size: 24,
-            color: Color(0xFF8B4513),
-          ),
-        ),
-        SizedBox(width: 12),
-        
-        // Información de la mesa
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Mesa ${mesa.numeroMesa}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Color(0xFF3E1F08),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              SizedBox(height: 2),
-              Text(
-                'ID: ${mesa.id}',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
-              ),
-              SizedBox(height: 4),
-              
-            ],
-          ),
-        ),
-        
-        // Botones de acción
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Botón activar/desactivar
-            
-            GestureDetector(
-              onTap: () => controller.confirmarEliminarMesa(mesa),
-              child: Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(
-                  Icons.delete_outline,
-                  color: Colors.red,
-                  size: 16,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  Widget buildMesaCard(Mesa mesa) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
         children: [
+          // Icono de mesa
           Container(
-            padding: EdgeInsets.all(24),
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
               color: Color(0xFF8B4513).withOpacity(0.1),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               Icons.table_restaurant,
-              size: 64,
+              size: 24,
               color: Color(0xFF8B4513),
             ),
           ),
-          SizedBox(height: 24),
-          Text(
-            controller.searchText.value.isNotEmpty || controller.selectedFilter.value != 'Todas'
-                ? 'No se encontraron mesas'
-                : 'No hay mesas registradas',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF3E1F08),
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            controller.searchText.value.isNotEmpty || controller.selectedFilter.value != 'Todas'
-                ? 'Intenta cambiar los filtros de búsqueda'
-                : 'Crea tu primera mesa para comenzar',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 16,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 24),
-          if (controller.searchText.value.isEmpty && controller.selectedFilter.value == 'Todas')
-            ElevatedButton.icon(
-              onPressed: () => controller.mostrarModalCrearMesa(),
-              icon: Icon(Icons.add),
-              label: Text('Crear Primera Mesa'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF8B4513),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          SizedBox(width: 12),
+          
+          // Información de la mesa
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mesa ${mesa.numeroMesa}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF3E1F08),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
+                SizedBox(height: 2),
+                Text(
+                  'ID: ${mesa.id}',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+                SizedBox(height: 4),
+                
+              ],
             ),
+          ),
+          
+          // Botones de acción
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+            
+              
+              // Botón eliminar
+              Obx(() => GestureDetector(
+                onTap: controller.isDeleting.value 
+                    ? null 
+                    : () => controller.confirmarEliminarMesa(mesa),
+                child: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: controller.isDeleting.value
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                          ),
+                        )
+                      : Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                          size: 16,
+                        ),
+                ),
+              )),
+            ],
+          ),
         ],
       ),
     );
   }
+
+  Widget _buildEmptyState() {
+    // ✅ MODIFICADO: SingleChildScrollView para permitir pull-to-refresh en estado vacío
+    return SingleChildScrollView(
+      physics: AlwaysScrollableScrollPhysics(), // ✅ IMPORTANTE
+      child: Container(
+        height: MediaQuery.of(Get.context!).size.height * 0.6,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Color(0xFF8B4513).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.table_restaurant,
+                  size: 64,
+                  color: Color(0xFF8B4513),
+                ),
+              ),
+              SizedBox(height: 24),
+              Text(
+                controller.searchText.value.isNotEmpty || controller.selectedFilter.value != 'Todas'
+                    ? 'No se encontraron mesas'
+                    : 'No hay mesas registradas',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF3E1F08),
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                controller.searchText.value.isNotEmpty || controller.selectedFilter.value != 'Todas'
+                    ? 'Intenta cambiar los filtros de búsqueda'
+                    : 'Crea tu primera mesa para comenzar',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              // ✅ AGREGADO: Texto indicativo de pull-to-refresh
+              Text(
+                'Desliza hacia abajo para actualizar',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              SizedBox(height: 24),
+              if (controller.searchText.value.isEmpty && controller.selectedFilter.value == 'Todas')
+                ElevatedButton.icon(
+                  onPressed: () => controller.mostrarModalCrearMesa(),
+                  icon: Icon(Icons.add),
+                  label: Text('Crear Primera Mesa'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF8B4513),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+// ===== MÉTODOS QUE NECESITAS AGREGAR AL TablesController =====
+
+/*
+✅ Agrega estos métodos a tu TablesController:
+
+class TablesController extends GetxController {
+  // ... propiedades existentes ...
+  
+  var isDeleting = false.obs; // ✅ Si no la tienes ya
+
+  /// ✅ NUEVO: Método para pull-to-refresh
+  Future<void> onRefresh() async {
+    print('🔄 Iniciando pull-to-refresh de mesas...');
+    try {
+      // Aquí va tu lógica para recargar mesas desde el servidor
+      await cargarMesas(); // Ajusta según el nombre de tu método
+      print('✅ Pull-to-refresh de mesas completado');
+    } catch (e) {
+      print('❌ Error en pull-to-refresh de mesas: $e');
+      // Opcional: mostrar mensaje de error
+      Get.snackbar(
+        'Error',
+        'No se pudo actualizar la lista de mesas',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
+    }
+  }
+
+  /// ✅ OPCIONAL: Método para mostrar modal de editar mesa
+  void mostrarModalEditarMesa(Mesa mesa) {
+    // Implementa según tu lógica de edición
+    print('Editando mesa: ${mesa.numeroMesa}');
+    // Aquí puedes abrir un modal similar al de crear
+  }
+
+  /// ✅ OPCIONAL: Método para refrescar lista (si no lo tienes)
+  Future<void> refrescarLista() async {
+    await onRefresh();
+  }
+}
+*/

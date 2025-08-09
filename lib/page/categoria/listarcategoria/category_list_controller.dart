@@ -5,6 +5,8 @@ import 'package:quickalert/quickalert.dart';
 import 'dart:convert';
 
 import 'package:restaurapp/common/constants/constants.dart';
+import 'package:restaurapp/page/categoria/listarcategoria/EditCategoryModalContent.dart';
+import 'package:restaurapp/page/orders/crear/crear_orden_controller.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
 
 // Controller GetX para listar categorías
@@ -14,7 +16,7 @@ class CategoryListController extends GetxController {
   var filteredCategories = <Map<String, dynamic>>[].obs; // Nueva variable observable
   var message = ''.obs;
   var isDeleting = false.obs;
-  
+  var isUpdating = false.obs;
   String defaultApiServer = AppConstants.serverBase;
 
   @override
@@ -27,7 +29,211 @@ class CategoryListController extends GetxController {
       filteredCategories.value = List.from(categoriesList);
     });
   }
+  Future<bool> modificarCategoria({
+    required int id,
+    required String nombre,
+    required String descripcion,
+  }) async {
+    try {
+      isUpdating.value = true;
+      message.value = '';
 
+      // Validaciones
+      if (nombre.trim().isEmpty) {
+        _mostrarError('El nombre de la categoría es requerido');
+        return false;
+      }
+
+      if (descripcion.trim().isEmpty) {
+        _mostrarError('La descripción de la categoría es requerida');
+        return false;
+      }
+
+      if (nombre.trim().length < 2) {
+        _mostrarError('El nombre debe tener al menos 2 caracteres');
+        return false;
+      }
+
+      // Preparar datos para enviar
+      final Map<String, dynamic> categoriaData = {
+        'nombre': nombre.trim(),
+        'descripcion': descripcion.trim(),
+      };
+
+      Uri uri = Uri.parse('$defaultApiServer/menu/modificarCategoriaMenu/$id/');
+
+      print('🔄 Modificando categoría en: $uri');
+      print('📤 Datos a enviar: $categoriaData');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode(categoriaData),
+      );
+
+      print('📡 Código de respuesta: ${response.statusCode}');
+      print('📄 Respuesta del servidor: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Actualizar la categoría en la lista local
+        final index = categories.indexWhere((cat) => cat['id'] == id);
+        if (index != -1) {
+          categories[index] = {
+            ...categories[index],
+            'nombreCategoria': nombre.trim(),
+            'descripcion': descripcion.trim(),
+          };
+          // Esto automáticamente actualizará filteredCategories por el listener en onInit
+        }
+
+        message.value = 'Categoría modificada exitosamente';
+        
+        // Mostrar mensaje de éxito
+        QuickAlert.show(
+          context: Get.context!,
+          type: QuickAlertType.success,
+          title: '¡Actualizada!',
+          text: 'La categoría ha sido modificada correctamente',
+          confirmBtnText: 'OK',
+          confirmBtnColor: Color(0xFF27AE60),
+          autoCloseDuration: Duration(seconds: 2),
+        );
+
+        // Recargar datos del menú
+        await _recargarDatosMenu();
+
+        return true;
+
+      } else {
+        String errorMessage = 'Error al modificar categoría (${response.statusCode})';
+        
+        try {
+          final errorData = json.decode(response.body);
+          errorMessage = errorData['message'] ?? errorData['error'] ?? errorMessage;
+        } catch (e) {
+          errorMessage = 'Error: ${response.reasonPhrase}';
+        }
+
+        message.value = errorMessage;
+        _mostrarError(errorMessage);
+        return false;
+      }
+
+    } catch (e) {
+      String errorMessage = 'Error de conexión: ${e.toString()}';
+      message.value = errorMessage;
+
+      print('🚨 Error en modificarCategoria: $e');
+      _mostrarError('No se pudo conectar al servidor para modificar la categoría.');
+      return false;
+
+    } finally {
+      isUpdating.value = false;
+    }
+  }
+   void mostrarModalEdicion(Map<String, dynamic> categoria) {
+    showModalBottomSheet(
+      context: Get.context!,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Color(0xFFF5F2F0),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Handle del modal
+              Container(
+                margin: EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              
+              // Header del modal
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey[300]!),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.edit,
+                      color: Color(0xFF8B4513),
+                      size: 24,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Editar Categoría',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF8B4513),
+                      ),
+                    ),
+                    Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Contenido del modal
+              Expanded(
+                child: EditCategoryModalContent(categoria: categoria),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+    Future<void> _recargarDatosMenu() async {
+    try {
+      // Recargar la lista de categorías
+      await listarCategorias();
+      
+      // Buscar si existe CreateOrderController y recargar
+      if (Get.isRegistered<CreateOrderController>()) {
+        final CreateOrderController controller = Get.find<CreateOrderController>();
+        await controller.cargarDatosIniciales();
+        print('✅ Datos del menú recargados');
+      }
+    } catch (e) {
+      print('⚠️ Error al recargar datos del menú: $e');
+    }
+  }
+
+  /// ✅ NUEVO: Método auxiliar para mostrar errores
+  void _mostrarError(String mensaje) {
+    QuickAlert.show(
+      context: Get.context!,
+      type: QuickAlertType.error,
+      title: 'Error',
+      text: mensaje,
+      confirmBtnText: 'OK',
+      confirmBtnColor: Color(0xFFE74C3C),
+    );
+  }
   /// Método para obtener todas las categorías
   Future<void> listarCategorias() async {
     try {

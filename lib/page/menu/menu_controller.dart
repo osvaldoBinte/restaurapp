@@ -8,7 +8,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:restaurapp/common/constants/constants.dart';
+import 'package:restaurapp/page/menu/listarmenu/listar_controller.dart';
 import 'package:restaurapp/page/orders/crear/crear_orden_controller.dart';
+import 'package:restaurapp/page/orders/orders_controller.dart';
 
 // Modelo para las categorías - CORREGIDO
 class Categoria {
@@ -320,6 +322,12 @@ class MenuController extends GetxController {
         final controller2 = Get.find<CreateOrderController>();
         controller2.cargarDatosIniciales();
         
+
+         final controller = Get.find<ListarMenuController>();
+        controller2.cargarDatosIniciales();
+        controller.refrescarLista();
+final controller3 = Get.find<OrdersController>();
+          controller3.cargarDatos();
         // ✅ VERIFICAR: Context antes de mostrar alert
         if (context.mounted) {
           QuickAlert.show(
@@ -407,6 +415,11 @@ class MenuController extends GetxController {
         message.value = 'Menú actualizado exitosamente';
        final controller2 = Get.find<CreateOrderController>();
          controller2.cargarDatosIniciales();
+          final controller = Get.find<ListarMenuController>();
+        controller2.cargarDatosIniciales();
+        controller.refrescarLista();
+final controller3 = Get.find<OrdersController>();
+          controller3.cargarDatos();
         if (context.mounted) {
           QuickAlert.show(
             context: context, // ✅ Usar context del widget

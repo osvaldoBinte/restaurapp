@@ -310,65 +310,116 @@ class ListarTodoMenuPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return isEmbedded ? _buildEmbeddedVersion() : _buildFullScreenVersion();
   }
+ Widget _buildLoadingWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Cargando menús...',
+            style: TextStyle(
+              color: Color(0xFF8B4513),
+              fontSize: 16,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Obteniendo datos del servidor',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _buildEmbeddedVersion() {
-     final controller = Get.find<ListarMenuController>();
+   Widget _buildEmbeddedVersion() {
+    final controller = Get.find<ListarMenuController>();
     return Column(
       children: [
         // Header compacto con búsqueda
         _buildCompactHeader(controller),
         SizedBox(height: 12),
         
-        // Lista de menús
+        // ✅ AGREGADO: RefreshIndicator envolviendo la lista
         Expanded(
-          child: Obx(() {
-            if (controller.isLoading.value) {
-              return Center(child: CircularProgressIndicator());
-            }
-            
-            if (controller.filteredMenus.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.restaurant_menu, size: 48, color: Colors.grey[400]),
-                    SizedBox(height: 16),
-                    Text(
-                      controller.menus.isEmpty 
-                        ? 'No hay menús registrados'
-                        : 'No se encontraron menús',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                    if (controller.menus.isEmpty) ...[
-                      SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () => _showCreateMenuModal(),
-                        icon: Icon(Icons.add),
-                        label: Text('Crear Primer Menú'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF8B4513),
-                          foregroundColor: Colors.white,
-                        ),
+          child: RefreshIndicator(
+            onRefresh: controller.refrescarLista,
+            color: Color(0xFF8B4513),
+            backgroundColor: Colors.white,
+            displacement: 40.0,
+            strokeWidth: 2.5,
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return _buildLoadingWidget();
+              }
+              
+              if (controller.filteredMenus.isEmpty) {
+                // ✅ IMPORTANTE: SingleChildScrollView para que funcione el pull-to-refresh
+                return SingleChildScrollView(
+                  physics: AlwaysScrollableScrollPhysics(),
+                  child: Container(
+                    height: MediaQuery.of(Get.context!).size.height * 0.5,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.restaurant_menu, size: 48, color: Colors.grey[400]),
+                          SizedBox(height: 16),
+                          Text(
+                            controller.menus.isEmpty
+                                ? 'No hay menús registrados'
+                                : 'No se encontraron menús',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Desliza hacia abajo para actualizar',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                          if (controller.menus.isEmpty) ...[
+                            SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              onPressed: () => _showCreateMenuModal(),
+                              icon: Icon(Icons.add),
+                              label: Text('Crear Primer Menú'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Color(0xFF8B4513),
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
-                ),
+                    ),
+                  ),
+                );
+              }
+              
+              return ListView.builder(
+                physics: AlwaysScrollableScrollPhysics(), // ✅ IMPORTANTE
+                itemCount: controller.filteredMenus.length,
+                itemBuilder: (context, index) {
+                  final menu = controller.filteredMenus[index];
+                  return _buildCompactMenuCard(menu, controller);
+                },
               );
-            }
-            
-            return ListView.builder(
-              itemCount: controller.filteredMenus.length,
-              itemBuilder: (context, index) {
-                final menu = controller.filteredMenus[index];
-                return _buildCompactMenuCard(menu, controller);
-              },
-            );
-          }),
+            }),
+          ),
         ),
       ],
     );
   }
-
   Widget _buildFullScreenVersion() {
     
     final controller = Get.find<ListarMenuController>();
@@ -595,6 +646,28 @@ class ListarTodoMenuPage extends StatelessWidget {
             child: Icon(Icons.add, color: Colors.white),
           ),
         ),
+        SizedBox(width: 8),
+        Obx(() => GestureDetector(
+            onTap: controller.isLoading.value ? null : () => controller.refrescarLista(),
+            child: Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                color: controller.isLoading.value ? Colors.grey[400] : Color(0xFF2196F3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: controller.isLoading.value
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Icon(Icons.refresh, color: Colors.white, size: 20),
+            ),
+          )),
         SizedBox(width: 8),
         Obx(() => Container(
           height: 40,
