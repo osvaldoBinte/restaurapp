@@ -24,7 +24,7 @@ class OrdersController extends GetxController {
   // ✅ NUEVO: Variables para el timer
   Timer? _autoRefreshTimer;
   var isAutoRefreshEnabled = true.obs;
-  final int autoRefreshInterval = 20; // segundos
+  final int autoRefreshInterval = 5; // segundos
 
   @override
   void onInit() {

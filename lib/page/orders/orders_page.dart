@@ -87,26 +87,7 @@ class OrdersDashboardScreen extends StatelessWidget {
                           color: Colors.white70,
                         ),
                       ),
-                      if (controller.isAutoRefreshEnabled.value) ...[
-                        SizedBox(width: 4),
-                        Container(
-                          width: isSmallWidth ? 4 : 6, // Tamaño adaptativo
-                          height: isSmallWidth ? 4 : 6,
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Auto ${controller.autoRefreshInterval}s',
-                          style: TextStyle(
-                            fontSize: isSmallWidth ? 8 : 10, // Font size adaptativo
-                            color: Colors.green[200],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                      
                     ],
                   )),
                 ],
@@ -116,19 +97,7 @@ class OrdersDashboardScreen extends StatelessWidget {
         ),
         actions: [
           // Botón auto-refresh
-          Obx(() => IconButton(
-            icon: Icon(
-              controller.isAutoRefreshEnabled.value 
-                ? Icons.pause_circle_filled 
-                : Icons.play_circle_filled,
-              color: Colors.white,
-              size: isSmallWidth ? 20 : 24, // Tamaño adaptativo
-            ),
-            tooltip: controller.isAutoRefreshEnabled.value 
-              ? 'Pausar auto-refresh' 
-              : 'Activar auto-refresh',
-            onPressed: () => controller.toggleAutoRefresh(),
-          )),
+         
           
           // Botón refresh manual
           IconButton(
