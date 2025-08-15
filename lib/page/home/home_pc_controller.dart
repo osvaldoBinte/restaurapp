@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:restaurapp/common/constants/userservice.dart';
+import 'package:restaurapp/page/orders/crear/crear_orden.dart';
 import 'package:restaurapp/page/user/UserManagementScreen.dart';
 import 'package:restaurapp/page/home/dashoard_page.dart';
 import 'package:restaurapp/page/home/home_pc_page.dart';
@@ -19,6 +20,7 @@ class HomeController extends GetxController {
   final List<Widget> _allPages = [
     DashboardPage(),
     OrdersDashboardScreen(),
+    OrderScreen(), // Página principal del menú
     UserManagementScreen(),
   ];
 
@@ -26,12 +28,14 @@ class HomeController extends GetxController {
   final List<String> _allTitles = [
     'Dashboard',
     'Órdenes',
+    'Menu',
     'Usuarios'
   ];
 
   // Iconos de navegación
   final List<IconData> _allIcons = [
     Icons.dashboard,
+    Icons.restaurant_menu,
     Icons.restaurant_menu,
     Icons.people,
   ];
@@ -40,6 +44,7 @@ class HomeController extends GetxController {
   final List<bool> _requiresAdmin = [
     true,   // Dashboard - solo admin
     false,  // Órdenes - todos los usuarios
+     false, 
     true,   // Usuarios - solo admin
   ];
 
