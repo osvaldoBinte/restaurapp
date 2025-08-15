@@ -444,4 +444,80 @@ class CategoryListController extends GetxController {
              descripcion.contains(query.toLowerCase());
     }).toList();
   }
+  Future<bool> actualizarOrdenCategoria(int categoriaId, int nuevoOrden) async {
+  try {
+    print('🔄 Actualizando orden de categoría $categoriaId a posición $nuevoOrden');
+
+    Uri uri = Uri.parse('$defaultApiServer/menu/actualizarOrdenCategoriaMenu/$categoriaId/');
+    
+    // Preparar el body con el nuevo orden
+    final Map<String, dynamic> body = {
+      'ordenMenu': nuevoOrden,
+    };
+
+    print('📡 URL: $uri');
+    print('📤 Body: $body');
+
+    final response = await http.put( 
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    print('📡 Código de respuesta: ${response.statusCode}');
+    print('📄 Respuesta del servidor: ${response.body}');
+
+    if (response.statusCode == 200) {
+      print('✅ Orden actualizado correctamente');
+      return true;
+    } else {
+      String errorMessage = 'Error al actualizar orden (${response.statusCode})';
+      
+      try {
+        final errorData = jsonDecode(response.body);
+        errorMessage = errorData['message'] ?? errorData['error'] ?? errorMessage;
+      } catch (e) {
+        errorMessage = 'Error: ${response.reasonPhrase}';
+      }
+
+      print('❌ Error: $errorMessage');
+      _mostrarError(errorMessage);
+      return false;
+    }
+
+  } catch (e) {
+    print('❌ Error de conexión: $e');
+    _mostrarError('Error de conexión al actualizar el orden');
+    return false;
+  }
+}
+Future<void> actualizarOrdenCategorias(List<Map<String, dynamic>> categoriasOrdenadas) async {
+  try {
+    isLoading.value = true;
+    
+    // Actualizar orden en lote
+    for (int i = 0; i < categoriasOrdenadas.length; i++) {
+      final categoria = categoriasOrdenadas[i];
+      final nuevoOrden = i + 1; // Orden basado en 1
+      
+     // await actualizarOrdenCategoria(categoria['id'], nuevoOrden);
+      
+      // Pequeña pausa para no sobrecargar el servidor
+      await Future.delayed(Duration(milliseconds: 100));
+    }
+    
+    // Recargar la lista para reflejar los cambios
+  //  await listarCategorias();
+    
+    
+  } catch (e) {
+    print('❌ Error al actualizar orden múltiple: $e');
+    _mostrarError('Error al guardar el nuevo orden');
+  } finally {
+    isLoading.value = false;
+  }
+}
 }

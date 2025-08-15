@@ -600,72 +600,72 @@ class UniversalPrinterService {
   // ===== FUNCIONES AUXILIARES =====
   
   /// Generar comandos ESC/POS para impresoras térmicas
-  List<int> _generarComandosESCPOS(Generator generator, Map<String, dynamic> pedido, double total) {
-    List<int> bytes = [];
-    
-    // Header
-    bytes += generator.text('COMEDOR "EL JOBO"',
-        styles: PosStyles(
-          align: PosAlign.center,
-          height: PosTextSize.size2,
-          width: PosTextSize.size2,
-          bold: true,
-        ));
-    
-    bytes += generator.text('================================',
-        styles: PosStyles(align: PosAlign.center));
-    
-    // Información del pedido
-    final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
-    
-    final fecha = DateTime.now();
-    final fechaStr = '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
-    final horaStr = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
-    
+ List<int> _generarComandosESCPOS(Generator generator, Map<String, dynamic> pedido, double total) {
+  List<int> bytes = [];
   
-    // Productos
-    bytes += generator.text('--------------------------------');
-    final detalles = pedido['detalles'] as List;
-    double subtotal = 0.0;
+  // Header (mantengo tu formato exacto)
+  bytes += generator.text(
+    'COMEDOR "EL JOBO"',
+    styles: PosStyles(
+      align: PosAlign.center,
+      height: PosTextSize.size1,
+      width: PosTextSize.size1,
+      bold: true,
+    ),
+  );
+
+  bytes += generator.text('================================',
+      styles: PosStyles(align: PosAlign.center));
+  
+  bytes += generator.text('--------------------------------');
+  final detalles = pedido['detalles'] as List;
+  double subtotal = 0.0;
+  
+  for (var detalle in detalles) {
+    final status = detalle['statusDetalle'] ?? 'proceso';
+    if (status == 'cancelado') continue;
     
-    for (var detalle in detalles) {
-      final status = detalle['statusDetalle'] ?? 'proceso';
-      if (status == 'cancelado') continue;
-      
-      final nombreProducto = detalle['nombreProducto'] ?? 'Producto';
-      final cantidad = detalle['cantidad'] ?? 1;
-      final precioUnitario = (detalle['precioUnitario'] ?? 0.0).toDouble();
-      final totalItem = precioUnitario * cantidad;
-      
-      subtotal += totalItem;
-      
-      bytes += generator.row([
-        PosColumn(text: nombreProducto, width: 6),
-        PosColumn(text: '$cantidad', width: 3, styles: PosStyles(align: PosAlign.center)),
-        PosColumn(text: '\$${totalItem.toStringAsFixed(2)}', width: 3, 
-            styles: PosStyles(align: PosAlign.right)),
-      ]);
-    }
+    final nombreProducto = detalle['nombreProducto'] ?? 'Producto';
+    final cantidad = detalle['cantidad'] ?? 1;
+    final precioUnitario = (detalle['precioUnitario'] ?? 0.0).toDouble();
+    final totalItem = precioUnitario * cantidad;
     
-    // Total
-    bytes += generator.text('--------------------------------');
+    subtotal += totalItem;
+    
+    // ✅ CAMBIO PRINCIPAL: Nombre completo en línea separada
+    bytes += generator.text(nombreProducto, 
+        styles: PosStyles(bold: true));
+    
+    // Cantidad y precio en línea separada con mejor distribución
     bytes += generator.row([
-      PosColumn(text: 'TOTAL:', width: 8, 
-          styles: PosStyles(bold: true, height: PosTextSize.size2)),
-      PosColumn(text: '\$${subtotal.toStringAsFixed(2)}', width: 4, 
-          styles: PosStyles(align: PosAlign.right, bold: true, height: PosTextSize.size2)),
+      PosColumn(text: 'Cant: $cantidad', width: 6, 
+          styles: PosStyles(align: PosAlign.left)),
+      PosColumn(text: '\$${totalItem.toStringAsFixed(2)}', width: 6, 
+          styles: PosStyles(align: PosAlign.right, bold: true)),
     ]);
     
-    bytes += generator.text('');
-    bytes += generator.text('¡Gracias por su visita!',
-        styles: PosStyles(align: PosAlign.center, bold: true));
-    
-    bytes += generator.feed(2);
-    bytes += generator.cut();
-    
-    return bytes;
+    // Espacio entre productos para mejor legibilidad
+    bytes += generator.text(' ');
   }
   
+  // Total (mantengo tu formato exacto)
+  bytes += generator.text('--------------------------------');
+  bytes += generator.row([
+    PosColumn(text: 'TOTAL:', width: 8, 
+        styles: PosStyles(bold: true, height: PosTextSize.size2)),
+    PosColumn(text: '\$${subtotal.toStringAsFixed(2)}', width: 4, 
+        styles: PosStyles(align: PosAlign.right, bold: true, height: PosTextSize.size2)),
+  ]);
+  
+  bytes += generator.text('');
+  bytes += generator.text('¡Gracias por su visita!',
+      styles: PosStyles(align: PosAlign.center, bold: true));
+  
+  bytes += generator.feed(2);
+  bytes += generator.cut();
+  
+  return bytes;
+}
   /// Generar ticket en texto plano para impresoras normales
   String _generarTicketTextoPlano(Map<String, dynamic> pedido, double total) {
     StringBuffer ticket = StringBuffer();

@@ -18,182 +18,380 @@ class CategoryListScreen extends StatelessWidget {
   CategoryListScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFFF5F2F0),
-     
-      body: Column(
-        children: [
-          // Barra de búsqueda
-      Container(
-  padding: EdgeInsets.all(16),
-  color: Colors.white,
-  child: Row(
-    children: [
-      Expanded(
-        child: Container(
-          height: 40,
-          child: TextField(
-            controller: _searchController,
-            onChanged: (query) => controller.filtrarCategorias(query),
-            decoration: InputDecoration(
-              hintText: 'Buscar categorías...',
-              prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF8B4513)),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Color(0xFF8B4513)),
-              ),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              fillColor: Color(0xFFF5F2F0),
-              filled: true,
-            ),
-            style: TextStyle(fontSize: 14),
-          ),
-        ),
-      ),
-      SizedBox(width: 8),
-      // Botón crear categoría compacto
-
-      GestureDetector(
-        onTap: () => _showCreateCategoryModal(context), // Ajusta según tu método
-        child: Container(
-          height: 40,
-          width: 40,
-          decoration: BoxDecoration(
-            color: Color(0xFF8B4513),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(Icons.add, color: Colors.white),
-        ),
-      ),
-      SizedBox(width: 8),
-      // Contador de categorías
-      Obx(() => GestureDetector(
-            onTap: controller.isLoading.value ? null : () => controller.refrescarLista(),
-            child: Container(
-              height: 40,
-              width: 40,
-              decoration: BoxDecoration(
-                color: controller.isLoading.value ? Colors.grey[400] : Color(0xFF2196F3),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: controller.isLoading.value
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Color(0xFFF5F2F0),
+    body: Column(
+      children: [
+        // Barra de búsqueda (sin cambios)
+        Container(
+          padding: EdgeInsets.all(16),
+          color: Colors.white,
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 40,
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (query) => controller.filtrarCategorias(query),
+                    decoration: InputDecoration(
+                      hintText: 'Buscar categorías...',
+                      prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF8B4513)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    )
-                  : Icon(Icons.refresh, color: Colors.white, size: 20),
-            ),
-          )),
-          SizedBox(width: 8),
-      Obx(() => Container(
-        height: 40,
-        padding: EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Color(0xFF3498DB),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: Text(
-            '${controller.categories.length}', // Ajusta según tu observable
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      )),
-    ],
-  ),
-),
-          // Lista de categorías
-          Expanded(
-            child: Obx(() {
-              if (controller.isLoading.value) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Color(0xFF8B4513)),
                       ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Cargando categorías...',
-                        style: TextStyle(
-                          color: Color(0xFF8B4513),
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      fillColor: Color(0xFFF5F2F0),
+                      filled: true,
+                    ),
+                    style: TextStyle(fontSize: 14),
                   ),
-                );
-              }
-
-              if (controller.filteredCategories.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.category_outlined,
-                        size: 64,
-                        color: Colors.grey[400],
-                      ),
-                      SizedBox(height: 16),
-                      Obx(() => Text(
-                        controller.categories.isEmpty 
-                            ? 'No hay categorías registradas'
-                            : 'No se encontraron categorías',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      )),
-                      SizedBox(height: 8),
-                      Obx(() => Text(
-                        controller.categories.isEmpty
-                            ? 'Agrega la primera categoría'
-                            : 'Prueba con otros términos de búsqueda',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                        ),
-                      )),
-                    ],
+                ),
+              ),
+              SizedBox(width: 8),
+              
+              // Botón crear categoría
+              GestureDetector(
+                onTap: () => _showCreateCategoryModal(context),
+                child: Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Color(0xFF8B4513),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                );
-              }
-
-              return RefreshIndicator(
-                onRefresh: controller.refrescarLista,
-                color: Color(0xFF8B4513),
-                child: ListView.builder(
-                  padding: EdgeInsets.all(16),
-                  itemCount: controller.filteredCategories.length,
-                  itemBuilder: (context, index) {
-                    final categoria = controller.filteredCategories[index];
-                    return _buildCategoryCard(categoria);
-                  },
+                  child: Icon(Icons.add, color: Colors.white),
+                ),
+              ),
+              SizedBox(width: 8),
+              
+              // Botón refrescar
+              Obx(() => GestureDetector(
+                onTap: controller.isLoading.value ? null : () => controller.refrescarLista(),
+                child: Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: controller.isLoading.value ? Colors.grey[400] : Color(0xFF2196F3),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: controller.isLoading.value
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Icon(Icons.refresh, color: Colors.white, size: 20),
+                ),
+              )),
+              SizedBox(width: 8),
+              
+              // Contador de categorías
+              Obx(() => Container(
+                height: 40,
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Color(0xFF3498DB),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(
+                    '${controller.categories.length}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              )),
+            ],
+          ),
+        ),
+        
+        // ✅ NUEVO: Instrucciones de drag & drop
+        
+        
+        // ✅ MODIFICADO: Lista de categorías con ReorderableListView
+        Expanded(
+          child: Obx(() {
+            if (controller.isLoading.value) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Cargando categorías...',
+                      style: TextStyle(
+                        color: Color(0xFF8B4513),
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
                 ),
               );
-            }),
+            }
+
+            if (controller.filteredCategories.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.category_outlined,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      controller.categories.isEmpty 
+                          ? 'No hay categorías registradas'
+                          : 'No se encontraron categorías',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      controller.categories.isEmpty
+                          ? 'Agrega la primera categoría'
+                          : 'Prueba con otros términos de búsqueda',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // ✅ NUEVO: ReorderableListView para drag & drop
+            return RefreshIndicator(
+              onRefresh: controller.refrescarLista,
+              color: Color(0xFF8B4513),
+              child: ReorderableListView.builder(
+                padding: EdgeInsets.all(16),
+                itemCount: controller.filteredCategories.length,
+                onReorder: (oldIndex, newIndex) {
+                  // Ajustar el índice si se mueve hacia abajo
+                  if (oldIndex < newIndex) {
+                    newIndex -= 1;
+                  }
+                  
+                  // Crear una copia de la lista
+                  final List<Map<String, dynamic>> items = List.from(controller.filteredCategories);
+                  
+                  // Mover el elemento
+                  final Map<String, dynamic> item = items.removeAt(oldIndex);
+                  items.insert(newIndex, item);
+                  
+                  // Actualizar la lista observable
+                  controller.filteredCategories.value = items;
+                  
+                  // Actualizar en el servidor
+                  controller.actualizarOrdenCategorias(items);
+                },
+                itemBuilder: (context, index) {
+                  final categoria = controller.filteredCategories[index];
+                  return _buildDraggableCategoryCard(categoria, index);
+                },
+              ),
+            );
+          }),
+        ),
+      ],
+    ),
+  );
+}
+
+// ✅ PASO 4: Crear nuevo widget para cards arrastrables
+Widget _buildDraggableCategoryCard(Map<String, dynamic> categoria, int index) {
+  return Card(
+    key: ValueKey(categoria['id']), 
+    margin: EdgeInsets.only(bottom: 12),
+    elevation: 3,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [Colors.white, Color(0xFFFAF9F8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // ✅ NUEVO: Handle de arrastre
+              
+              
+              // ✅ NUEVO: Número de orden
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Color(0xFF8B4513),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+              
+              // Ícono de la categoría
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Color(0xFF8B4513).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Color(0xFF8B4513).withOpacity(0.3),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.category,
+                    color: Color(0xFF8B4513),
+                    size: 20,
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+              
+              // Información de la categoría
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      categoria['nombreCategoria'] ?? 'Sin nombre',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3E1F08),
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF8B4513).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'ID: ${categoria['id']}',
+                        style: TextStyle(
+                          color: Color(0xFF8B4513),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Botón de editar
+              Obx(() => IconButton(
+                onPressed: controller.isUpdating.value 
+                    ? null 
+                    : () => controller.mostrarModalEdicion(categoria),
+                icon: controller.isUpdating.value
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+                        ),
+                      )
+                    : Icon(
+                        Icons.edit,
+                        color: Color(0xFF8B4513),
+                        size: 20,
+                      ),
+                tooltip: 'Editar categoría',
+              )),
+              
+              // Botón de eliminar
+              Obx(() => IconButton(
+                onPressed: controller.isDeleting.value 
+                    ? null 
+                    : () => controller.confirmarEliminacion(categoria),
+                icon: controller.isDeleting.value
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                        ),
+                      )
+                    : Icon(
+                        Icons.delete,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                tooltip: 'Eliminar categoría',
+              )),
+            ],
+          ),
+          
+          SizedBox(height: 12),
+          
+          // Descripción
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Color(0xFFF5F2F0),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              categoria['descripcion'] ?? 'Sin descripción',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[700],
+                height: 1.3,
+              ),
+            ),
           ),
         ],
       ),
-      
-    );
-  }
-
+    ),
+  );
+}
   // Método para mostrar el modal
   void _showCreateCategoryModal(BuildContext context) {
     showModalBottomSheet(

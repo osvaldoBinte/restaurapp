@@ -358,7 +358,6 @@ Future<void> buscarProductos(String query) async {
                 return null;
               }
             })
-            .where((mesa) => mesa != null && mesa.status) // Solo mesas activas y válidas
             .cast<Mesa>()
             .toList();
       } else {
@@ -739,13 +738,7 @@ Future<void> buscarProductos(String query) async {
         
           final controller2 = Get.find<OrdersController>();
           controller2.cargarDatos();
-        await _mostrarAlertaAsync(
-          QuickAlertType.success,
-          '¡Orden Creada Exitosamente!',
-          'La orden "$nombreFinal"  ha sido enviada a cocina.',
-          'Perfecto',
-          Color(0xFF4CAF50),
-        );
+     
 
         return true;
 

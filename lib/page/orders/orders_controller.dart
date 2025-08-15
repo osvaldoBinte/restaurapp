@@ -7,7 +7,7 @@ import 'dart:async'; // ✅ AGREGADO: Import para Timer
 
 import 'package:restaurapp/common/constants/constants.dart';
 import 'package:restaurapp/page/orders/OrderStatusModal.dart';
-import 'package:restaurapp/page/orders/TableDetailsModal.dart';
+import 'package:restaurapp/page/orders/modaltable/TableDetailsModal.dart';
 import 'package:restaurapp/page/orders/orders_page.dart';
 
 // Controller GetX para órdenes - ACTUALIZADO CON AUTO-REFRESH
@@ -18,7 +18,8 @@ class OrdersController extends GetxController {
   var pedidosIndividuales = <Map<String, dynamic>>[].obs;
   var mesasConPedidos = <Map<String, dynamic>>[].obs;
   var selectedTableData = <Map<String, dynamic>>[].obs;
-  
+  var isLiberandoTodasLasMesas = false.obs;
+
   String defaultApiServer = AppConstants.serverBase;
 
   // ✅ NUEVO: Variables para el timer
@@ -211,24 +212,7 @@ class OrdersController extends GetxController {
   Future<void> actualizarEstadoOrden(int detalleId, String nuevoEstado) async {
     try {
       // Mostrar loading
-      Get.dialog(
-        Dialog(
-          child: Container(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
-                ),
-                SizedBox(height: 16),
-                Text('Actualizando estado...'),
-              ],
-            ),
-          ),
-        ),
-        barrierDismissible: false,
-      );
+      
 
       Uri uri = Uri.parse('$defaultApiServer/ordenes/actualizarStatusorden/$detalleId/');
 
@@ -245,25 +229,12 @@ class OrdersController extends GetxController {
 
       print('📡 Actualizar estado - Código: ${response.statusCode}');
 
-      // Cerrar loading
-      Get.back();
+    
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         
         if (data['success'] == true || response.statusCode == 200) {
-          // Cerrar modal de estado
-          Get.back();
-          
-          // Mostrar mensaje de éxito
-          QuickAlert.show(
-            context: Get.context!,
-            type: QuickAlertType.success,
-            title: 'Éxito',
-            text: 'Estado actualizado correctamente',
-            confirmBtnText: 'OK',
-            confirmBtnColor: Color(0xFF27AE60),
-          );
           
           // Recargar datos y reiniciar timer
           await refrescarDatos();
@@ -485,18 +456,24 @@ Future<void> obtenerMesasConPedidosAbiertos() async {
     }
   }
 
-  void _showTableDetailsModal(Map<String, dynamic> mesa) {
-    Get.dialog(
-      Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: Get.width * 0.9,
-          height: Get.height * 0.8,
-          child: TableDetailsModal(mesa: mesa),
+void _showTableDetailsModal(Map<String, dynamic> mesa) {
+  showModalBottomSheet(
+    context: Get.context!,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => Container(
+      height: MediaQuery.of(context).size.height * 0.95, // 95% de la pantalla
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
       ),
-    );
-  }
+      child: TableDetailsModal(mesa: mesa),
+    ),
+  );
+}
 
   /// ✅ MODIFICADO: Refrescar datos y reiniciar timer
   Future<void> refrescarDatos() async {
@@ -799,4 +776,476 @@ Future<void> obtenerMesasConPedidosAbiertos() async {
       },
     );
   }
+  // ✅ NUEVO MÉTODO: Atender todos los pedidos de una mesa
+Future<void> atenderTodosLosPedidosMesa(int numeroMesa) async {
+  try {
+    // 🔍 PASO 1: Obtener el ID de la mesa desde la estructura
+    final mesa = mesasConPedidos.firstWhereOrNull(
+      (mesa) => mesa['numeroMesa'] == numeroMesa
+    );
+    
+    if (mesa == null) {
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.error,
+        title: 'Error',
+        text: 'No se encontró la mesa $numeroMesa',
+        confirmBtnText: 'OK',
+        confirmBtnColor: Color(0xFFE74C3C),
+      );
+      return;
+    }
+
+    // 🔍 PASO 2: Extraer el ID de la mesa
+    final mesaId = mesa['id'] ?? 
+                  mesa['idnumeroMesa'] ?? 
+                  mesa['mesaId'] ?? 
+                  numeroMesa; // Fallback al número de mesa
+
+    print('🏪 Mesa $numeroMesa - ID para API: $mesaId');
+
+    // 🔍 PASO 3: Verificar que hay pedidos pendientes
+    final pedidos = mesa['pedidos'] as List;
+    final pedidosPendientes = pedidos.where((pedido) {
+      final detalles = pedido['detalles'] as List;
+      return detalles.any((detalle) => 
+        (detalle['statusDetalle'] ?? 'proceso') == 'proceso'
+      );
+    }).toList();
+
+    if (pedidosPendientes.isEmpty) {
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.info,
+        title: 'Sin Pedidos Pendientes',
+        text: 'La mesa $numeroMesa no tiene pedidos pendientes para atender',
+        confirmBtnText: 'OK',
+        confirmBtnColor: Color(0xFF3498DB),
+      );
+      return;
+    }
+
+    // 🔍 PASO 4: Mostrar confirmación
+    final cantidadPedidosPendientes = pedidosPendientes.length;
+    final totalItems = pedidosPendientes.fold<int>(0, (sum, pedido) {
+      final detalles = pedido['detalles'] as List;
+      return sum + detalles.where((detalle) => 
+        (detalle['statusDetalle'] ?? 'proceso') == 'proceso'
+      ).length;
+    });
+
+    await ejecutarAtenderMesa( numeroMesa);
+
+  } catch (e) {
+    print('❌ Error en atenderTodosLosPedidosMesa: $e');
+    QuickAlert.show(
+      context: Get.context!,
+      type: QuickAlertType.error,
+      title: 'Error',
+      text: 'Error al procesar la solicitud: $e',
+      confirmBtnText: 'OK',
+      confirmBtnColor: Color(0xFFE74C3C),
+    );
+  }
+}
+
+// 🔧 MÉTODO PRIVADO: Ejecutar la llamada a la API
+Future<void> ejecutarAtenderMesa(int numeroMesa) async {
+  try {
+    // 🔍 PASO 1: Mostrar loading
+   
+    // 🔍 PASO 2: Construir URL y realizar llamada POST
+    Uri uri = Uri.parse('$defaultApiServer/mesas/$numeroMesa/atender-todo/');
+    
+    print('📡 Llamando API: $uri');
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      // El body puede estar vacío o contener información adicional si es necesario
+      body: jsonEncode({
+        'numeroMesa': numeroMesa,
+        'timestamp': DateTime.now().toIso8601String(),
+      }),
+    );
+
+    print('📡 Respuesta API - Código: ${response.statusCode}');
+    print('📡 Respuesta API - Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      
+      if (data['success'] == true || response.statusCode == 200) {
+     
+        if (Get.isDialogOpen ?? false) {
+          Get.back();
+        }
+        
+       
+        // 🔄 PASO 5: Recargar datos para reflejar cambios
+        await refrescarDatos();
+        
+      } else {
+        // ❌ ERROR EN RESPUESTA
+        final mensaje = data['message'] ?? data['error'] ?? 'Respuesta inesperada del servidor';
+        _mostrarErrorAtenderMesa('Error del servidor: $mensaje');
+      }
+      
+    } else if (response.statusCode == 404) {
+      _mostrarErrorAtenderMesa('Mesa no encontrada en el servidor');
+      
+    } else if (response.statusCode == 400) {
+      final data = jsonDecode(response.body);
+      final mensaje = data['message'] ?? data['error'] ?? 'Solicitud inválida';
+      _mostrarErrorAtenderMesa('Error en la solicitud: $mensaje');
+      
+    } else {
+      _mostrarErrorAtenderMesa('Error del servidor (${response.statusCode})');
+    }
+
+  } catch (e) {
+    // 🔍 PASO 6: Manejo de errores de conexión
+    
+    // Cerrar loading si está abierto
+    if (Get.isDialogOpen ?? false) {
+      Get.back();
+    }
+    
+    print('❌ Error de conexión en _ejecutarAtenderMesa: $e');
+    _mostrarErrorAtenderMesa('Error de conexión: $e');
+  }
+}
+void _mostrarErrorAtenderMesa(String mensaje) {
+  QuickAlert.show(
+    context: Get.context!,
+    type: QuickAlertType.error,
+    title: 'Error al Atender Mesa',
+    text: 'No se pudieron atender los pedidos:\n\n$mensaje',
+    confirmBtnText: 'Entendido',
+    confirmBtnColor: Color(0xFFE74C3C),
+  );
+}
+Future<void> liberarTodasLasMesas() async {
+  // Evitar múltiples ejecuciones
+  if (isLiberandoTodasLasMesas.value) return;
+  
+  try {
+    // Obtener todas las mesas con pedidos pendientes
+    List<Map<String, dynamic>> mesasConPendientes = [];
+    
+    for (var mesa in mesasConPedidos) {
+      final numeroMesa = mesa['numeroMesa'];
+      final pedidos = mesa['pedidos'] as List;
+      
+      // Verificar si la mesa tiene pedidos pendientes
+      bool tienePendientes = pedidos.any((pedido) {
+        final detalles = pedido['detalles'] as List;
+        return detalles.any((detalle) => 
+          (detalle['statusDetalle'] ?? 'proceso') == 'proceso'
+        );
+      });
+      
+      if (tienePendientes) {
+        // Contar items pendientes
+        int itemsPendientes = 0;
+        for (var pedido in pedidos) {
+          final detalles = pedido['detalles'] as List;
+          itemsPendientes += detalles.where((detalle) => 
+            (detalle['statusDetalle'] ?? 'proceso') == 'proceso'
+          ).length;
+        }
+        
+        mesasConPendientes.add({
+          'numeroMesa': numeroMesa,
+          'itemsPendientes': itemsPendientes,
+          'mesa': mesa,
+        });
+        
+        print('✅ Mesa $numeroMesa agregada para liberación');
+      }
+    }
+    
+    // Validar que hay mesas para liberar
+    if (mesasConPendientes.isEmpty) {
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.info,
+        title: 'Sin Pedidos Pendientes',
+        text: 'No hay mesas con pedidos pendientes para liberar.',
+        confirmBtnText: 'Entendido',
+        confirmBtnColor: Color(0xFF3498DB),
+      );
+      return;
+    }
+    
+    // Calcular totales para confirmación
+    final totalMesas = mesasConPendientes.length;
+    final totalItems = mesasConPendientes.fold<int>(0, 
+      (sum, mesa) => sum + (mesa['itemsPendientes'] as int)
+    );
+    
+    // Mostrar diálogo de confirmación
+    String detallesMesas = mesasConPendientes.map((mesa) => 
+      'Mesa ${mesa['numeroMesa']}: ${mesa['itemsPendientes']} items'
+    ).join('\n');
+     await _ejecutarLiberacionMasiva(mesasConPendientes);
+    
+  } catch (e) {
+    print('❌ Error en liberarTodasLasMesas: $e');
+    QuickAlert.show(
+      context: Get.context!,
+      type: QuickAlertType.error,
+      title: 'Error',
+      text: 'Error al procesar la solicitud: $e',
+      confirmBtnText: 'OK',
+      confirmBtnColor: Color(0xFFE74C3C),
+    );
+  }
+}
+
+dynamic _extraerIdMesa(Map<String, dynamic> mesa, int numeroMesa) {
+  // Lista de posibles campos que contienen el ID de la mesa
+  List<String> posiblesCamposId = [
+    'id',           // Campo más común
+    'idMesa',       // Alternativa 1
+    'mesaId',       // Alternativa 2
+    'mesa_id',      // Snake case
+    'idnumeroMesa', // Campo específico que vimos antes
+    'pk',           // Primary key
+    'Mesa_id',      // Capitalizado
+    'ID',           // Mayúsculas
+  ];
+  
+  // 🔍 BUSCAR el ID en los campos posibles
+  for (String campo in posiblesCamposId) {
+    if (mesa.containsKey(campo) && mesa[campo] != null) {
+      dynamic valor = mesa[campo];
+      
+      // Verificar que sea un número válido
+      if (valor is int && valor > 0) {
+        print('✅ ID encontrado en campo "$campo": $valor');
+        return valor;
+      } else if (valor is String) {
+        try {
+          int idParsed = int.parse(valor);
+          if (idParsed > 0) {
+            print('✅ ID encontrado en campo "$campo" (string): $idParsed');
+            return idParsed;
+          }
+        } catch (e) {
+          // Continuar buscando
+        }
+      }
+    }
+  }
+  
+  // 🔍 BUSCAR en pedidos individuales por si el ID está ahí
+  try {
+    final pedidos = mesa['pedidos'] as List;
+    if (pedidos.isNotEmpty) {
+      final primerPedido = pedidos.first;
+      
+      // Buscar en el primer pedido
+      for (String campo in ['mesaId', 'mesa_id', 'idMesa']) {
+        if (primerPedido.containsKey(campo)) {
+          dynamic valor = primerPedido[campo];
+          if (valor is int && valor > 0) {
+            print('✅ ID encontrado en pedido, campo "$campo": $valor');
+            return valor;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    print('⚠️ Error buscando ID en pedidos: $e');
+  }
+  
+  // 🔍 ÚLTIMO RECURSO: Buscar mesa por número en todas las mesas
+  for (var mesaCompleta in mesasConPedidos) {
+    if (mesaCompleta['numeroMesa'] == numeroMesa) {
+      // Hacer una búsqueda más profunda
+      print('🔍 Estructura completa de mesa $numeroMesa:');
+      mesaCompleta.forEach((key, value) {
+        print('  "$key": $value (${value.runtimeType})');
+      });
+      break;
+    }
+  }
+  
+  // ⚠️ FALLBACK: Usar numeroMesa como ID (puede causar 404 si no coincide)
+  print('⚠️ No se encontró ID específico para mesa $numeroMesa, usando numeroMesa como fallback');
+  return numeroMesa;
+}Future<void> _ejecutarLiberacionMasiva(List<Map<String, dynamic>> mesasConPendientes) async {
+  try {
+    // ✅ ACTIVAR estado de carga
+    isLiberandoTodasLasMesas.value = true;
+    
+    List<Map<String, dynamic>> resultados = [];
+    int exitosas = 0;
+    int fallidas = 0;
+    
+    for (var mesaInfo in mesasConPendientes) {
+      final numeroMesa = mesaInfo['numeroMesa'];
+      
+      try {
+        print('🔄 Procesando Mesa $numeroMesa...');
+        
+        Uri uri = Uri.parse('$defaultApiServer/mesas/$numeroMesa/atender-todo/');
+        
+        print('📡 URL llamada: $uri');
+        
+        final response = await http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        );
+        
+        print('📡 Mesa $numeroMesa - Respuesta: ${response.statusCode}');
+        print('📡 Mesa $numeroMesa - Body: ${response.body}');
+        
+        if (response.statusCode == 200) {
+          exitosas++;
+          resultados.add({
+            'numeroMesa': numeroMesa,
+            'success': true,
+            'itemsProcesados': mesaInfo['itemsPendientes'],
+          });
+          print('✅ Mesa $numeroMesa liberada exitosamente');
+          
+        } else if (response.statusCode == 404) {
+          fallidas++;
+          resultados.add({
+            'numeroMesa': numeroMesa,
+            'success': false,
+            'error': 'Mesa $numeroMesa no encontrada en el servidor',
+          });
+          print('❌ Mesa $numeroMesa - Error 404: Mesa no encontrada');
+          
+        } else {
+          fallidas++;
+          final responseBody = response.body.isNotEmpty ? response.body : 'Sin mensaje';
+          resultados.add({
+            'numeroMesa': numeroMesa,
+            'success': false,
+            'error': 'Error HTTP ${response.statusCode}: $responseBody',
+          });
+          print('❌ Mesa $numeroMesa - Error HTTP ${response.statusCode}');
+        }
+        
+        // Pausa entre requests
+        await Future.delayed(Duration(milliseconds: 300));
+        
+      } catch (e) {
+        fallidas++;
+        resultados.add({
+          'numeroMesa': numeroMesa,
+          'success': false,
+          'error': 'Error de conexión: $e',
+        });
+        print('❌ Mesa $numeroMesa - Error de conexión: $e');
+      }
+    }
+    
+    // Mostrar resultados
+    if (fallidas == 0) {
+      final totalItemsProcesados = resultados.fold<int>(0, 
+        (sum, resultado) => sum + (resultado['itemsProcesados'] as int? ?? 0)
+      );
+      
+    
+      
+    } else if (exitosas > 0) {
+      final mesasExitosas = resultados.where((r) => r['success'] == true)
+        .map((r) => 'Mesa ${r['numeroMesa']}').join(', ');
+      
+      final erroresDetallados = resultados.where((r) => r['success'] == false)
+        .map((r) => '• Mesa ${r['numeroMesa']}: ${r['error']}').join('\n');
+      
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.warning,
+        title: 'Liberación Parcial',
+        text: '⚠️ Procesamiento parcial:\n\n'
+              '✅ Exitosas ($exitosas): $mesasExitosas\n\n'
+              '❌ Errores ($fallidas):\n$erroresDetallados',
+        confirmBtnText: 'Entendido',
+        confirmBtnColor: Color(0xFFF39C12),
+      );
+      
+    } else {
+      final erroresDetallados = resultados.map((r) => 
+        '• Mesa ${r['numeroMesa']}: ${r['error']}'
+      ).join('\n');
+      
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.error,
+        title: 'Error en Liberación',
+        text: '❌ No se pudo liberar ninguna mesa:\n\n$erroresDetallados\n\n'
+              '💡 Verifica que las mesas existan en el servidor.',
+        confirmBtnText: 'Entendido',
+        confirmBtnColor: Color(0xFFE74C3C),
+      );
+    }
+    
+    // Recargar datos
+    await refrescarDatos();
+    
+  } catch (e) {
+    print('❌ Error general en _ejecutarLiberacionMasiva: $e');
+    QuickAlert.show(
+      context: Get.context!,
+      type: QuickAlertType.error,
+      title: 'Error de Sistema',
+      text: 'Error inesperado: $e',
+      confirmBtnText: 'OK',
+      confirmBtnColor: Color(0xFFE74C3C),
+    );
+  } finally {
+    // ✅ DESACTIVAR estado de carga
+    isLiberandoTodasLasMesas.value = false;
+  }
+}
+
+void debugEstructuraMesa(int numeroMesa) {
+  final mesa = mesasConPedidos.firstWhereOrNull(
+    (mesa) => mesa['numeroMesa'] == numeroMesa
+  );
+  
+  if (mesa != null) {
+    print('🔍 === DEBUG ESTRUCTURA MESA $numeroMesa ===');
+    mesa.forEach((key, value) {
+      print('$key: $value (${value.runtimeType})');
+    });
+    print('🔍 === FIN DEBUG ===');
+  } else {
+    print('❌ Mesa $numeroMesa no encontrada en mesasConPedidos');
+  }
+}
+// 🔧 MÉTODO AUXILIAR: Obtener conteo de mesas con pendientes (para UI)
+int obtenerConteoMesasConPendientes() {
+  int conteo = 0;
+  
+  for (var mesa in mesasConPedidos) {
+    final pedidos = mesa['pedidos'] as List;
+    
+    bool tienePendientes = pedidos.any((pedido) {
+      final detalles = pedido['detalles'] as List;
+      return detalles.any((detalle) => 
+        (detalle['statusDetalle'] ?? 'proceso') == 'proceso'
+      );
+    });
+    
+    if (tienePendientes) {
+      conteo++;
+    }
+  }
+  
+  return conteo;
+}
 }

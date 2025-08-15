@@ -3,9 +3,11 @@ import 'package:get/get.dart';
 import 'package:restaurapp/common/constants/userservice.dart';
 import 'package:restaurapp/page/home/home_pc_controller.dart';
 
-
 class HomePCPage extends StatelessWidget {
   final HomeController controller = Get.put(HomeController());
+  
+  // Variable observable para controlar si la sidebar está visible
+  final RxBool isSidebarVisible = true.obs;
 
   @override
   Widget build(BuildContext context) {
@@ -13,12 +15,116 @@ class HomePCPage extends StatelessWidget {
       backgroundColor: Color(0xFFF5F2F0),
       body: Row(
         children: [
-          // Sidebar Navigation
-          _buildSidebar(context),
+          // Sidebar Navigation (Colapsable)
+          Obx(() => AnimatedContainer(
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            width: isSidebarVisible.value ? _getSidebarWidth(context) : 0,
+            child: isSidebarVisible.value 
+              ? _buildSidebar(context)
+              : SizedBox.shrink(),
+          )),
           
           // Main Content Area
           Expanded(
-            child: Obx(() => controller.currentPage),
+            child: Column(
+              children: [
+                // Header con botón de menú
+                _buildHeader(),
+                
+                // Contenido principal
+                Expanded(
+                  child: Obx(() => controller.currentPage),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  double _getSidebarWidth(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 1024;
+    return isSmallScreen ? 80 : 260;
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Botón de menú hamburguesa
+          Obx(() => AnimatedSwitcher(
+            duration: Duration(milliseconds: 200),
+            child: IconButton(
+              key: ValueKey(isSidebarVisible.value),
+              icon: Icon(
+                isSidebarVisible.value ? Icons.menu_open : Icons.menu,
+                color: Color(0xFF8B4513),
+                size: 24,
+              ),
+              onPressed: () {
+                isSidebarVisible.value = !isSidebarVisible.value;
+              },
+              tooltip: isSidebarVisible.value ? 'Ocultar menú' : 'Mostrar menú',
+            ),
+          )),
+          
+          // Título de la página actual (opcional)
+          Expanded(
+            child: Obx(() {
+              final selectedIndex = controller.selectedIndex.value;
+              final visibleItems = controller.visibleNavigationItems;
+              final currentPageTitle = selectedIndex < visibleItems.length 
+                ? visibleItems[selectedIndex].title
+                : 'Dashboard';
+              
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  currentPageTitle,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3E1F08),
+                  ),
+                ),
+              );
+            }),
+          ),
+          
+          // Información adicional del header (opcional)
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.restaurant,
+                  color: Color(0xFF8B4513),
+                  size: 20,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Comedor "El Jobo"',
+                  style: TextStyle(
+                    color: Color(0xFF8B4513),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -26,12 +132,10 @@ class HomePCPage extends StatelessWidget {
   }
 
   Widget _buildSidebar(BuildContext context) {
-    // Detectar si es una pantalla pequeña (tablet o menor)
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 1024; // Ajusta este valor según tus necesidades
+    final isSmallScreen = screenWidth < 1024;
     
     return Container(
-      width: isSmallScreen ? 80 : 260, // Ancho reducido para pantallas pequeñas
       decoration: BoxDecoration(
         color: Color(0xFF8B4513),
         boxShadow: [

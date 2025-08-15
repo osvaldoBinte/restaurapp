@@ -800,198 +800,200 @@ class AddProductsToOrderScreen extends StatelessWidget {
   }
 
   // ✅ Los métodos restantes permanecen iguales
-  /// Dialog para agregar producto al carrito
-  void _showAddToCartDialog(Producto producto) {
-    final TextEditingController observacionesController = TextEditingController();
-    
-    Get.bottomSheet(
-      Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        padding: EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle del bottomsheet
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            SizedBox(height: 20),
-            
-            // Icono
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Color(0xFF8B4513).withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.add_shopping_cart,
-                color: Color(0xFF8B4513),
-                size: 40,
-              ),
-            ),
-            SizedBox(height: 16),
-            
-            // Título
-            Text(
-              'Agregar al carrito',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8B4513),
-              ),
-            ),
-            SizedBox(height: 16),
-            
-            // Info del producto
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Color(0xFFF5F2F0),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Color(0xFF8B4513).withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    producto.nombre,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Color(0xFF3E1F08),
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    '\$${producto.precioDouble.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: Color(0xFF8B4513),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  if (producto.descripcion.isNotEmpty) ...[
-                    SizedBox(height: 4),
-                    Text(
-                      producto.descripcion,
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            SizedBox(height: 20),
-            
-            // Campo de observaciones
-            TextField(
-              controller: observacionesController,
-              decoration: InputDecoration(
-                labelText: 'Observaciones (opcional)',
-                hintText: 'Ej: Sin cebolla, extra queso...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color(0xFF8B4513)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color(0xFF8B4513).withOpacity(0.5)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color(0xFF8B4513), width: 2),
-                ),
-                labelStyle: TextStyle(color: Color(0xFF8B4513)),
-                prefixIcon: Icon(Icons.edit_note, color: Color(0xFF8B4513)),
-              ),
-              maxLines: 3,
-              style: TextStyle(color: Color(0xFF3E1F08)),
-            ),
-            SizedBox(height: 24),
-            
-            // Botones
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Get.back(),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.grey),
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Text(
-                      'Cancelar',
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      controller.agregarAlCarrito(
-                        producto,
-                        observaciones: observacionesController.text.trim(),
-                      );
-                      Get.back();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF8B4513),
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      'Agregar al carrito',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            
-            // Espaciado adicional para el teclado
-            SizedBox(height: MediaQuery.of(Get.context!).viewInsets.bottom),
-          ],
+  /// Dialog para agregar producto al carritovoid
+   _showAddToCartDialog(Producto producto) {
+  final TextEditingController observacionesController = TextEditingController();
+  
+  Get.bottomSheet(
+    Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
       ),
-      backgroundColor: Colors.transparent,
-      isDismissible: true,
-      enableDrag: true,
-      isScrollControlled: true,
-    );
-  }
-
+      padding: EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle del bottomsheet
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          SizedBox(height: 20),
+          
+          // Icono
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Color(0xFF8B4513).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.add_shopping_cart,
+              color: Color(0xFF8B4513),
+              size: 40,
+            ),
+          ),
+          SizedBox(height: 16),
+          
+          // Título
+          Text(
+            'Agregar al carrito',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF8B4513),
+            ),
+          ),
+          SizedBox(height: 16),
+          
+          // Info del producto
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Color(0xFFF5F2F0),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Color(0xFF8B4513).withOpacity(0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  producto.nombre,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF3E1F08),
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '\$${producto.precioDouble.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    color: Color(0xFF8B4513),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                if (producto.descripcion.isNotEmpty) ...[
+                  SizedBox(height: 4),
+                  Text(
+                    producto.descripcion,
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          SizedBox(height: 20),
+          
+          // Campo de observaciones
+          TextField(
+            controller: observacionesController,
+            decoration: InputDecoration(
+              labelText: 'Observaciones (opcional)',
+              hintText: 'Ej: Sin cebolla, extra queso...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Color(0xFF8B4513)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Color(0xFF8B4513).withOpacity(0.5)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Color(0xFF8B4513), width: 2),
+              ),
+              labelStyle: TextStyle(color: Color(0xFF8B4513)),
+              prefixIcon: Icon(Icons.edit_note, color: Color(0xFF8B4513)),
+            ),
+            maxLines: 3,
+            style: TextStyle(color: Color(0xFF3E1F08)),
+          ),
+          SizedBox(height: 24),
+          
+          // Botones
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Get.back(),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey),
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Cancelar',
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: () {
+                    controller.agregarAlCarrito(
+                      producto,
+                      observaciones: observacionesController.text.trim(),
+                    );
+                    Get.back();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF8B4513),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Agregar al carrito',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          // CAMBIO AQUÍ: Espaciado seguro para teclado Y navegación del sistema
+          SizedBox(
+            height: MediaQuery.of(Get.context!).viewInsets.bottom + 
+                   MediaQuery.of(Get.context!).viewPadding.bottom,
+          ),
+        ],
+      ),
+    ),
+    backgroundColor: Colors.transparent,
+    isDismissible: true,
+    enableDrag: true,
+    isScrollControlled: true,
+  );
+}
   /// Modal del carrito
   void _showCart() {
     showModalBottomSheet(

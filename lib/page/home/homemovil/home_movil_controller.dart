@@ -22,7 +22,7 @@ class HomeMovilController extends GetxController {
   List<String> get titles => [
     
     'Orden',
-    'Pedios',
+    'Pedidos',
     'Perfil'
   ];
 

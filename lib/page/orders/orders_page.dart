@@ -18,378 +18,457 @@ class OrdersDashboardScreen extends StatelessWidget {
 
   OrdersDashboardScreen({Key? key}) : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    // 🎯 RESPONSIVIDAD: Detectar tamaño de pantalla
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenHeight < 600;
-    final isVerySmallScreen = screenHeight < 500;
-    final isSmallWidth = screenWidth < 400;
-    
-    // 📐 FLEX ADAPTATIVO basado en tamaño de pantalla
-    int carouselFlex;
-    int tablesFlex;
-    
-    if (isVerySmallScreen) {
-      carouselFlex = 1; // Mínimo espacio en pantallas muy pequeñas
-      tablesFlex = 4;
-    } else if (isSmallScreen) {
-      carouselFlex = 2; // Menos espacio en pantallas pequeñas
-      tablesFlex = 5;
-    } else {
-      carouselFlex = 3; // Espacio normal en pantallas medianas/grandes
-      tablesFlex = 6;
-    }
 
-    return Scaffold(
-      backgroundColor: Color(0xFFF5F2F0),
-      appBar: AppBar(
-        backgroundColor: Color(0xFF8B4513),
-        title: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(isSmallWidth ? 6 : 8), // Padding adaptativo
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'EJ',
-                style: TextStyle(
-                  color: Color(0xFF8B4513),
-                  fontWeight: FontWeight.bold,
-                  fontSize: isSmallWidth ? 14 : 16, // Font size adaptativo
-                ),
-              ),
-            ),
-            SizedBox(width: isSmallWidth ? 8 : 12), // Spacing adaptativo
-            
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Comedor "El Jobo"',
-                    style: TextStyle(
-                      fontSize: isSmallWidth ? 16 : 18, // Font size adaptativo
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  // Auto-refresh status
-                 
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          // Botón auto-refresh
-         
-          
-          // Botón refresh manual
-          IconButton(
-            icon: Icon(
-              Icons.refresh, 
+@override
+Widget build(BuildContext context) {
+  // 🎯 RESPONSIVIDAD: Detectar tamaño de pantalla
+  final screenHeight = MediaQuery.of(context).size.height;
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isSmallScreen = screenHeight < 600;
+  final isVerySmallScreen = screenHeight < 500;
+  final isSmallWidth = screenWidth < 400;
+  
+  // 📐 ALTURA MÍNIMA ADAPTATIVA para el carousel
+  double minCarouselHeight;
+  double maxCarouselHeight;
+  
+  if (isVerySmallScreen) {
+    minCarouselHeight = 140; // Aumentado para que el texto se vea mejor
+    maxCarouselHeight = 180;
+  } else if (isSmallScreen) {
+    minCarouselHeight = 160; 
+    maxCarouselHeight = 200;
+  } else {
+    minCarouselHeight = 180; 
+    maxCarouselHeight = 240;
+  }
+
+  return Scaffold(
+    backgroundColor: Color(0xFFF5F2F0),
+    appBar: AppBar(
+      backgroundColor: Color(0xFF8B4513),
+      title: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(isSmallWidth ? 6 : 8),
+            decoration: BoxDecoration(
               color: Colors.white,
-              size: isSmallWidth ? 20 : 24, // Tamaño adaptativo
+              borderRadius: BorderRadius.circular(8),
             ),
-            onPressed: () => controller.refrescarDatos(),
+            child: Text(
+              'EJ',
+              style: TextStyle(
+                color: Color(0xFF8B4513),
+                fontWeight: FontWeight.bold,
+                fontSize: isSmallWidth ? 14 : 16,
+              ),
+            ),
           ),
-        ],
-      ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return Center(
+          SizedBox(width: isSmallWidth ? 8 : 12),
+          
+          Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
-                ),
-                SizedBox(height: 16),
                 Text(
-                  'Cargando órdenes...',
+                  'Comedor "El Jobo"',
                   style: TextStyle(
-                    color: Color(0xFF8B4513),
-                    fontSize: isSmallScreen ? 14 : 16, // Font size adaptativo
+                    fontSize: isSmallWidth ? 16 : 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ],
             ),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: controller.refrescarDatos,
-          color: Color(0xFF8B4513),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(
+            Icons.refresh, 
+            color: Colors.white,
+            size: isSmallWidth ? 20 : 24,
+          ),
+          onPressed: () => controller.refrescarDatos(),
+        ),
+      ],
+    ),
+    body: Obx(() {
+      if (controller.isLoading.value) {
+        return Center(
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 🎯 CAROUSEL RESPONSIVO - Flex adaptativo
-              Expanded(
-                flex: carouselFlex,
-                child: _buildPendingOrdersCarousel(isSmallScreen, isVerySmallScreen, isSmallWidth),
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
               ),
-              
-              // 📋 LISTA DE MESAS RESPONSIVA - Flex adaptativo  
-              Expanded(
-                flex: tablesFlex,
-                child: _buildTablesList(isSmallScreen, isSmallWidth),
+              SizedBox(height: 16),
+              Text(
+                'Cargando órdenes...',
+                style: TextStyle(
+                  color: Color(0xFF8B4513),
+                  fontSize: isSmallScreen ? 14 : 16,
+                ),
               ),
             ],
           ),
         );
-      }),
-    );
-  }
+      }
 
-  // 🎠 CAROUSEL RESPONSIVO
-  Widget _buildPendingOrdersCarousel(bool isSmallScreen, bool isVerySmallScreen, bool isSmallWidth) {
-    return Container(
-      child: Column(
-        children: [
-          // Header del carousel - Padding y font adaptativo
-          Padding(
-            padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.restaurant_menu, 
+      return RefreshIndicator(
+        onRefresh: controller.refrescarDatos,
+        color: Color(0xFF8B4513),
+        child: Column(
+          children: [
+            // 🎯 CAROUSEL CON ALTURA FLEXIBLE - SOLUCIÓN PRINCIPAL
+            Container(
+              constraints: BoxConstraints(
+                minHeight: minCarouselHeight,
+                maxHeight: maxCarouselHeight, // Altura máxima más flexible
+              ),
+              child: _buildPendingOrdersCarousel(isSmallScreen, isVerySmallScreen, isSmallWidth),
+            ),
+            
+            // 📋 LISTA DE MESAS - Usa el espacio restante
+            Expanded(
+              child: _buildTablesList(isSmallScreen, isSmallWidth),
+            ),
+          ],
+        ),
+      );
+    }),
+  );
+}
+Widget _buildPendingOrdersCarousel(bool isSmallScreen, bool isVerySmallScreen, bool isSmallWidth) {
+  return Column(
+    children: [
+      // Header del carousel - MODIFICADO con botón Liberar Todo
+      Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 12 : 16,
+          vertical: isSmallScreen ? 8 : 10,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.restaurant_menu, 
+              color: Color(0xFF8B4513),
+              size: isSmallWidth ? 18 : 22,
+            ),
+            SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Pedidos Pendientes',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 14 : 16,
+                  fontWeight: FontWeight.bold,
                   color: Color(0xFF8B4513),
-                  size: isSmallWidth ? 20 : 24, // Tamaño adaptativo
                 ),
-                SizedBox(width: 8),
-                Expanded(
+              ),
+            ),
+            
+            // ✅ NUEVO: Botón Liberar Todo (solo si hay pedidos pendientes)
+            Obx(() {
+  final conteoMesas = controller.obtenerConteoMesasConPendientes();
+  final isLoading = controller.isLiberandoTodasLasMesas.value;
+  
+  if (conteoMesas > 0) {
+    return Container(
+      margin: EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: isLoading ? null : () => controller.liberarTodasLasMesas(), // ✅ Deshabilitar si está cargando
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallWidth ? 8 : 10,
+            vertical: isSmallWidth ? 4 : 6,
+          ),
+          decoration: BoxDecoration(
+            color: isLoading 
+                ? Colors.grey[400] // ✅ Color gris mientras carga
+                : Color(0xFFE74C3C), // Color normal
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isLoading 
+                ? [] // ✅ Sin sombra mientras carga
+                : [
+                    BoxShadow(
+                      color: Color(0xFFE74C3C).withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ✅ Mostrar loader o ícono normal
+              isLoading 
+                  ? SizedBox(
+                      width: isSmallWidth ? 14 : 16,
+                      height: isSmallWidth ? 14 : 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Icon(
+                      Icons.done_all,
+                      color: Colors.white,
+                      size: isSmallWidth ? 14 : 16,
+                    ),
+              SizedBox(width: 4),
+              Text(
+                isLoading 
+                    ? (isSmallWidth ? 'Proc...' : 'Procesando...')  // ✅ Texto mientras carga
+                    : (isSmallWidth ? 'Todo' : 'Liberar Todo'),     // Texto normal
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallWidth ? 10 : 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              // ✅ Solo mostrar contador si NO está cargando
+              if (!isLoading && !isSmallWidth) ...[
+                SizedBox(width: 4),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   child: Text(
-                    'Pedidos Pendientes',
+                    '$conteoMesas',
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 16 : 18, // Font size adaptativo
+                      color: Colors.white,
+                      fontSize: 9,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF8B4513),
                     ),
                   ),
                 ),
-                // Auto-refresh indicator
-                Obx(() {
-                  if (controller.isAutoRefreshEnabled.value) {
-                    return Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isSmallWidth ? 6 : 8, 
-                        vertical: isSmallWidth ? 2 : 4
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: isSmallWidth ? 4 : 6,
-                            height: isSmallWidth ? 4 : 6,
-                            decoration: BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Auto',
-                            style: TextStyle(
-                              fontSize: isSmallWidth ? 8 : 10,
-                              color: Colors.green[700],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  return SizedBox.shrink();
-                }),
               ],
-            ),
+            ],
           ),
-          
-          // Lista de cards
-          Expanded(
-            child: Obx(() {
-              if (controller.pedidosIndividuales.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+        ),
+      ),
+    );
+  }
+  return SizedBox.shrink();
+}),
+            
+            // Auto-refresh indicator (existente)
+            Obx(() {
+              if (controller.isAutoRefreshEnabled.value) {
+                return Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmallWidth ? 4 : 6, 
+                    vertical: 2
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.check_circle, 
-                        size: isSmallScreen ? 32 : 48, // Tamaño adaptativo
-                        color: Colors.green
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                      SizedBox(height: 8),
+                      SizedBox(width: 3),
                       Text(
-                        'No hay pedidos pendientes',
+                        'Auto',
                         style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: isSmallScreen ? 12 : 14, // Font size adaptativo
+                          fontSize: 8,
+                          color: Colors.green[700],
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 );
               }
-
-              return ScrollConfiguration(
-                behavior: ScrollConfiguration.of(Get.context!).copyWith(
-                  dragDevices: {
-                    PointerDeviceKind.touch,
-                    PointerDeviceKind.mouse,
-                    PointerDeviceKind.trackpad,
-                  },
-                  scrollbars: true,
-                ),
-                child: Container(
-                  height: double.infinity,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    physics: BouncingScrollPhysics(),
-                    padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16),
-                    itemCount: controller.pedidosIndividuales.length,
-                    itemBuilder: (context, index) {
-                      final pedido = controller.pedidosIndividuales[index];
-                      return _buildCarouselCardIndividual(pedido, isSmallScreen, isVerySmallScreen, isSmallWidth);
-                    },
-                  ),
-                ),
-              );
+              return SizedBox.shrink();
             }),
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
-
-  // 🃏 CARD INDIVIDUAL RESPONSIVA
-  Widget _buildCarouselCardIndividual(Map<String, dynamic> detalle, bool isSmallScreen, bool isVerySmallScreen, bool isSmallWidth) {
-    final numeroMesa = detalle['numeroMesa'];
-    final nombreOrden = detalle['nombreOrden'] ?? 'Sin nombre';
-    final pedidoId = detalle['detalleId'];
-    final nombreProducto = detalle['nombreProducto'] ?? 'Producto';
-    final cantidad = detalle['cantidad'] ?? 1;
-    final precio = (detalle['precio'] ?? 0.0).toDouble();
-    final observaciones = detalle['observaciones'] ?? '';
-    final fecha = DateTime.parse(detalle['fecha']);
-    final timeString = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
-         
-    // 📐 DIMENSIONES ADAPTATIVAS
-    double cardWidth;
-    if (isSmallWidth) {
-      cardWidth = 140; // Muy estrecho
-    } else if (isSmallScreen) {
-      cardWidth = 160; // Pantalla pequeña
-    } else {
-      cardWidth = 180; // Pantalla normal
-    }
-         
-    return Container(
-      width: cardWidth,
-      margin: EdgeInsets.only(right: 12, bottom: isVerySmallScreen ? 2 : 8),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: InkWell(
-          onTap: () => controller.mostrarModalEstadoOrden(pedidoId),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: EdgeInsets.all(isSmallScreen ? 8 : 12), // Padding adaptativo
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                colors: [Color(0xFFFFB74D), Color(0xFFFF8A65)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min, // ✅ CLAVE: Evita overflow vertical
-              children: [
-                // Nombre del producto - Limitado y adaptativo
-                Flexible(
-                  child: Text(
-                    nombreProducto,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isSmallWidth ? 11 : (isSmallScreen ? 12 : 14), // Font adaptativo
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: isVerySmallScreen ? 1 : 2, // Líneas adaptativas
-                    overflow: TextOverflow.ellipsis,
+      
+      // Lista flexible que se adapta al contenido (sin cambios)
+      Flexible(
+        child: Obx(() {
+          if (controller.pedidosIndividuales.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.check_circle, 
+                    size: isSmallScreen ? 24 : 32,
+                    color: Colors.green
                   ),
+                  SizedBox(height: 6),
+                  Text(
+                    'No hay pedidos pendientes',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: isSmallScreen ? 11 : 13,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ScrollConfiguration(
+            behavior: ScrollConfiguration.of(Get.context!).copyWith(
+              dragDevices: {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.mouse,
+                PointerDeviceKind.trackpad,
+              },
+              scrollbars: true,
+            ),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8 : 12),
+              itemCount: controller.pedidosIndividuales.length,
+              itemBuilder: (context, index) {
+                final pedido = controller.pedidosIndividuales[index];
+                return _buildCarouselCardIndividual(pedido, isSmallScreen, isVerySmallScreen, isSmallWidth);
+              },
+            ),
+          );
+        }),
+      ),
+    ],
+  );
+}
+
+Widget _buildCarouselCardIndividual(Map<String, dynamic> detalle, bool isSmallScreen, bool isVerySmallScreen, bool isSmallWidth) {
+  final numeroMesa = detalle['numeroMesa'];
+  final nombreOrden = detalle['nombreOrden'] ?? 'Sin nombre';
+  final pedidoId = detalle['detalleId'];
+  final nombreProducto = detalle['nombreProducto'] ?? 'Producto';
+  final cantidad = detalle['cantidad'] ?? 1;
+  final precio = (detalle['precio'] ?? 0.0).toDouble();
+  final observaciones = detalle['observaciones'] ?? '';
+  final fecha = DateTime.parse(detalle['fecha']);
+  final timeString = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
+       
+  // 📐 DIMENSIONES BASE - Solo ancho, altura será automática
+  double cardWidth;
+  
+  if (isSmallWidth) {
+    cardWidth = 150;
+  } else if (isSmallScreen) {
+    cardWidth = 170;
+  } else {
+    cardWidth = 190;
+  }
+       
+  return Container(
+    width: cardWidth,
+    // ✅ REMOVIDO: constraints con minHeight - ahora es completamente flexible
+    margin: EdgeInsets.only(right: 12, bottom: isVerySmallScreen ? 4 : 8),
+    child: Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => controller.mostrarModalEstadoOrden(pedidoId),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          // ✅ REMOVIDO: constraints - la altura será automática
+          padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [Color(0xFFFFB74D), Color(0xFFFF8A65)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // ✅ IMPORTANTE: min para que se ajuste al contenido
+            children: [
+              // 🔧 Nombre del producto - SIN límite de líneas
+              Text(
+                nombreProducto,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallWidth ? 12 : (isSmallScreen ? 13 : 14),
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
                 ),
-                SizedBox(height: isVerySmallScreen ? 2 : 4),
-                             
-                // Cantidad y precio - Compacto
-                Text(
-                  'Cant: $cantidad',
+                // ✅ REMOVIDO: maxLines y overflow - ahora se expande automáticamente
+              ),
+              
+              SizedBox(height: 6),
+                           
+              // 🔧 Cantidad
+              Text(
+                'Cant: $cantidad',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallWidth ? 10 : (isSmallScreen ? 11 : 12),
+                  fontWeight: FontWeight.w500,
+                  height: 1.2,
+                ),
+              ),
+             
+              SizedBox(height: 8),
+                           
+              // 🔧 Mesa - Badge
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 6 : 8, 
+                  vertical: isSmallScreen ? 3 : 4
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'MESA $numeroMesa',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: isSmallWidth ? 9 : (isSmallScreen ? 10 : 12),
-                    fontWeight: FontWeight.w500,
+                    fontSize: isSmallWidth ? 10 : (isSmallScreen ? 11 : 12),
+                    fontWeight: FontWeight.bold,
+                    height: 1.1,
                   ),
                 ),
+              ),
+                           
+              // 🔧 Observaciones - SIN restricciones de líneas
+              if (observaciones.isNotEmpty) ...[
+                SizedBox(height: 6),
+                Flexible(
+                  child: Text(
+                 'MESA $observaciones',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    height: 1.2,
+                  ),
+                  // ✅ REMOVIDO: maxLines y overflow - se expande automáticamente
+                ),
+                  )  // ✅ Flexible para que se ajuste al contenido
                
-                SizedBox(height: isVerySmallScreen ? 2 : 8),
-                             
-                // Mesa - Compacto
-                 Flexible(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isSmallScreen ? 4 : 8, 
-                      vertical: isSmallScreen ? 2 : 4
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'MESA $numeroMesa',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: isSmallWidth ? 9 : (isSmallScreen ? 10 : 12),
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ),
-                ),
-                             
-                // Spacer adaptativo
-                       
-                // Observaciones - Solo en pantallas normales
-                if (observaciones.isNotEmpty && !isSmallScreen) ...[
-                  Flexible(
-                    child: Text(
-                      observaciones,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                ],
-                 
               ],
-            ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // 📋 LISTA DE MESAS RESPONSIVA
   Widget _buildTablesList(bool isSmallScreen, bool isSmallWidth) {
@@ -615,4 +694,5 @@ class OrdersDashboardScreen extends StatelessWidget {
       ),
     );
   }
+  
 }

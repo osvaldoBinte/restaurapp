@@ -815,7 +815,6 @@ void _debugCategorySelection() {
       ),
     );
   }
-
 void _showAddToCartDialog(Producto producto) {
   final TextEditingController observacionesController = TextEditingController();
   
@@ -995,8 +994,11 @@ void _showAddToCartDialog(Producto producto) {
             ],
           ),
           
-          // Espaciado adicional para el teclado
-          SizedBox(height: MediaQuery.of(Get.context!).viewInsets.bottom),
+          // Espaciado seguro para teclado Y navegación del sistema
+          SizedBox(
+            height: MediaQuery.of(Get.context!).viewInsets.bottom + 
+                   MediaQuery.of(Get.context!).viewPadding.bottom,
+          ),
         ],
       ),
     ),
@@ -1006,7 +1008,6 @@ void _showAddToCartDialog(Producto producto) {
     isScrollControlled: true,
   );
 }
-
 
 
 void _showCart() {
@@ -1253,7 +1254,7 @@ void _showCart() {
                   )),
           ),
           
-          // Footer with order name input (sin cambios importantes)
+          // Footer with order name input
           Obx(() => controller.cartItems.isNotEmpty
               ? Container(
                   padding: EdgeInsets.all(16),
@@ -1346,6 +1347,11 @@ void _showCart() {
                                 ),
                         )),
                       ),
+                      
+                      // ✅ CAMBIO PRINCIPAL: Agregamos el padding para navegación del sistema
+                      SizedBox(
+                        height: MediaQuery.of(context).viewPadding.bottom,
+                      ),
                     ],
                   ),
                 )
@@ -1355,7 +1361,6 @@ void _showCart() {
     ),
   );
 }
-
   Widget _buildCartItem(CartItem cartItem, int index) {
     return Container(
       margin: EdgeInsets.only(bottom: 12),

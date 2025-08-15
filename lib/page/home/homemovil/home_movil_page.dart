@@ -60,7 +60,7 @@ class HomeMovilPage extends StatelessWidget {
     final List<String> labels = [
      
     'Orden',
-    'Pedios',
+    'Pedidos',
       'Perfil'
     ];
     

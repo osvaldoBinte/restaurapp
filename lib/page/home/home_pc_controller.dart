@@ -18,7 +18,7 @@ class HomeController extends GetxController {
   // Páginas principales del dashboard
   final List<Widget> _allPages = [
     DashboardPage(),
-    OrdenesPageDesktop(),
+    OrdersDashboardScreen(),
     UserManagementScreen(),
   ];
 

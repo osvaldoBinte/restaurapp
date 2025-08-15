@@ -331,6 +331,16 @@ class UserProfileScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(
+                          ventasController.fechaInicio.value.isNotEmpty
+                              ? ventasController.fechaInicio.value
+                              : DateTime.now().toString().split(' ')[0],
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF3E1F08),
+                          ),
+                        ),
+                        Text(
                           'Total del Día',
                           style: TextStyle(
                             fontSize: 14,
@@ -345,38 +355,6 @@ class UserProfileScreen extends StatelessWidget {
                 
                 SizedBox(width: 16),
                 
-                Expanded(
-                  child: Container(
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          ventasController.fechaInicio.value.isNotEmpty
-                              ? ventasController.fechaInicio.value
-                              : DateTime.now().toString().split(' ')[0],
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF3E1F08),
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Fecha',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ],
             );
           }),
