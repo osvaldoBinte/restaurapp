@@ -265,7 +265,7 @@ Future<void> buscarProductos(String query) async {
   /// Obtener todas las categorías
   Future<void> obtenerCategorias() async {
     try {
-      isLoadingCategories.value = true;
+    //  isLoadingCategories.value = true;
       
       Uri uri = Uri.parse('$defaultApiServer/menu/listarCategorias/');
       
@@ -294,17 +294,8 @@ Future<void> buscarProductos(String query) async {
         }
         
         final List<dynamic> data = decodedData;
-        categorias.value = data
-            .map((json) {
-              try {
-                return Category.fromJson(json);
-              } catch (e) {
-                print('⚠️ Error al parsear categoría: $json - Error: $e');
-                return null;
-              }
-            })
-            .where((cat) => cat != null && cat.status) // Solo categorías activas y válidas
-            .cast<Category>()
+      categorias.value = data
+            .map((json) => Category.fromJson(json))
             .toList();
       } else {
         throw Exception('Error del servidor: ${response.statusCode}');
@@ -313,7 +304,7 @@ Future<void> buscarProductos(String query) async {
       print('❌ Error al obtener categorías: $e');
      // _mostrarError('Error al cargar categorías', 'No se pudieron cargar las categorías: $e');
     } finally {
-      isLoadingCategories.value = false;
+     // isLoadingCategories.value = false;
     }
   }
 

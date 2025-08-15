@@ -224,16 +224,23 @@ class CategoryListController extends GetxController {
   }
 
   /// ✅ NUEVO: Método auxiliar para mostrar errores
-  void _mostrarError(String mensaje) {
+void _mostrarError(String mensaje) {
+  // ✅ CORRECCIÓN: Verificar contexto antes de mostrar alert
+  final context = Get.context;
+  if (context != null) {
     QuickAlert.show(
-      context: Get.context!,
+      context: context,
       type: QuickAlertType.error,
       title: 'Error',
       text: mensaje,
       confirmBtnText: 'OK',
       confirmBtnColor: Color(0xFFE74C3C),
     );
+  } else {
+    // Fallback: imprimir en consola si no hay contexto
+    print('❌ ERROR: $mensaje');
   }
+}
   /// Método para obtener todas las categorías
   Future<void> listarCategorias() async {
     try {
@@ -444,13 +451,14 @@ class CategoryListController extends GetxController {
              descripcion.contains(query.toLowerCase());
     }).toList();
   }
+
+
   Future<bool> actualizarOrdenCategoria(int categoriaId, int nuevoOrden) async {
   try {
-    print('🔄 Actualizando orden de categoría $categoriaId a posición $nuevoOrden');
+    print('🔄 desde Actualizando orden de categoría $categoriaId a posición $nuevoOrden');
 
     Uri uri = Uri.parse('$defaultApiServer/menu/actualizarOrdenCategoriaMenu/$categoriaId/');
     
-    // Preparar el body con el nuevo orden
     final Map<String, dynamic> body = {
       'ordenMenu': nuevoOrden,
     };
@@ -458,7 +466,7 @@ class CategoryListController extends GetxController {
     print('📡 URL: $uri');
     print('📤 Body: $body');
 
-    final response = await http.put( 
+    final response = await http.put(
       uri,
       headers: {
         'Content-Type': 'application/json',
@@ -471,7 +479,21 @@ class CategoryListController extends GetxController {
     print('📄 Respuesta del servidor: ${response.body}');
 
     if (response.statusCode == 200) {
-      print('✅ Orden actualizado correctamente');
+      print('✅ desde Orden actualizado correctamente');
+      print('📄 desde Respuesta: ${response.body}');
+      
+      // ✅ CORRECCIÓN: Verificar si el controller existe antes de usarlo
+      try {
+        if (Get.isRegistered<CreateOrderController>()) {
+          final CreateOrderController controller = Get.find<CreateOrderController>();
+          await controller.obtenerCategorias();
+          print('✅ Datos del menú recargados');
+        }
+      } catch (e) {
+        print('⚠️ Error al recargar CreateOrderController: $e');
+        // No detener el flujo si falla esto
+      }
+      
       return true;
     } else {
       String errorMessage = 'Error al actualizar orden (${response.statusCode})';
@@ -480,7 +502,7 @@ class CategoryListController extends GetxController {
         final errorData = jsonDecode(response.body);
         errorMessage = errorData['message'] ?? errorData['error'] ?? errorMessage;
       } catch (e) {
-        errorMessage = 'Error: ${response.reasonPhrase}';
+        errorMessage = 'Error: ${response.reasonPhrase ?? 'Desconocido'}';
       }
 
       print('❌ Error: $errorMessage');
@@ -496,21 +518,19 @@ class CategoryListController extends GetxController {
 }
 Future<void> actualizarOrdenCategorias(List<Map<String, dynamic>> categoriasOrdenadas) async {
   try {
-    isLoading.value = true;
+   // isLoading.value = true;
     
     // Actualizar orden en lote
     for (int i = 0; i < categoriasOrdenadas.length; i++) {
       final categoria = categoriasOrdenadas[i];
       final nuevoOrden = i + 1; // Orden basado en 1
+       print('desde  actualizarOrdenCategorias');
+      await actualizarOrdenCategoria(categoria['id'], nuevoOrden);
       
-     // await actualizarOrdenCategoria(categoria['id'], nuevoOrden);
-      
-      // Pequeña pausa para no sobrecargar el servidor
-      await Future.delayed(Duration(milliseconds: 100));
     }
     
     // Recargar la lista para reflejar los cambios
-  //  await listarCategorias();
+   
     
     
   } catch (e) {
