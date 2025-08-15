@@ -266,25 +266,8 @@ Future<void> buscarProductos(String query) async {
   }
 
   /// Obtener todas las categorías
-   Future<void> obtenerCategorias() async {
+  Future<void> obtenerCategorias() async {
     try {
-      // ✅ Evitar recargas muy frecuentes
-      final now = DateTime.now();
-      if (_lastReload != null && 
-          now.difference(_lastReload!).inSeconds < 2) {
-        print('⏱️ Recarga muy reciente, omitiendo...');
-        return;
-      }
-      
-      // ✅ Evitar múltiples recargas simultáneas
-      if (_isReloading) {
-        print('🔄 Ya está recargando, omitiendo...');
-        return;
-      }
-      
-      _isReloading = true;
-      _lastReload = now;
-      
       isLoadingCategories.value = true;
       
       Uri uri = Uri.parse('$defaultApiServer/menu/listarCategorias/');
@@ -295,40 +278,38 @@ Future<void> buscarProductos(String query) async {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-      ).timeout(Duration(seconds: 30));
+      ).timeout(Duration(seconds: 30)); // ✅ Agregar timeout
 
       print('📡 Categorías - Código: ${response.statusCode}');
       print('📄 Respuesta: ${response.body}');
 
       if (response.statusCode == 200) {
+        // ✅ Verificar que la respuesta no esté vacía
         if (response.body.isEmpty) {
           throw Exception('Respuesta vacía del servidor');
         }
         
         final dynamic decodedData = jsonDecode(response.body);
         
+        // ✅ Verificar que sea una lista
         if (decodedData is! List) {
           throw Exception('Formato de respuesta inválido - esperaba una lista');
         }
         
         final List<dynamic> data = decodedData;
-        categorias.value = data
+      categorias.value = data
             .map((json) => Category.fromJson(json))
             .toList();
-            
-        print('✅ Categorías actualizadas: ${categorias.length}');
-        
       } else {
         throw Exception('Error del servidor: ${response.statusCode}');
       }
     } catch (e) {
       print('❌ Error al obtener categorías: $e');
+     // _mostrarError('Error al cargar categorías', 'No se pudieron cargar las categorías: $e');
     } finally {
       isLoadingCategories.value = false;
-      _isReloading = false;
     }
   }
-  
 
   /// Obtener todas las mesas
   Future<void> obtenerMesas() async {
