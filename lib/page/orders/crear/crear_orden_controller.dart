@@ -265,7 +265,7 @@ Future<void> buscarProductos(String query) async {
   /// Obtener todas las categorías
   Future<void> obtenerCategorias() async {
     try {
-    //  isLoadingCategories.value = true;
+      isLoadingCategories.value = true;
       
       Uri uri = Uri.parse('$defaultApiServer/menu/listarCategorias/');
       
@@ -304,7 +304,7 @@ Future<void> buscarProductos(String query) async {
       print('❌ Error al obtener categorías: $e');
      // _mostrarError('Error al cargar categorías', 'No se pudieron cargar las categorías: $e');
     } finally {
-     // isLoadingCategories.value = false;
+      isLoadingCategories.value = false;
     }
   }
 
