@@ -998,7 +998,7 @@ class ListarTodoMenuPage extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '\${menu.precio}',
+                        '\$${menu.precio}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF8B4513),

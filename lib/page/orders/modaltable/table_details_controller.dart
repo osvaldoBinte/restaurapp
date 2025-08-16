@@ -769,7 +769,7 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
     }
 
     if (fallidos == 0) {
-      String mensaje = 'Pedido #$pedidoId pagado correctamente\nTotal: \${totalReal.toStringAsFixed(2)}';
+      String mensaje = 'Pedido #$pedidoId pagado correctamente\nTotal: \$${totalReal.toStringAsFixed(2)}';
       
       if (impresoraConectada) {
         mensaje += '\n✅ Ticket impreso';
