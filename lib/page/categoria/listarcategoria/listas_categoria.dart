@@ -281,6 +281,7 @@ class CategoryListScreen extends StatelessWidget {
             Row(
               children: [
                 // Número de orden
+                Icon( Icons.drag_handle, color: Colors.grey[400]),
                 Container(
                   width: 30,
                   height: 30,

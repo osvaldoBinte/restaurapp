@@ -878,7 +878,7 @@ Color getStatusColor(String status) {
   
   mensaje += 'Pedido: $nombreOrden\n'
              'ID: #$pedidoId\n'
-             'Total: \${total.toStringAsFixed(2)}\n\n'
+             'Total: \$${total.toStringAsFixed(2)}\n\n'
              'Esta acción procesará el pago e inmediatamente liberará la mesa.';
   
   QuickAlert.show(
@@ -982,13 +982,13 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
 
     // Cerrar diálogo de progreso
     Get.back();
-
+ Get.back();
     // Paso 5: Mostrar resultado
     if (fallidos == 0 && mesaLiberada) {
       // Éxito completo
       String mensaje = 'Mesa $numeroMesa liberada exitosamente\n'
                       'Pedido #$pedidoId pagado\n'
-                      'Total: \${totalReal.toStringAsFixed(2)}';
+                      'Total: \$${totalReal.toStringAsFixed(2)}';
       
       if (impresoraConectada) {
         mensaje += '\n✅ Ticket impreso';
@@ -1010,7 +1010,7 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       // Pago exitoso pero error liberando mesa
       Get.snackbar(
         'Pago Exitoso - Error al Liberar',
-        'Pedido #$pedidoId pagado correctamente\nTotal: \${totalReal.toStringAsFixed(2)}\n\n❌ No se pudo liberar la mesa automáticamente',
+        'Pedido #$pedidoId pagado correctamente\nTotal: \$${totalReal.toStringAsFixed(2)}\n\n❌ No se pudo liberar la mesa automáticamente',
         backgroundColor: Colors.orange.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 4),
@@ -1397,8 +1397,8 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
       }
     }
 
-    Get.back(); // Cerrar diálogo de progreso
-
+    Get.back(); 
+Get.back(); 
     if (fallidos == 0 && mesaLiberada) {
       String mensaje = '🎉 Mesa $numeroMesa liberada exitosamente!\n'
                       'Productos seleccionados pagados\n'

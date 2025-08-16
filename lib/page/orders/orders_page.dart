@@ -451,7 +451,7 @@ Widget _buildCarouselCardIndividual(Map<String, dynamic> detalle, bool isSmallSc
                 SizedBox(height: 6),
                 Flexible(
                   child: Text(
-                 'MESA $observaciones',
+                 '$observaciones',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 13,

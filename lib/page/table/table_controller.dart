@@ -137,8 +137,11 @@ class TablesController extends GetxController {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
 
-         final controller3 = Get.find<OrdersController>();
-          controller3.cargarDatos();
+            if (Get.isRegistered<OrdersController>()) {
+        final OrdersController controller = Get.find<OrdersController>();
+        await controller.cargarDatos();
+        print('✅ Datos del menú recargados');
+      }
         QuickAlert.show(
           context: Get.context!,
           type: QuickAlertType.success,
@@ -201,8 +204,11 @@ Future<bool> modificarStatusMesa(int mesaId) async {
     if (response.statusCode == 200) {
       final mesa = mesas.firstWhereOrNull((m) => m.id == mesaId);
       
-          final controller3 = Get.find<OrdersController>();
-          controller3.cargarDatos();
+          if (Get.isRegistered<OrdersController>()) {
+        final OrdersController controller = Get.find<OrdersController>();
+        await controller.cargarDatos();
+        print('✅ Datos del menú recargados');
+      }
       QuickAlert.show(
         context: Get.context!,
         type: QuickAlertType.success,
