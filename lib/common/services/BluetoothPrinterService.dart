@@ -34,8 +34,8 @@ class UniversalPrinterService {
       
       if (isMobile) {
         return await _conectarBluetoothAutomatico();
-      } else if (isDesktop) {
-        return await _conectarImpresoraDesktopConDiagnostico();
+      } else if (isMobile) {
+        return await _conectarBluetoothWindows();
       }
       return false;
     } catch (e) {
@@ -44,6 +44,160 @@ class UniversalPrinterService {
     }
   }
   
+/// ✅ NUEVA FUNCIÓN: Bluetooth específico para Windows
+Future<bool> _conectarBluetoothWindows() async {
+  try {
+    print('📶 Conectando a impresora Bluetooth en Windows...');
+    
+    // Buscar SOLO impresoras Bluetooth
+    List<String> impresorasBT = await _buscarSoloImpresorasBluetooth();
+    
+    if (impresorasBT.isEmpty) {
+      print('❌ No se encontraron impresoras Bluetooth en Windows');
+      return false;
+    }
+    
+    // Buscar específicamente POS-58 Bluetooth
+    String? impresoraPOS = _buscarPOS58EnListaBluetooth(impresorasBT);
+    
+    if (impresoraPOS != null) {
+      selectedPrinterName = impresoraPOS;
+      isDesktopPrinterConnected = true;
+      print('✅ POS-58 Bluetooth conectada: $impresoraPOS');
+      return true;
+    } else {
+      print('❌ No se encontró POS-58 en impresoras Bluetooth');
+      return false;
+    }
+    
+  } catch (e) {
+    print('❌ Error conectando Bluetooth Windows: $e');
+    return false;
+  }
+}
+
+/// ✅ NUEVA FUNCIÓN: Buscar SOLO impresoras Bluetooth
+Future<List<String>> _buscarSoloImpresorasBluetooth() async {
+  List<String> soloBluetoothPrinters = [];
+  
+  try {
+    print('🔍 Buscando EXCLUSIVAMENTE impresoras Bluetooth...');
+    
+    // Comando específico para impresoras con puerto Bluetooth
+    ProcessResult result = await Process.run(
+      'powershell',
+      ['-Command', '''
+        Get-Printer | Where-Object {
+          $_.PortName -like "*BTH*" -or 
+          $_.PortName -like "*BLUETOOTH*" -or
+          $_.Name -like "*BT*" -or
+          $_.Name -like "*Bluetooth*"
+        } | Select-Object Name, PortName | Format-Table -HideTableHeaders
+      '''],
+      runInShell: true,
+    );
+    
+    print('📡 Resultado búsqueda Bluetooth: ${result.stdout}');
+    
+    if (result.exitCode == 0) {
+      String output = result.stdout.toString();
+      List<String> lines = output.split('\n');
+      
+      for (String line in lines) {
+        String cleanLine = line.trim();
+        if (cleanLine.isNotEmpty && !cleanLine.contains('Name')) {
+          // Extraer solo el nombre de la impresora (primera palabra)
+          List<String> parts = cleanLine.split(RegExp(r'\s+'));
+          if (parts.isNotEmpty) {
+            String printerName = parts[0];
+            if (printerName.isNotEmpty) {
+              soloBluetoothPrinters.add(printerName);
+              print('✅ Impresora Bluetooth encontrada: $printerName');
+            }
+          }
+        }
+      }
+    }
+    
+    // Si no encuentra por PowerShell, buscar dispositivos Bluetooth emparejados
+    if (soloBluetoothPrinters.isEmpty) {
+      print('🔄 Buscando dispositivos POS emparejados...');
+      
+      ProcessResult btResult = await Process.run(
+        'powershell',
+        ['-Command', '''
+          Get-WmiObject -Namespace root\\cimv2 -Class Win32_PnPEntity | 
+          Where-Object {
+            $_.Name -like "*POS*" -or 
+            $_.Name -like "*Printer*" -or
+            $_.Name -like "*Receipt*"
+          } | 
+          Where-Object {$_.Service -like "*BTH*"} |
+          Select-Object Name
+        '''],
+        runInShell: true,
+      );
+      
+      if (btResult.exitCode == 0) {
+        String btOutput = btResult.stdout.toString();
+        print('📡 Dispositivos Bluetooth POS: $btOutput');
+        
+        // Extraer nombres de dispositivos
+        RegExp regex = RegExp(r'Name\s*:\s*(.+)', multiLine: true);
+        Iterable<RegExpMatch> matches = regex.allMatches(btOutput);
+        
+        for (var match in matches) {
+          String deviceName = match.group(1)!.trim();
+          if (!soloBluetoothPrinters.contains(deviceName)) {
+            soloBluetoothPrinters.add(deviceName);
+            print('✅ Dispositivo POS Bluetooth: $deviceName');
+          }
+        }
+      }
+    }
+    
+  } catch (e) {
+    print('❌ Error buscando Bluetooth: $e');
+  }
+  
+  print('📊 Total impresoras Bluetooth encontradas: ${soloBluetoothPrinters.length}');
+  return soloBluetoothPrinters;
+}
+
+/// ✅ NUEVA FUNCIÓN: Buscar POS-58 en lista Bluetooth
+String? _buscarPOS58EnListaBluetooth(List<String> impresorasBT) {
+  print('🎯 Buscando POS-58 en lista Bluetooth...');
+  
+  List<String> patronesPOS = [
+    'pos-58',
+    'pos58',
+    'pos 58',
+    'bluetooth pos',
+    'bt pos',
+    'thermal',
+    'receipt',
+  ];
+  
+  for (String impresora in impresorasBT) {
+    final nombreLower = impresora.toLowerCase();
+    print('   🔍 Verificando: "$impresora"');
+    
+    for (String patron in patronesPOS) {
+      if (nombreLower.contains(patron)) {
+        print('   ✅ POS-58 Bluetooth encontrada: "$impresora"');
+        return impresora;
+      }
+    }
+  }
+  
+  // Si no encuentra específica, usar la primera disponible
+  if (impresorasBT.isNotEmpty) {
+    print('   ⚠️ Usando primera impresora Bluetooth: "${impresorasBT.first}"');
+    return impresorasBT.first;
+  }
+  
+  return null;
+}
   /// ✅ NUEVO: Mostrar diálogo de diagnóstico antes del ticket
   Future<void> mostrarDiagnosticoYConfirmar(Map<String, dynamic> pedido, double total) async {
     try {
