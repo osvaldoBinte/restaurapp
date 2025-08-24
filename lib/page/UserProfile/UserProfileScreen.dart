@@ -324,7 +324,7 @@ class UserProfileScreen extends StatelessWidget {
                         Text(
                           ventasController.totalVentasFormateado,
                           style: TextStyle(
-                            fontSize: 28,
+                            fontSize: 17,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF8B4513),
                           ),

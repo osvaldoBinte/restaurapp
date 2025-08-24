@@ -922,23 +922,39 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       print('⚠️ Impresora no disponible, continuando sin imprimir...');
     }
 
-    // Paso 2: Procesar el pago
+    // Paso 2: Procesar el pago SOLO de los productos completados (no pagados anteriormente)
     double totalReal = 0.0;
     int exitosos = 0;
     int fallidos = 0;
+    List<Map<String, dynamic>> productosRecienPagados = []; // ✅ NUEVO: Solo productos de ESTA transacción
 
     for (int detalleId in detalleIds) {
       try {
-        // Marcar el producto como pagado
-        await controller.actualizarEstadoOrden(detalleId, 'pagado');
-        
-        // Buscar el detalle para obtener su precio y calcular el total
+        // Buscar el detalle ANTES de marcarlo como pagado para obtener su estado actual
         final detalle = _buscarDetallePorId(detalleId);
         if (detalle != null) {
-          final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
-          final precioUnitario = (detalle['precioUnitario'] as num?)?.toDouble() ?? 0.0;
-          totalReal += precioUnitario * cantidad;
-          exitosos++;
+          final statusActual = detalle['statusDetalle'] as String? ?? 'proceso';
+          
+          // ✅ FILTRO CRÍTICO: Solo procesar si NO está ya pagado
+          if (statusActual != 'pagado') {
+            // Marcar el producto como pagado
+            await controller.actualizarEstadoOrden(detalleId, 'pagado');
+            
+            final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
+            final precioUnitario = (detalle['precioUnitario'] as num?)?.toDouble() ?? 0.0;
+            totalReal += precioUnitario * cantidad;
+            exitosos++;
+            
+            // ✅ CLAVE: Solo agregar productos que se pagaron EN ESTA transacción
+            productosRecienPagados.add({
+              ...detalle,
+              'statusDetalle': 'pagado', // Marcar como recién pagado para el ticket
+            });
+            
+            print('✅ Producto pagado en esta transacción: ${detalle['nombreProducto']} x$cantidad = \$${(precioUnitario * cantidad).toStringAsFixed(2)}');
+          } else {
+            print('⏭️ Producto ya pagado anteriormente, omitiendo: ${detalle['nombreProducto']}');
+          }
         }
       } catch (e) {
         print('❌ Error marcando detalle $detalleId como pagado: $e');
@@ -971,10 +987,21 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       }
     }
 
-    // Paso 4: Imprimir ticket (si hay impresora y el pago fue exitoso)
-    if (fallidos == 0 && impresoraConectada) {
+    // Paso 4: Imprimir ticket SOLO con productos recién pagados
+    if (fallidos == 0 && impresoraConectada && productosRecienPagados.isNotEmpty) {
       try {
-        await printerService.imprimirTicket(pedido, totalReal);
+        print('🎫 Creando ticket SOLO con ${productosRecienPagados.length} productos recién pagados (total: \$${totalReal.toStringAsFixed(2)})');
+        
+        // ✅ USAR SOLO productos recién pagados, NO todos los del pedido
+        final pedidoParaTicket = _crearPedidoParaTicketConFiltro(
+          productosRecienPagados, 
+          pedido, 
+          totalReal,
+          'pago_final_liberacion' // Tipo especial para diferenciarlo
+        );
+        
+        await printerService.imprimirTicket(pedidoParaTicket, totalReal);
+        print('✅ Ticket impreso SOLO con productos de esta transacción');
       } catch (e) {
         print('❌ Error en impresión: $e');
       }
@@ -982,16 +1009,19 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
 
     // Cerrar diálogo de progreso
     Get.back();
- Get.back();
+    Get.back();
+
     // Paso 5: Mostrar resultado
     if (fallidos == 0 && mesaLiberada) {
       // Éxito completo
       String mensaje = 'Mesa $numeroMesa liberada exitosamente\n'
-                      'Pedido #$pedidoId pagado\n'
-                      'Total: \$${totalReal.toStringAsFixed(2)}';
+                      'Productos finales pagados: $exitosos\n'
+                      'Total de esta transacción: \$${totalReal.toStringAsFixed(2)}';
       
-      if (impresoraConectada) {
-        mensaje += '\n✅ Ticket impreso';
+      if (impresoraConectada && productosRecienPagados.isNotEmpty) {
+        mensaje += '\n✅ Ticket impreso con productos de esta transacción';
+      } else if (productosRecienPagados.isEmpty) {
+        mensaje += '\n📋 No había productos pendientes por pagar';
       }
       
       Get.snackbar(
@@ -1010,7 +1040,7 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       // Pago exitoso pero error liberando mesa
       Get.snackbar(
         'Pago Exitoso - Error al Liberar',
-        'Pedido #$pedidoId pagado correctamente\nTotal: \$${totalReal.toStringAsFixed(2)}\n\n❌ No se pudo liberar la mesa automáticamente',
+        'Productos pagados correctamente\nTotal: \$${totalReal.toStringAsFixed(2)}\n\n❌ No se pudo liberar la mesa automáticamente',
         backgroundColor: Colors.orange.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 4),
@@ -1022,7 +1052,7 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       // Error en el pago
       Get.snackbar(
         'Error en la Operación',
-        'No se pudo completar el pago del pedido #$pedidoId\nExitosos: $exitosos items\nFallidos: $fallidos items',
+        'No se pudo completar el pago\nExitosos: $exitosos items\nFallidos: $fallidos items',
         backgroundColor: Colors.red.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 4),
@@ -1043,6 +1073,63 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
   } finally {
     await printerService.desconectar();
   }
+}
+
+// ✅ NUEVA FUNCIÓN: Crear ticket con filtro especial y tipo de transacción
+Map<String, dynamic> _crearPedidoParaTicketConFiltro(
+  List<Map<String, dynamic>> productosParaTicket, 
+  Map<String, dynamic> pedidoOriginal, 
+  double totalCalculado,
+  String tipoTransaccion
+) {
+  print('🎫 Creando ticket filtrado con ${productosParaTicket.length} productos para $tipoTransaccion');
+  
+  // Crear detalles para el ticket (ya filtrados)
+  List<Map<String, dynamic>> detallesParaTicket = [];
+  
+  for (var producto in productosParaTicket) {
+    try {
+      final detalleParaTicket = {
+        'detalleId': producto['detalleId'],
+        'nombreProducto': producto['nombreProducto'] ?? 'Producto',
+        'cantidad': producto['cantidad'] ?? 1,
+        'precioUnitario': (producto['precioUnitario'] as num?)?.toDouble() ?? 0.0,
+        'statusDetalle': 'pagado', // Todos están recién pagados
+        'observaciones': producto['observaciones'] ?? '',
+        'categoria': producto['categoria'] ?? '',
+      };
+      
+      detallesParaTicket.add(detalleParaTicket);
+      
+      final subtotal = detalleParaTicket['precioUnitario'] * detalleParaTicket['cantidad'];
+      print('✅ Producto en ticket: ${detalleParaTicket['nombreProducto']} x${detalleParaTicket['cantidad']} = \$${subtotal.toStringAsFixed(2)}');
+    } catch (e) {
+      print('❌ Error procesando producto para ticket: $e');
+      continue;
+    }
+  }
+  
+  // Crear estructura de pedido para el ticket
+  final pedidoParaTicket = {
+    'pedidoId': pedidoOriginal['pedidoId'],
+    'nombreOrden': pedidoOriginal['nombreOrden'] ?? 'Sin nombre',
+    'detalles': detallesParaTicket,
+    'totalCalculado': totalCalculado,
+    'tipoTicket': tipoTransaccion,
+    'fechaCompra': DateTime.now().toIso8601String(),
+    'mesa': numeroMesa,
+    // ✅ Información adicional para el ticket
+    'esPagoFinal': tipoTransaccion == 'pago_final_liberacion',
+    'productosEnTransaccion': productosParaTicket.length,
+  };
+  
+  print('🎫 Ticket filtrado creado exitosamente:');
+  print('   - Tipo: $tipoTransaccion');
+  print('   - Pedido ID: ${pedidoParaTicket['pedidoId']}');
+  print('   - Productos en ESTA transacción: ${detallesParaTicket.length}');
+  print('   - Total de ESTA transacción: \$${totalCalculado.toStringAsFixed(2)}');
+  
+  return pedidoParaTicket;
 }
 bool esUltimoPedidoPendiente(Map<String, dynamic> pedidoActual) {
   int pedidosConProductosPendientes = 0;
@@ -1263,6 +1350,12 @@ Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, 
       barrierDismissible: false,
     );
 
+    // ✅ AGREGAR: Conectar impresora para productos seleccionados también
+    final impresoraConectada = await printerService.conectarImpresoraAutomaticamente();
+    if (!impresoraConectada) {
+      print('⚠️ Impresora no disponible para productos seleccionados');
+    }
+
     double totalReal = 0.0;
     int exitosos = 0;
     int fallidos = 0;
@@ -1284,10 +1377,29 @@ Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, 
 
     Get.back(); // Cerrar diálogo de progreso
 
+    // ✅ NUEVO: Imprimir ticket para productos seleccionados si todo fue exitoso
+    if (fallidos == 0 && impresoraConectada) {
+      try {
+        // Crear estructura de pedido para ticket con solo los productos seleccionados
+        final pedidoParaTicket = _crearPedidoParaTicket(productos, pedido, totalReal);
+        await printerService.imprimirTicket(pedidoParaTicket, totalReal);
+        print('✅ Ticket impreso para productos seleccionados');
+      } catch (e) {
+        print('❌ Error en impresión de productos seleccionados: $e');
+      }
+    }
+
     if (fallidos == 0) {
+      String mensaje = 'Productos pagados correctamente\nPedido #$pedidoId\n$exitosos productos pagados\nTotal: \$${totalReal.toStringAsFixed(2)}';
+      
+      // ✅ AGREGAR: Incluir información de impresión
+      if (impresoraConectada) {
+        mensaje += '\n✅ Ticket impreso';
+      }
+      
       Get.snackbar(
         'Pago Exitoso',
-        'Productos pagados correctamente\nPedido #$pedidoId\n$exitosos productos pagados\nTotal: \$${totalReal.toStringAsFixed(2)}',
+        mensaje,
         backgroundColor: Colors.green.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 3),
@@ -1317,10 +1429,61 @@ Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, 
       colorText: Colors.white,
       duration: Duration(seconds: 3),
     );
+  } finally {
+    // ✅ AGREGAR: Desconectar impresora
+    await printerService.desconectar();
   }
 }
+Map<String, dynamic> _crearPedidoParaTicket(List<Map<String, dynamic>> productosSeleccionados, Map<String, dynamic> pedidoOriginal, double totalCalculado) {
+  print('🎫 Creando pedido para ticket con ${productosSeleccionados.length} productos seleccionados');
+  
+  // Filtrar solo los productos seleccionados y crear detalles para el ticket
+  List<Map<String, dynamic>> detallesParaTicket = [];
+  
+  for (var producto in productosSeleccionados) {
+    try {
+      // Crear detalle para el ticket manteniendo la estructura esperada
+      final detalleParaTicket = {
+        'detalleId': producto['detalleId'],
+        'nombreProducto': producto['nombreProducto'] ?? 'Producto',
+        'cantidad': producto['cantidad'] ?? 1,
+        'precioUnitario': (producto['precioUnitario'] as num?)?.toDouble() ?? 0.0,
+        'statusDetalle': 'pagado', // Marcar como pagado para el ticket
+        'observaciones': producto['observaciones'] ?? '',
+        'categoria': producto['categoria'] ?? '',
+      };
+      
+      detallesParaTicket.add(detalleParaTicket);
+      
+      print('✅ Producto agregado al ticket: ${detalleParaTicket['nombreProducto']} x${detalleParaTicket['cantidad']}');
+    } catch (e) {
+      print('❌ Error procesando producto para ticket: $e');
+      continue;
+    }
+  }
+  
+  // Crear estructura de pedido para el ticket
+  final pedidoParaTicket = {
+    'pedidoId': pedidoOriginal['pedidoId'],
+    'nombreOrden': pedidoOriginal['nombreOrden'] ?? 'Sin nombre',
+    'detalles': detallesParaTicket,
+    'totalCalculado': totalCalculado,
+    // Agregar información adicional para el ticket
+    'tipoTicket': 'productos_seleccionados',
+    'fechaCompra': DateTime.now().toIso8601String(),
+    'mesa': numeroMesa,
+  };
+  
+  print('🎫 Pedido para ticket creado:');
+  print('   - Pedido ID: ${pedidoParaTicket['pedidoId']}');
+  print('   - Nombre: ${pedidoParaTicket['nombreOrden']}');
+  print('   - Productos: ${detallesParaTicket.length}');
+  print('   - Total: \$${totalCalculado.toStringAsFixed(2)}');
+  
+  return pedidoParaTicket;
+}
 
-// Método para pagar seleccionados y liberar mesa
+
 Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> productos, Map<String, dynamic> pedido, double totalEstimado) async {
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];
@@ -1333,7 +1496,7 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Procesando pago y liberando mesa...'),
+            Text('Procesando pago seleccionados y liberando mesa...'),
           ],
         ),
       ),
@@ -1346,17 +1509,31 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
     double totalReal = 0.0;
     int exitosos = 0;
     int fallidos = 0;
+    List<Map<String, dynamic>> productosRecienPagados = []; // ✅ Solo productos de esta transacción
 
     // Pagar productos seleccionados
     for (var producto in productos) {
       try {
         final detalleId = producto['detalleId'] as int;
-        await controller.actualizarEstadoOrden(detalleId, 'pagado');
+        final statusActual = producto['statusDetalle'] as String? ?? 'proceso';
         
-        final cantidad = (producto['cantidad'] as num?)?.toInt() ?? 1;
-        final precioUnitario = (producto['precioUnitario'] as num?)?.toDouble() ?? 0.0;
-        totalReal += precioUnitario * cantidad;
-        exitosos++;
+        // ✅ FILTRO: Solo procesar si NO está ya pagado
+        if (statusActual != 'pagado') {
+          await controller.actualizarEstadoOrden(detalleId, 'pagado');
+          
+          final cantidad = (producto['cantidad'] as num?)?.toInt() ?? 1;
+          final precioUnitario = (producto['precioUnitario'] as num?)?.toDouble() ?? 0.0;
+          totalReal += precioUnitario * cantidad;
+          exitosos++;
+          
+          // Agregar solo productos recién pagados
+          productosRecienPagados.add({
+            ...producto,
+            'statusDetalle': 'pagado',
+          });
+        } else {
+          print('⏭️ Producto seleccionado ya estaba pagado: ${producto['nombreProducto']}');
+        }
       } catch (e) {
         print('❌ Error pagando producto: $e');
         fallidos++;
@@ -1388,25 +1565,33 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
       }
     }
 
-    // Imprimir ticket
-    if (fallidos == 0 && impresoraConectada) {
+    // ✅ Imprimir ticket SOLO con productos recién pagados en esta transacción
+    if (fallidos == 0 && impresoraConectada && productosRecienPagados.isNotEmpty) {
       try {
-        await printerService.imprimirTicket(pedido, totalReal);
+        print('🎫 Imprimiendo ticket solo con ${productosRecienPagados.length} productos recién pagados');
+        final pedidoParaTicket = _crearPedidoParaTicketConFiltro(
+          productosRecienPagados, 
+          pedido, 
+          totalReal,
+          'productos_seleccionados_liberacion'
+        );
+        await printerService.imprimirTicket(pedidoParaTicket, totalReal);
+        print('✅ Ticket impreso para pago y liberación de seleccionados');
       } catch (e) {
         print('❌ Error en impresión: $e');
       }
     }
 
     Get.back(); 
-Get.back(); 
+    Get.back(); 
+    
     if (fallidos == 0 && mesaLiberada) {
       String mensaje = '🎉 Mesa $numeroMesa liberada exitosamente!\n'
-                      'Productos seleccionados pagados\n'
-                      'Pedido #$pedidoId completado\n'
-                      'Total: \$${totalReal.toStringAsFixed(2)}';
+                      'Productos seleccionados pagados: $exitosos\n'
+                      'Total de esta transacción: \$${totalReal.toStringAsFixed(2)}';
       
-      if (impresoraConectada) {
-        mensaje += '\n✅ Ticket impreso';
+      if (impresoraConectada && productosRecienPagados.isNotEmpty) {
+        mensaje += '\n✅ Ticket impreso con productos de esta transacción';
       }
       
       Get.snackbar(

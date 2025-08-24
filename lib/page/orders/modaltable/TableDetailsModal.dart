@@ -149,32 +149,32 @@ Widget _buildOrderSelector(TableDetailsController controller) {
           final index = entry.key;
           final pedido = entry.value;
           
-          return Expanded(
-            child: Obx(() {
-              final isSelected = controller.selectedOrderIndex.value == index;
-              return GestureDetector(
-                onTap: () => controller.seleccionarPedido(index),
-                child: Container(
-                  height: 40,
-                  margin: EdgeInsets.only(right: index < controller.pedidos.length - 1 ? 8 : 0),
-                  decoration: BoxDecoration(
-                    color: isSelected ? Color(0xFF2196F3) : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '#${pedido['pedidoId']}',
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.grey[700],
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+         return Expanded(
+              child: Obx(() {
+                final isSelected = controller.selectedOrderIndex.value == index;
+                return GestureDetector(
+                  onTap: () => controller.seleccionarPedido(index),
+                  child: Container(
+                    height: 40,
+                    margin: EdgeInsets.only(right: index < controller.pedidos.length - 1 ? 8 : 0),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Color(0xFF2196F3) : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Center(
+                      child: Text(
+                        ' #${index + 1}',
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.grey[700],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            }),
-          );
+                );
+              }),
+            );
         }).toList(),
       ],
     ),
@@ -351,35 +351,46 @@ Widget _buildProductCard(TableDetailsController controller, Map<String, dynamic>
                 SizedBox(height: 8),
                                    
                 // Botones de estado (SOLO cuando está en proceso)
-                if (statusDetalle == 'proceso') ...[
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Botón cancelar
-                      IconButton(
-                        onPressed: () => controller.cambiarEstadoProducto(producto, 'cancelado'),
-                        icon: Icon(Icons.cancel, color: Colors.red, size: 18),
-                        constraints: BoxConstraints(minWidth: 28, minHeight: 28),
-                        padding: EdgeInsets.zero,
-                        tooltip: 'Cancelar',
+                if (['proceso', 'completado'].contains(statusDetalle)) ...[
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: statusDetalle == 'proceso' 
+                          ? [
+                              // Botón cancelar
+                              IconButton(
+                                onPressed: () => controller.cambiarEstadoProducto(producto, 'cancelado'),
+                                icon: Icon(Icons.cancel, color: Colors.red, size: 18),
+                                constraints: BoxConstraints(minWidth: 28, minHeight: 28),
+                                padding: EdgeInsets.zero,
+                                tooltip: 'Cancelar',
+                              ),
+                              
+                              // Botón completar
+                              IconButton(
+                                onPressed: () => controller.cambiarEstadoProducto(producto, 'completado'),
+                                icon: Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                constraints: BoxConstraints(minWidth: 28, minHeight: 28),
+                                padding: EdgeInsets.zero,
+                                tooltip: 'Completar',
+                              ),
+                            ]
+                          : [
+                              // Solo botón cancelar
+                              IconButton(
+                                onPressed: () => controller.cambiarEstadoProducto(producto, 'cancelado'),
+                                icon: Icon(Icons.cancel, color: Colors.red, size: 18),
+                                constraints: BoxConstraints(minWidth: 28, minHeight: 28),
+                                padding: EdgeInsets.zero,
+                                tooltip: 'Cancelar',
+                              ),
+                            ],
                       ),
-                                               
-                      // Botón completar
-                      IconButton(
-                        onPressed: () => controller.cambiarEstadoProducto(producto, 'completado'),
-                        icon: Icon(Icons.check_circle, color: Colors.green, size: 18),
-                        constraints: BoxConstraints(minWidth: 28, minHeight: 28),
-                        padding: EdgeInsets.zero,
-                        tooltip: 'Completar',
-                      ),
+                      
+                      SizedBox(height: 4),
                     ],
-                  ),
-                                       
-                  SizedBox(height: 4),
-                ],
                                    
                 // Controles de cantidad (solo si NO está cancelado NI pagado)
-                 if (statusDetalle.trim().toLowerCase() == 'proceso') ...[
+                 if (statusDetalle.trim().toLowerCase() == 'proceso' ) ...[
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -488,7 +499,7 @@ Widget _buildProductCard(TableDetailsController controller, Map<String, dynamic>
                   print('❌ NO PUEDE seleccionar $detalleId - orden:${controller.selectedOrderIndex.value}, status:"$statusLimpio", activo:$noEstaInactivo');
                 },
                 child: Transform.scale(
-                  scale: 0.8,
+                  scale: 1.2,
                   child: Container(
                     decoration: BoxDecoration(
                       color: isSelected ? Color(0xFF8B4513) : Colors.white,

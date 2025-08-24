@@ -315,25 +315,3 @@ class OrdenesPageDesktop extends StatelessWidget {
   }
 }
 
-// ✅ OPCIONAL: Widget helper para debug de tamaños
-class DebugScreenSize extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Container(
-          padding: EdgeInsets.all(8),
-          color: Colors.black.withOpacity(0.7),
-          child: Text(
-            'Ancho: ${constraints.maxWidth.toInt()}px',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
