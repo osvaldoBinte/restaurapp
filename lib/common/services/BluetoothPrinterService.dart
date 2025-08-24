@@ -768,10 +768,29 @@ class UniversalPrinterService {
            nombre.contains('series');
   }
   
-  // Imprimir en impresora POS desde desktop
-  Future<void> _imprimirPOSDesktop(Map<String, dynamic> pedido, double total) async {
+Future<void> _imprimirPOSDesktop(Map<String, dynamic> pedido, double total) async {
+  try {
+    print('🖨️ === INICIANDO IMPRESIÓN POS-58 EN WINDOWS ===');
+    print('🔗 Impresora seleccionada: $selectedPrinterName');
+    
+    // ✅ MÉTODO 1: Intentar con texto plano primero (más compatible)
+    String contenidoTicket = _generarTicketTextoPlano(pedido, total);
+    bool exitosoTextoPlano = false;
+    
     try {
-      // Generar comandos ESC/POS como bytes
+      print('📄 Intentando impresión con texto plano...');
+      await _imprimirWindowsTextoPlanoMejorado(contenidoTicket);
+      exitosoTextoPlano = true;
+      print('✅ Impresión exitosa con texto plano');
+      return; // Si funciona, salir aquí
+    } catch (e) {
+      print('❌ Error con texto plano: $e');
+    }
+    
+    // ✅ MÉTODO 2: Si texto plano falla, intentar ESC/POS
+    if (!exitosoTextoPlano) {
+      print('🔄 Intentando con comandos ESC/POS...');
+      
       final profile = await CapabilityProfile.load();
       final generator = Generator(PaperSize.mm58, profile);
       List<int> bytes = _generarComandosESCPOS(generator, pedido, total);
@@ -781,79 +800,50 @@ class UniversalPrinterService {
       final tempFile = File('${tempDir.path}/ticket_pos_${DateTime.now().millisecondsSinceEpoch}.bin');
       await tempFile.writeAsBytes(bytes);
       
-      if (Platform.isWindows) {
-        print('🖨️ Enviando comandos ESC/POS a: $selectedPrinterName');
+      bool exitosoESCPOS = false;
+      
+      // ✅ MÉTODO 2A: copy /B (mejor para POS)
+      try {
+        print('📡 Intentando copy /B...');
+        ProcessResult result = await Process.run(
+          'copy',
+          ['/B', tempFile.path, '"$selectedPrinterName"'],
+          runInShell: true,
+        );
         
-        // ✅ MÉTODO MEJORADO: Múltiples intentos para POS-58
-        bool exitoso = false;
+        print('📊 copy /B - Código: ${result.exitCode}');
+        print('📊 copy /B - Salida: ${result.stdout}');
+        print('📊 copy /B - Error: ${result.stderr}');
         
-        // Intento 1: copy /B (recomendado para POS)
+        if (result.exitCode == 0) {
+          exitosoESCPOS = true;
+          print('✅ Impresión exitosa con copy /B');
+        }
+      } catch (e) {
+        print('❌ Error con copy /B: $e');
+      }
+      
+      // ✅ MÉTODO 2B: Usar puerto directo si copy /B falla
+      if (!exitosoESCPOS) {
         try {
-          ProcessResult result = await Process.run(
-            'copy',
-            ['/B', tempFile.path, selectedPrinterName!],
-            runInShell: true,
-          );
+          print('📡 Intentando escritura directa al puerto...');
+          String? puertoImpresora = await _detectarPuertoImpresora();
           
-          print('📡 Resultado copy /B: ${result.exitCode}');
-          print('📡 Salida: ${result.stdout}');
-          if (result.stderr.toString().isNotEmpty) {
-            print('📡 Error: ${result.stderr}');
-          }
-          
-          if (result.exitCode == 0) {
-            exitoso = true;
-            print('✅ Impresión exitosa con copy /B');
+          if (puertoImpresora != null) {
+            ProcessResult result = await Process.run(
+              'copy',
+              ['/B', tempFile.path, puertoImpresora],
+              runInShell: true,
+            );
+            
+            print('📊 Puerto directo - Código: ${result.exitCode}');
+            if (result.exitCode == 0) {
+              exitosoESCPOS = true;
+              print('✅ Impresión exitosa con puerto directo: $puertoImpresora');
+            }
           }
         } catch (e) {
-          print('❌ Error con copy /B: $e');
-        }
-        
-        // Intento 2: print command (fallback)
-        if (!exitoso) {
-          try {
-            ProcessResult result2 = await Process.run(
-              'print',
-              ['/D:"$selectedPrinterName"', tempFile.path],
-              runInShell: true,
-            );
-            
-            print('📡 Resultado print: ${result2.exitCode}');
-            print('📡 Salida: ${result2.stdout}');
-            if (result2.stderr.toString().isNotEmpty) {
-              print('📡 Error: ${result2.stderr}');
-            }
-            
-            if (result2.exitCode == 0) {
-              exitoso = true;
-              print('✅ Impresión exitosa con print command');
-            }
-          } catch (e) {
-            print('❌ Error con print command: $e');
-          }
-        }
-        
-        // Intento 3: PowerShell Out-Printer (último recurso)
-        if (!exitoso) {
-          try {
-            ProcessResult result3 = await Process.run(
-              'powershell',
-              ['-Command', 'Get-Content "${tempFile.path}" -Encoding Byte | Out-Printer -Name "$selectedPrinterName"'],
-              runInShell: true,
-            );
-            
-            print('📡 Resultado PowerShell: ${result3.exitCode}');
-            if (result3.exitCode == 0) {
-              exitoso = true;
-              print('✅ Impresión exitosa con PowerShell');
-            }
-          } catch (e) {
-            print('❌ Error con PowerShell: $e');
-          }
-        }
-        
-        if (!exitoso) {
-          throw Exception('Falló impresión POS con todos los métodos');
+          print('❌ Error con puerto directo: $e');
         }
       }
       
@@ -862,11 +852,236 @@ class UniversalPrinterService {
         await tempFile.delete();
       }
       
+      if (!exitosoESCPOS) {
+        throw Exception('Falló impresión ESC/POS con todos los métodos');
+      }
+    }
+    
+  } catch (e) {
+    print('❌ Error general en impresión POS desktop: $e');
+    rethrow;
+  }
+}
+
+// ✅ NUEVA FUNCIÓN: Impresión de texto plano mejorada
+Future<void> _imprimirWindowsTextoPlanoMejorado(String contenido) async {
+  try {
+    print('🖨️ Impresión texto plano mejorada para: $selectedPrinterName');
+    
+    // Crear archivo temporal con encoding correcto
+    final tempDir = Directory.systemTemp;
+    final tempFile = File('${tempDir.path}/ticket_${DateTime.now().millisecondsSinceEpoch}.txt');
+    
+    // ✅ IMPORTANTE: Usar encoding que entienda la impresora POS
+    await tempFile.writeAsString(contenido, encoding: latin1);
+    
+    print('📄 Archivo creado: ${tempFile.path}');
+    
+    bool exitoso = false;
+    
+    // ✅ MÉTODO 1: print command con comillas
+    try {
+      ProcessResult result = await Process.run(
+        'print',
+        ['/D:"$selectedPrinterName"', '"${tempFile.path}"'],
+        runInShell: true,
+      );
+      
+      print('📊 print - Código: ${result.exitCode}');
+      print('📊 print - Salida: ${result.stdout}');
+      print('📊 print - Error: ${result.stderr}');
+      
+      if (result.exitCode == 0) {
+        exitoso = true;
+        print('✅ Impresión exitosa con print command');
+      }
     } catch (e) {
-      print('❌ Error impresión POS desktop: $e');
-      rethrow;
+      print('❌ Error con print command: $e');
+    }
+    
+    // ✅ MÉTODO 2: notepad /p (funciona bien con POS)
+    if (!exitoso) {
+      try {
+        ProcessResult result = await Process.run(
+          'notepad',
+          ['/p', tempFile.path],
+          runInShell: true,
+        );
+        
+        print('📊 notepad - Código: ${result.exitCode}');
+        if (result.exitCode == 0) {
+          exitoso = true;
+          print('✅ Impresión exitosa con notepad /p');
+          
+          // Esperar un poco para que notepad procese
+          await Future.delayed(Duration(seconds: 2));
+        }
+      } catch (e) {
+        print('❌ Error con notepad: $e');
+      }
+    }
+    
+    // ✅ MÉTODO 3: PowerShell Out-Printer
+    if (!exitoso) {
+      try {
+        ProcessResult result = await Process.run(
+          'powershell',
+          ['-Command', 'Get-Content "${tempFile.path}" | Out-Printer -Name "$selectedPrinterName"'],
+          runInShell: true,
+        );
+        
+        print('📊 PowerShell - Código: ${result.exitCode}');
+        if (result.exitCode == 0) {
+          exitoso = true;
+          print('✅ Impresión exitosa con PowerShell');
+        }
+      } catch (e) {
+        print('❌ Error con PowerShell: $e');
+      }
+    }
+    
+    // Limpiar archivo temporal
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+    
+    if (!exitoso) {
+      throw Exception('Falló impresión de texto con todos los métodos');
+    }
+    
+  } catch (e) {
+    print('❌ Error en impresión texto plano mejorada: $e');
+    rethrow;
+  }
+}
+
+// ✅ NUEVA FUNCIÓN: Detectar puerto de la impresora
+Future<String?> _detectarPuertoImpresora() async {
+  try {
+    print('🔍 Detectando puerto de impresora...');
+    
+    ProcessResult result = await Process.run(
+      'powershell',
+      ['-Command', 'Get-Printer "$selectedPrinterName" | Select-Object -ExpandProperty PortName'],
+      runInShell: true,
+    );
+    
+    if (result.exitCode == 0) {
+      String puerto = result.stdout.toString().trim();
+      print('🔗 Puerto detectado: $puerto');
+      
+      // Convertir puertos USB a formato correcto
+      if (puerto.startsWith('USB')) {
+        // Para puertos USB, intentar usar LPT1 o COM1
+        List<String> puertosAlternativos = ['LPT1:', 'COM1:', 'COM2:', 'COM3:'];
+        
+        for (String puertoAlt in puertosAlternativos) {
+          try {
+            // Verificar si el puerto existe
+            ProcessResult testResult = await Process.run(
+              'mode',
+              [puertoAlt],
+              runInShell: true,
+            );
+            
+            if (testResult.exitCode == 0) {
+              print('✅ Puerto alternativo encontrado: $puertoAlt');
+              return puertoAlt;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+        
+        return null;
+      } else {
+        return puerto.endsWith(':') ? puerto : '$puerto:';
+      }
+    }
+    
+    return null;
+  } catch (e) {
+    print('❌ Error detectando puerto: $e');
+    return null;
+  }
+}
+
+// ✅ FUNCIÓN MEJORADA: Generar ticket más compatible
+String _generarTicketTextoPlanoCompatible(Map<String, dynamic> pedido, double total) {
+  StringBuffer ticket = StringBuffer();
+  
+  // Header más simple para POS
+  ticket.writeln('================================');
+  ticket.writeln('       COMEDOR EL JOBO');
+  ticket.writeln('================================');
+  ticket.writeln('');
+  
+  // Información básica
+  final fecha = DateTime.now();
+  final fechaStr = '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
+  final horaStr = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
+  
+  ticket.writeln('Fecha: $fechaStr  Hora: $horaStr');
+  ticket.writeln('Mesa: ${pedido['mesa'] ?? 'N/A'}');
+  ticket.writeln('Pedido: ${pedido['nombreOrden'] ?? 'Sin nombre'}');
+  ticket.writeln('ID: #${pedido['pedidoId'] ?? 'N/A'}');
+  ticket.writeln('');
+  ticket.writeln('--------------------------------');
+  
+  // Productos
+  final detalles = pedido['detalles'] as List? ?? [];
+  double subtotal = 0.0;
+  
+  for (var detalle in detalles) {
+    try {
+      final status = detalle['statusDetalle'] ?? 'proceso';
+      if (status == 'cancelado') continue;
+      
+      final nombreProducto = detalle['nombreProducto'] ?? 'Producto';
+      final cantidad = (detalle['cantidad'] ?? 1).toInt();
+      final precioUnitario = (detalle['precioUnitario'] ?? 0.0).toDouble();
+      final totalItem = precioUnitario * cantidad;
+      
+      subtotal += totalItem;
+      
+      // Nombre del producto
+      ticket.writeln(nombreProducto);
+      // Cantidad y precio en línea separada
+      ticket.writeln('  ${cantidad}x \$${precioUnitario.toStringAsFixed(2)} = \$${totalItem.toStringAsFixed(2)}');
+      
+      // Observaciones si existen
+      final observaciones = detalle['observaciones'];
+      if (observaciones != null && observaciones.toString().trim().isNotEmpty) {
+        ticket.writeln('  * $observaciones');
+      }
+      
+      ticket.writeln('');
+    } catch (e) {
+      print('❌ Error procesando detalle: $e');
+      continue;
     }
   }
+  
+  // Total
+  ticket.writeln('--------------------------------');
+  ticket.writeln('TOTAL: \$${subtotal.toStringAsFixed(2)}');
+  ticket.writeln('================================');
+  ticket.writeln('');
+  ticket.writeln('      Gracias por su visita!');
+  ticket.writeln('');
+  ticket.writeln('   ${DateTime.now().toString().substring(0, 19)}');
+  ticket.writeln('');
+  ticket.writeln('');
+  ticket.writeln('');
+  ticket.writeln('');
+  
+  return ticket.toString();
+}
+
+// ✅ ACTUALIZA también esta función para usar el nuevo formato
+String _generarTicketTextoPlano(Map<String, dynamic> pedido, double total) {
+  return _generarTicketTextoPlanoCompatible(pedido, total);
+}
   
   Future<void> _imprimirWindows(String contenido) async {
     try {
@@ -1033,72 +1248,4 @@ class UniversalPrinterService {
     return bytes;
   }
 
-  /// Generar ticket en texto plano para impresoras normales
-  String _generarTicketTextoPlano(Map<String, dynamic> pedido, double total) {
-    StringBuffer ticket = StringBuffer();
-    
-    // Header
-    ticket.writeln(''.padLeft(32, '='));
-    ticket.writeln('       COMEDOR "EL JOBO"');
-    ticket.writeln('        Órdenes de Comida');
-    ticket.writeln(''.padLeft(32, '='));
-    
-    // Información del pedido
-    final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
- 
-    final fecha = DateTime.now();
-    final fechaStr = '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
-    final horaStr = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
-    
-    ticket.writeln('TICKET DE VENTA');
-    ticket.writeln(''.padLeft(32, '-'));
-    ticket.writeln('Fecha: $fechaStr');
-    ticket.writeln('Hora: $horaStr');
-    ticket.writeln(''.padLeft(32, '='));
-    
-    // Productos
-    ticket.writeln('PRODUCTO         CANT   TOTAL');
-    ticket.writeln(''.padLeft(32, '-'));
-    
-    final detalles = pedido['detalles'] as List;
-    double subtotal = 0.0;
-    
-    for (var detalle in detalles) {
-      final status = detalle['statusDetalle'] ?? 'proceso';
-      if (status == 'cancelado') continue;
-      
-      final nombreProducto = detalle['nombreProducto'] ?? 'Producto';
-      final cantidad = detalle['cantidad'] ?? 1;
-      final precioUnitario = (detalle['precioUnitario'] ?? 0.0).toDouble();
-      final totalItem = precioUnitario * cantidad;
-      
-      subtotal += totalItem;
-      
-      // Formatear línea del producto
-      String nombre = nombreProducto.length > 16 ? nombreProducto.substring(0, 16) : nombreProducto;
-      String linea = '${nombre.padRight(16)} ${cantidad.toString().padLeft(4)} \${totalItem.toStringAsFixed(2).padLeft(6)}';
-      ticket.writeln(linea);
-      
-      // Observaciones si existen
-      final observaciones = detalle['observaciones'];
-      if (observaciones != null && observaciones.toString().trim().isNotEmpty) {
-        ticket.writeln('  * $observaciones');
-      }
-    }
-    
-    // Total
-    ticket.writeln(''.padLeft(32, '-'));
-    ticket.writeln('TOTAL:                  \${subtotal.toStringAsFixed(2)}');
-    ticket.writeln(''.padLeft(32, '='));
-    ticket.writeln('');
-    ticket.writeln('      ¡Gracias por su visita!');
-    ticket.writeln('');
-    ticket.writeln('     Sistema de Restaurante');
-    ticket.writeln('   ${DateTime.now().toString().substring(0, 19)}');
-    ticket.writeln('');
-    ticket.writeln('');
-    ticket.writeln('');
-    
-    return ticket.toString();
-  }
 }
