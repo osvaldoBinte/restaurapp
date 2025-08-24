@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -672,549 +671,29 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
     );
   }
 
-  // ✅ REEMPLAZA tu función confirmarPagoPedido con esta versión mejorada
-
-void confirmarPagoPedido(Map<String, dynamic> pedido) async {
-  final pedidoId = pedido['pedidoId'];
-  final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
-  final total = calcularTotalPedido(pedido);
-  final detalleIds = _obtenerDetalleIdsDePedido(pedido);
-  
-  try {
-    // ✅ PASO 1: Mostrar diálogo de "Verificando impresora..."
-    Get.dialog(
-      AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('🔍 Verificando impresora disponible...'),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    );
-
-    // ✅ PASO 2: Realizar diagnóstico de impresora
-    bool impresoraConectada = await printerService.conectarImpresoraConDiagnostico();
-    
-    // Cerrar el diálogo de "verificando"
-    Get.back();
-
-    // ✅ PASO 3: Mostrar resultado del diagnóstico Y confirmación de pago juntos
-    String tituloDialog;
-    String mensajeDialog;
-    QuickAlertType tipoDialog;
-    IconData icono;
-
-    if (impresoraConectada) {
-      tituloDialog = '✅ Confirmar Pago con Impresión';
-      mensajeDialog = '🖨️ IMPRESORA DETECTADA Y LISTA:\n\n'
-          '📍 Sistema: ${Platform.operatingSystem}\n'
-          '🔗 Impresora: ${printerService.selectedPrinterName}\n'
-          '📊 Total encontradas: ${printerService.impresorasDetectadas.length}\n'
-          '\n'
-          '💰 DETALLES DEL PAGO:\n'
-          'Pedido: $nombreOrden\n'
-          'ID: #$pedidoId\n'
-          'Total: \$${total.toStringAsFixed(2)}\n'
-          '\n'
-          '¿Confirmar el pago e imprimir ticket?';
-      tipoDialog = QuickAlertType.success;
-    } else {
-      tituloDialog = '⚠️ Confirmar Pago sin Impresión';
-      mensajeDialog = '🔍 ESTADO DE IMPRESORAS:\n\n'
-          '📍 Sistema: ${Platform.operatingSystem}\n'
-          '📊 Impresoras encontradas: ${printerService.impresorasDetectadas.length}\n';
-      
-      if (printerService.impresorasDetectadas.isNotEmpty) {
-        mensajeDialog += '\n🖨️ Lista detectada:\n';
-        for (int i = 0; i < printerService.impresorasDetectadas.length && i < 3; i++) {
-          mensajeDialog += '  ${i+1}. ${printerService.impresorasDetectadas[i]}\n';
-        }
-      } else {
-        mensajeDialog += '❌ No se detectaron impresoras\n';
-      }
-      
-      mensajeDialog += '\n💰 DETALLES DEL PAGO:\n'
-                      'Pedido: $nombreOrden\n'
-                      'ID: #$pedidoId\n'
-                      'Total: \$${total.toStringAsFixed(2)}\n'
-                      '\n'
-                      '⚠️ El pago se procesará SIN imprimir ticket.\n'
-                      '¿Desea continuar?';
-      tipoDialog = QuickAlertType.warning;
-    }
-
-    // ✅ PASO 4: Mostrar diálogo de confirmación con información de impresora
-    QuickAlert.show(
-      context: Get.context!,
-      type: tipoDialog,
-      title: tituloDialog,
-      text: mensajeDialog,
-      confirmBtnText: impresoraConectada ? 'Pagar e Imprimir' : 'Pagar sin Ticket',
-      cancelBtnText: 'Cancelar',
-      confirmBtnColor: impresoraConectada ? Color(0xFF27AE60) : Color(0xFFFF9800),
-      onConfirmBtnTap: () async {
-        Get.back();
-        // ✅ PASO 5: Proceder con el pago (la impresora ya está conectada si es posible)
-        await pagarPedidoEspecificoConImpresoraYaVerificada(pedido, detalleIds, total, impresoraConectada);
-      },
-      onCancelBtnTap: () {
-        Get.back();
-        // Desconectar impresora si se cancela
-        printerService.desconectar();
-      },
-    );
-
-  } catch (e) {
-    // Cerrar diálogo si hay error
-    if (Get.isDialogOpen ?? false) Get.back();
-    
-    print('❌ Error en diagnóstico de impresora: $e');
-    
-    // Mostrar error y opción de continuar sin diagnóstico
-    QuickAlert.show(
-      context: Get.context!,
-      type: QuickAlertType.error,
-      title: '❌ Error de Diagnóstico',
-      text: '🔍 No se pudo verificar el estado de la impresora:\n\n'
-          'Error: $e\n\n'
-          '💰 DETALLES DEL PAGO:\n'
-          'Pedido: $nombreOrden\n'
-          'ID: #$pedidoId\n'
-          'Total: \$${total.toStringAsFixed(2)}\n\n'
-          '¿Procesar pago sin verificar impresora?',
-      confirmBtnText: 'Pagar sin Verificar',
-      cancelBtnText: 'Cancelar',
-      confirmBtnColor: Color(0xFFE74C3C),
-      onConfirmBtnTap: () async {
-        Get.back();
-        // Proceder con el método original como fallback
-        await pagarPedidoEspecificoConImpresoraYaVerificada(pedido, detalleIds, total, false);
-      },
-    );
-  }
-}
-
-// ✅ NUEVA FUNCIÓN: Versión optimizada que NO vuelve a verificar la impresora
-Future<void> pagarPedidoEspecificoConImpresoraYaVerificada(
-    Map<String, dynamic> pedido, 
-    List<int> detalleIds, 
-    double totalEstimado,
-    bool impresoraYaConectada) async {
-  
-  final controller = Get.find<OrdersController>();
-  final pedidoId = pedido['pedidoId'];
-  
-  try {
-    // Mostrar progreso de pago
-    Get.dialog(
-      AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('💰 Procesando pago...'),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    );
-
-    double totalReal = 0.0;
-    int exitosos = 0;
-    int fallidos = 0;
-
-    // Procesar pago de cada producto
-    for (int detalleId in detalleIds) {
-      try {
-        await controller.actualizarEstadoOrden(detalleId, 'pagado');
-        
-        final detalle = _buscarDetallePorId(detalleId);
-        if (detalle != null) {
-          final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
-          final precioUnitario = (detalle['precioUnitario'] as num?)?.toDouble() ?? 0.0;
-          totalReal += precioUnitario * cantidad;
-          exitosos++;
-        }
-      } catch (e) {
-        print('❌ Error marcando detalle $detalleId como pagado: $e');
-        fallidos++;
-      }
-    }
-
-    // Cerrar diálogo de progreso
-    Get.back();
-
-    // Intentar impresión solo si la impresora ya estaba conectada
-    bool ticketImpreso = false;
-    if (fallidos == 0 && impresoraYaConectada) {
-      try {
-        // Actualizar progreso
-        Get.dialog(
-          AlertDialog(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('🖨️ Imprimiendo ticket...'),
-              ],
-            ),
-          ),
-          barrierDismissible: false,
-        );
-
-        await printerService.imprimirTicket(pedido, totalReal);
-        ticketImpreso = true;
-        
-        // Cerrar diálogo de impresión
-        Get.back();
-        
-      } catch (e) {
-        // Cerrar diálogo de impresión
-        if (Get.isDialogOpen ?? false) Get.back();
-        
-        print('❌ Error en impresión: $e');
-        
-        // Mostrar error de impresión pero continuar con éxito de pago
-        Get.snackbar(
-          '⚠️ Pago Exitoso - Error de Impresión',
-          'El pago se procesó correctamente pero hubo un problema al imprimir:\n$e',
-          backgroundColor: Colors.orange.withOpacity(0.8),
-          colorText: Colors.white,
-          duration: Duration(seconds: 4),
-        );
-      }
-    }
-
-    // Mostrar resultado final
-    if (fallidos == 0) {
-      String mensaje = 'Pedido #$pedidoId pagado correctamente\nTotal: \$${totalReal.toStringAsFixed(2)}';
-      
-      if (impresoraYaConectada) {
-        if (ticketImpreso) {
-          mensaje += '\n✅ Ticket impreso correctamente';
-        } else {
-          mensaje += '\n⚠️ Pagado sin ticket (error de impresión)';
-        }
-      } else {
-        mensaje += '\n📋 Procesado sin impresión (sin impresora)';
-      }
-      
-      Get.snackbar(
-        'Pago Exitoso',
-        mensaje,
-        backgroundColor: Colors.green.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 4),
-      );
-      
-      await controller.refrescarDatos();
-      
-    } else if (exitosos > 0) {
-      Get.snackbar(
-        'Pago Parcial',
-        'Pedido #$pedidoId procesado parcialmente\nExitosos: $exitosos items\nFallidos: $fallidos items',
-        backgroundColor: Colors.orange.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 4),
-      );
-      
-      await controller.refrescarDatos();
-      
-    } else {
-      Get.snackbar(
-        'Error en Pago',
-        'No se pudo procesar ningún item del pedido #$pedidoId',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 3),
-      );
-    }
-
-  } catch (e) {
-    // Cerrar cualquier diálogo abierto
-    if (Get.isDialogOpen ?? false) Get.back();
-    
-    Get.snackbar(
-      'Error',
-      'Error al procesar pago del pedido: $e',
-      backgroundColor: Colors.red.withOpacity(0.8),
-      colorText: Colors.white,
-      duration: Duration(seconds: 3),
-    );
-  } finally {
-    await printerService.desconectar();
-  }
-}
-
-// ✅ TAMBIÉN ACTUALIZA confirmarPagoYLiberacion con el mismo patrón
-void confirmarPagoYLiberacion(Map<String, dynamic> pedido) async {
-  final pedidoId = pedido['pedidoId'];
-  final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
-  final total = calcularTotalPedido(pedido);
-  final detalleIds = _obtenerDetalleIdsDePedido(pedido);
-  final esUnico = pedidos.length == 1;
-  
-  try {
-    // Verificar impresora primero
-    Get.dialog(
-      AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('🔍 Verificando impresora para pago final...'),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    );
-
-    bool impresoraConectada = await printerService.conectarImpresoraConDiagnostico();
-    Get.back();
-
-    // Crear mensaje según disponibilidad de impresora
-    String titulo = esUnico ? '💰 Pagar y Liberar Mesa' : '🎉 Último Pedido - Pagar y Liberar';
-    String mensaje;
-    
-    if (impresoraConectada) {
-      mensaje = '✅ IMPRESORA LISTA PARA TICKET FINAL:\n\n'
-          '🖨️ Impresora: ${printerService.selectedPrinterName}\n'
-          '📊 Total detectadas: ${printerService.impresorasDetectadas.length}\n\n';
-    } else {
-      mensaje = '⚠️ SIN IMPRESORA DISPONIBLE:\n\n'
-          '📊 Impresoras detectadas: ${printerService.impresorasDetectadas.length}\n'
-          '❌ No se imprimirá ticket final\n\n';
-    }
-    
-    if (!esUnico) {
-      mensaje += '🎉 ¡Este es el último pedido pendiente!\n\n';
-    }
-    
-    mensaje += '💰 DETALLES DEL PAGO FINAL:\n'
-               'Pedido: $nombreOrden\n'
-               'ID: #$pedidoId\n'
-               'Total: \$${total.toStringAsFixed(2)}\n\n'
-               '🏠 Esta acción procesará el pago y liberará la Mesa $numeroMesa.';
-    
-    QuickAlertType tipoDialog = impresoraConectada ? QuickAlertType.success : QuickAlertType.warning;
-    String textoBoton = impresoraConectada ? 'Pagar, Imprimir y Liberar' : 'Pagar y Liberar (Sin Ticket)';
-    Color colorBoton = impresoraConectada ? Color(0xFF27AE60) : Color(0xFFFF9800);
+  void confirmarPagoPedido(Map<String, dynamic> pedido) {
+    final pedidoId = pedido['pedidoId'];
+    final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
+    final total = calcularTotalPedido(pedido);
+    final detalleIds = _obtenerDetalleIdsDePedido(pedido);
     
     QuickAlert.show(
       context: Get.context!,
-      type: tipoDialog,
-      title: titulo,
-      text: mensaje,
-      confirmBtnText: textoBoton,
+      type: QuickAlertType.confirm,
+      title: 'Confirmar Pago',
+      text: '¿Confirmar el pago del pedido?\n\n'
+            'Pedido: $nombreOrden\n'
+            'ID: #$pedidoId\n'
+            'Total: \$${total.toStringAsFixed(2)}',
+      confirmBtnText: 'Confirmar Pago',
       cancelBtnText: 'Cancelar',
-      confirmBtnColor: colorBoton,
+      confirmBtnColor: Color(0xFF27AE60),
       onConfirmBtnTap: () async {
         Get.back();
-        Get.back(); // Cerrar también el modal de detalles de mesa
-        await _pagarYLiberarMesaConImpresoraVerificada(pedido, detalleIds, total, impresoraConectada);
-      },
-      onCancelBtnTap: () {
-        Get.back();
-        printerService.desconectar();
-      },
-    );
-
-  } catch (e) {
-    if (Get.isDialogOpen ?? false) Get.back();
-    
-    // Fallback a diálogo simple sin diagnóstico
-    String titulo = esUnico ? 'Pagar y Liberar Mesa' : 'Último Pedido - Pagar y Liberar';
-    String mensaje = '❌ Error verificando impresora: $e\n\n'
-                    'Pedido: $nombreOrden\n'
-                    'ID: #$pedidoId\n'
-                    'Total: \$${total.toStringAsFixed(2)}\n\n'
-                    '¿Continuar sin verificar impresora?';
-    
-    QuickAlert.show(
-      context: Get.context!,
-      type: QuickAlertType.warning,
-      title: titulo,
-      text: mensaje,
-      confirmBtnText: 'Continuar',
-      cancelBtnText: 'Cancelar',
-      confirmBtnColor: Color(0xFFE74C3C),
-      onConfirmBtnTap: () async {
-        Get.back();
-        Get.back();
-        await _pagarYLiberarMesaConImpresoraVerificada(pedido, detalleIds, total, false);
+        await pagarPedidoEspecifico(pedido, detalleIds, total);
       },
     );
   }
-}
-
-// ✅ FUNCIÓN AUXILIAR: Pagar y liberar con impresora ya verificada
-Future<void> _pagarYLiberarMesaConImpresoraVerificada(
-    Map<String, dynamic> pedido, 
-    List<int> detalleIds, 
-    double totalEstimado,
-    bool impresoraYaConectada) async {
-  
-  final controller = Get.find<OrdersController>();
-  final pedidoId = pedido['pedidoId'];
-  
-  try {
-    Get.dialog(
-      AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('💰 Procesando pago final y liberando mesa...'),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    );
-
-    // Procesar pago
-    double totalReal = 0.0;
-    int exitosos = 0;
-    int fallidos = 0;
-    List<Map<String, dynamic>> productosRecienPagados = [];
-
-    for (int detalleId in detalleIds) {
-      try {
-        final detalle = _buscarDetallePorId(detalleId);
-        if (detalle != null) {
-          final statusActual = detalle['statusDetalle'] as String? ?? 'proceso';
-          
-          if (statusActual != 'pagado') {
-            await controller.actualizarEstadoOrden(detalleId, 'pagado');
-            
-            final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
-            final precioUnitario = (detalle['precioUnitario'] as num?)?.toDouble() ?? 0.0;
-            totalReal += precioUnitario * cantidad;
-            exitosos++;
-            
-            productosRecienPagados.add({
-              ...detalle,
-              'statusDetalle': 'pagado',
-            });
-          }
-        }
-      } catch (e) {
-        print('❌ Error marcando detalle $detalleId como pagado: $e');
-        fallidos++;
-      }
-    }
-
-    // Liberar mesa
-    bool mesaLiberada = false;
-    if (fallidos == 0) {
-      try {
-        Uri uri = Uri.parse('${controller.defaultApiServer}/mesas/liberarMesa/$idnumeromesa/');
-        final statusData = {'status': true};
-        
-        final response = await http.post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: jsonEncode(statusData),
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          mesaLiberada = data['success'] == true;
-        }
-      } catch (e) {
-        print('❌ Error liberando mesa: $e');
-      }
-    }
-
-    // Imprimir ticket si es posible
-    bool ticketImpreso = false;
-    if (fallidos == 0 && impresoraYaConectada && productosRecienPagados.isNotEmpty) {
-      try {
-        final pedidoParaTicket = _crearPedidoParaTicketConFiltro(
-          productosRecienPagados, 
-          pedido, 
-          totalReal,
-          'pago_final_liberacion'
-        );
-        
-        await printerService.imprimirTicket(pedidoParaTicket, totalReal);
-        ticketImpreso = true;
-      } catch (e) {
-        print('❌ Error en impresión: $e');
-      }
-    }
-
-    Get.back(); // Cerrar diálogo de progreso
-
-    // Mostrar resultado
-    if (fallidos == 0 && mesaLiberada) {
-      String mensaje = '🎉 Mesa $numeroMesa liberada exitosamente!\n'
-                      'Productos finales pagados: $exitosos\n'
-                      'Total de esta transacción: \$${totalReal.toStringAsFixed(2)}';
-      
-      if (impresoraYaConectada) {
-        if (ticketImpreso && productosRecienPagados.isNotEmpty) {
-          mensaje += '\n✅ Ticket final impreso';
-        } else if (productosRecienPagados.isEmpty) {
-          mensaje += '\n📋 No había productos pendientes por pagar';
-        } else {
-          mensaje += '\n⚠️ Error al imprimir ticket final';
-        }
-      } else {
-        mensaje += '\n📋 Procesado sin impresión (sin impresora)';
-      }
-      
-      Get.snackbar(
-        'Operación Exitosa',
-        mensaje,
-        backgroundColor: Colors.green.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 4),
-      );
-      
-      Get.back(); // Cerrar modal de mesa
-      await controller.refrescarDatos();
-      
-    } else {
-      String mensaje = fallidos == 0 
-          ? 'Productos pagados correctamente pero no se pudo liberar la mesa'
-          : 'Error en el proceso de pago y liberación';
-      
-      Get.snackbar(
-        'Error Parcial',
-        mensaje,
-        backgroundColor: Colors.orange.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 4),
-      );
-      
-      await controller.refrescarDatos();
-    }
-
-  } catch (e) {
-    if (Get.isDialogOpen ?? false) Get.back();
-    
-    Get.snackbar(
-      'Error',
-      'Error al procesar pago y liberación: $e',
-      backgroundColor: Colors.red.withOpacity(0.8),
-      colorText: Colors.white,
-      duration: Duration(seconds: 3),
-    );
-  } finally {
-    await printerService.desconectar();
-  }
-}
 
   List<int> _obtenerDetalleIdsDePedido(Map<String, dynamic> pedido) {
     List<int> detalleIds = [];
@@ -1385,6 +864,38 @@ Color getStatusColor(String status) {
     if (categoriaLower.contains('extra')) return '🥄';
     return '🌮';
   }
+  void confirmarPagoYLiberacion(Map<String, dynamic> pedido) {
+  final pedidoId = pedido['pedidoId'];
+  final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
+  final total = calcularTotalPedido(pedido);
+  final detalleIds = _obtenerDetalleIdsDePedido(pedido);
+  final esUnico = pedidos.length == 1;
+  
+  String titulo = esUnico ? 'Pagar y Liberar Mesa' : 'Último Pedido - Pagar y Liberar';
+  String mensaje = esUnico 
+      ? '¿Confirmar el pago y liberar la Mesa $numeroMesa?\n\n'
+      : '🎉 ¡Este es el último pedido pendiente!\n\n¿Confirmar el pago y liberar la Mesa $numeroMesa?\n\n';
+  
+  mensaje += 'Pedido: $nombreOrden\n'
+             'ID: #$pedidoId\n'
+             'Total: \$${total.toStringAsFixed(2)}\n\n'
+             'Esta acción procesará el pago e inmediatamente liberará la mesa.';
+  
+  QuickAlert.show(
+    context: Get.context!,
+    type: QuickAlertType.confirm,
+    title: titulo,
+    text: mensaje,
+    confirmBtnText: 'Pagar y Liberar',
+    cancelBtnText: 'Cancelar',
+    confirmBtnColor: Color(0xFF27AE60),
+    onConfirmBtnTap: () async {
+      Get.back();
+      Get.back();
+      await _pagarYLiberarMesa(pedido, detalleIds, total);
+    },
+  );
+}
 Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleIds, double totalEstimado) async {
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];

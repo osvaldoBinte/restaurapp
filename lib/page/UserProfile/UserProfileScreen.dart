@@ -3,19 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:restaurapp/common/constants/constants.dart';
+import 'package:restaurapp/common/constants/controllermetricas.dart';
 import 'package:restaurapp/common/constants/userservice.dart';
 import 'package:restaurapp/framework/preferences_service.dart';
 import 'package:restaurapp/page/UserProfile/UserProfileController.dart';
 import 'package:restaurapp/page/VentasService/VentasService.dart';
 import 'package:restaurapp/page/categoria/listarcategoria/listas_categoria.dart';
 import 'package:restaurapp/page/menu/listarmenu/listar_controller.dart';
+import 'package:restaurapp/page/orders/historial/historal_controller.dart';
+import 'package:restaurapp/page/orders/historial/historial_page.dart';
 import 'package:restaurapp/page/table/table_page.dart';
 import 'package:restaurapp/page/user/UserManagementScreen.dart';
-// user_profile_screen.dart (simplificado)
+
+
 class UserProfileScreen extends StatelessWidget {
   final UserProfileController controller = Get.put(UserProfileController());
-  // 🆕 Agregar el VentasController
   final VentasController ventasController = Get.put(VentasController());
+  final MetricasController metricasController = Get.put(MetricasController());
 
   @override
   Widget build(BuildContext context) {
@@ -51,10 +55,7 @@ class UserProfileScreen extends StatelessWidget {
               floating: false,
               pinned: true,
               backgroundColor: Color(0xFF8B4513),
-              // 🆕 Agregar botón de refrescar en el AppBar
-              actions: [
-                
-              ],
+              actions: [],
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: BoxDecoration(
@@ -133,12 +134,15 @@ class UserProfileScreen extends StatelessWidget {
                 padding: EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // 🆕 Sección de ventas (solo para admins)
+                    // Sección de ventas (solo para admins)
                     Obx(() {
                       if (controller.isAdmin.value) {
                         return Column(
                           children: [
                             _buildVentasSection(),
+                                                        SizedBox(height: 24),
+
+                            _buildMetricasYHistorial(),
                             SizedBox(height: 24),
                           ],
                         );
@@ -146,9 +150,8 @@ class UserProfileScreen extends StatelessWidget {
                       return SizedBox.shrink();
                     }),
                     
-                    // Información Personal (solo email)
+                    // Información Personal
                     _buildPersonalInfoSection(),
-                    
                     SizedBox(height: 24),
                     
                     // Acciones rápidas
@@ -181,7 +184,6 @@ class UserProfileScreen extends StatelessWidget {
                     
                     // Configuración
                     _buildSettingsSection(),
-                    
                     SizedBox(height: 20),
                   ],
                 ),
@@ -193,7 +195,116 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  // 🆕 Widget para mostrar la sección de ventas
+
+
+  // 🆕 NUEVO MÉTODO: Mostrar modal de historial de ventas
+  void _showHistorialModal() {
+    // Asegurar que el controller esté inicializado
+    Get.put(HistorialController(), permanent: false);
+    
+    Get.dialog(
+      Dialog(
+        insetPadding: EdgeInsets.zero,
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: Get.width,
+          height: Get.height,
+          decoration: BoxDecoration(
+            color: Color(0xFFF5F2F0),
+          ),
+          child: Column(
+            children: [
+              // Header del modal
+              Container(
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(Get.context!).padding.top + 8,
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: Color(0xFF4CAF50),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Row(
+                    children: [
+                      // Icono
+                      Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.history, color: Colors.white, size: 20),
+                      ),
+                      SizedBox(width: 12),
+                      
+                      // Título
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Historial de Ventas',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                            Text(
+                              'Consulta ventas por fecha',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Botón de cerrar
+                      Container(
+                        width: 36,
+                        height: 36,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          onPressed: () => Get.back(),
+                          icon: Icon(Icons.close, color: Colors.white, size: 18),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Contenido: HistorialPage
+              Expanded(
+                child: ClipRRect(
+                  child: HistorialPage(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: true,
+    );
+  }
+  // 🆕 Widget para mostrar la sección de ventas CON MÉTRICAS
+
+  
   Widget _buildVentasSection() {
     return Container(
       width: double.infinity,
@@ -355,16 +466,119 @@ class UserProfileScreen extends StatelessWidget {
                 
                 SizedBox(width: 16),
                 
+                
               ],
+              
             );
           }),
         ],
       ),
     );
   }
-
-  // Mantén todos tus métodos existentes...
-
+Widget _buildMetricasYHistorial() {
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: 20),
+    child: Row(
+      children: [
+       // 🆕 Botón para ver métricas por categorías
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _showMetricasModal(),
+                    child: Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF2196F3).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Color(0xFF2196F3).withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Color(0xFF2196F3).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.analytics, 
+                              color: Color(0xFF2196F3), 
+                              size: 20
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Ver Métricas',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF3E1F08),
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Por Categorías',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                 Expanded(
+                  child: GestureDetector(
+                    onTap: () => _showHistorialModal(),
+                    child: Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF2196F3).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Color(0xFF2196F3).withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Color(0xFF2196F3).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.analytics, 
+                              color: Color(0xFF2196F3), 
+                              size: 20
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'historial',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF3E1F08),
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'ultimas ventas',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+      ],
+    ),
+  );
+}
 
   Widget _buildPersonalInfoSection() {
     return _buildSection(
@@ -419,83 +633,6 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  void _showUsersModal() {
-    Get.dialog(
-      Dialog(
-        insetPadding: EdgeInsets.all(16),
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: Get.width,
-          height: Get.height * 0.85,
-          decoration: BoxDecoration(
-            color: Color(0xFFF5F2F0),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              // Header del modal
-              Container(
-                padding: EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Color(0xFF9C27B0),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.people, color: Colors.white, size: 24),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Gestión de Usuarios',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'Administra los usuarios del sistema',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Get.back(),
-                      icon: Icon(Icons.close, color: Colors.white),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Contenido del modal
-              Expanded(
-                child: Container(
-                  child: UserManagementScreen(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      barrierDismissible: true,
-    );
-  }
   Widget _buildManagementSection() {
     return _buildSection(
       title: 'Gestión de Administrador',
@@ -522,7 +659,492 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  // Métodos para mostrar modales
+  // 🆕 Modal para mostrar métricas por categorías
+  void _showMetricasModal() {
+  // Cargar datos al abrir el modal
+  metricasController.cargarMetricasPorCategorias();
+  
+  Get.dialog(
+    Dialog(
+      // 🆕 Modal que cubre toda la pantalla
+      insetPadding: EdgeInsets.zero,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        // 🆕 Ocupa todo el ancho y alto de la pantalla
+        width: Get.width,
+        height: Get.height,
+        decoration: BoxDecoration(
+          color: Color(0xFFF5F2F0),
+        ),
+        child: Column(
+          children: [
+            // Header del modal - Responsivo
+            Container(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(Get.context!).padding.top + 8,
+                left: 16,
+                right: 16,
+                bottom: 16,
+              ),
+              decoration: BoxDecoration(
+                color: Color(0xFF2196F3),
+                borderRadius: BorderRadius.zero, // Sin bordes redondeados
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    // Fila principal del header
+                    Row(
+                      children: [
+                        // Icono
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.analytics, color: Colors.white, size: 20),
+                        ),
+                        SizedBox(width: 12),
+                        
+                        // 🆕 Títulos con Expanded para evitar overflow
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Métricas por Categorías',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              Obx(() => Text(
+                                'Ventas del ${metricasController.fechaFormateada}',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              )),
+                            ],
+                          ),
+                        ),
+                        
+                        // 🆕 Botones en fila horizontal responsiva
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Botón de refrescar
+                            Container(
+                              width: 36,
+                              height: 36,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () => metricasController.refrescarMetricas(),
+                                icon: Obx(() => metricasController.isLoading.value
+                                    ? SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      )
+                                    : Icon(Icons.refresh, color: Colors.white, size: 18)
+                                ),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.white.withOpacity(0.2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            // Botón de cerrar
+                            Container(
+                              width: 36,
+                              height: 36,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () => Get.back(),
+                                icon: Icon(Icons.close, color: Colors.white, size: 18),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.white.withOpacity(0.2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Contenido del modal - Completamente expandido
+            Expanded(
+              child: Obx(() {
+                if (metricasController.isLoading.value) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+                        ),
+                        SizedBox(height: 16),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            'Cargando métricas...',
+                            style: TextStyle(
+                              color: Color(0xFF2196F3),
+                              fontSize: 16,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                if (metricasController.error.value.isNotEmpty) {
+                  return Center(
+                    child: Container(
+                      margin: EdgeInsets.all(20),
+                      padding: EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red, size: 48),
+                          SizedBox(height: 12),
+                          Text(
+                            'Error al cargar métricas',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red[700],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: 8),
+                          // 🆕 Texto de error con Expanded
+                          Flexible(
+                            child: Text(
+                              metricasController.error.value,
+                              style: TextStyle(
+                                color: Colors.red[600],
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.visible,
+                            ),
+                          ),
+                          SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () => metricasController.refrescarMetricas(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              child: Text('Reintentar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return Container(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 🆕 Resumen total responsivo
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: Get.width > 400 ? 20 : 16,
+                        ),
+                        margin: EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0xFF2196F3).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Total General',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: Get.width > 400 ? 16 : 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 8),
+                            // 🆕 Total con tamaño adaptativo
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                metricasController.totalGeneralFormateado,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: Get.width > 400 ? 28 : 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Lista de categorías
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          'Desglose por Categorías',
+                          style: TextStyle(
+                            fontSize: Get.width > 400 ? 18 : 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF3E1F08),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 12),
+
+                      // 🆕 Lista completamente expandida
+                      Expanded(
+                        child: metricasController.categorias.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.inbox_outlined,
+                                      size: Get.width > 400 ? 64 : 48,
+                                      color: Colors.grey[400],
+                                    ),
+                                    SizedBox(height: 16),
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 20),
+                                      child: Text(
+                                        'No hay datos disponibles',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 20),
+                                      child: Text(
+                                        'Para la fecha seleccionada',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[500],
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: EdgeInsets.only(bottom: 16),
+                                itemCount: metricasController.categorias.length,
+                                itemBuilder: (context, index) {
+                                  final categoria = metricasController.categorias[index];
+                                  final nombre = categoria['categoria'] ?? categoria['nombre'] ?? 'Sin categoría';
+                                  final total = categoria['total'] ?? 0.0;
+                                  final cantidad = categoria['cantidad'] ?? categoria['items'] ?? 0;
+                                  final porcentaje = metricasController.totalGeneral.value > 0 
+                                      ? (total / metricasController.totalGeneral.value * 100) 
+                                      : 0.0;
+
+                                  return Container(
+                                    margin: EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 4,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(16),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Icono
+                                          Container(
+                                            width: 45,
+                                            height: 45,
+                                            decoration: BoxDecoration(
+                                              color: Color(0xFF2196F3).withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Icon(
+                                              Icons.restaurant_menu,
+                                              color: Color(0xFF2196F3),
+                                              size: 22,
+                                            ),
+                                          ),
+                                          SizedBox(width: 12),
+                                          
+                                          // 🆕 Contenido principal expandido
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                // Nombre de categoría
+                                                Text(
+                                                  nombre,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: Get.width > 400 ? 16 : 14,
+                                                    color: Color(0xFF3E1F08),
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 2,
+                                                ),
+                                                SizedBox(height: 4),
+                                                
+                                                /*Items vendidos
+                                                Row(
+                                                  children: [
+                                                    Icon(Icons.shopping_cart, size: 14, color: Colors.grey[600]),
+                                                    SizedBox(width: 4),
+                                                    Expanded(
+                                                      child: Text(
+                                                        '$cantidad items vendidos',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors.grey[600],
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),*/
+                                                SizedBox(height: 8),
+                                                
+                                                // Barra de progreso
+                                                Container(
+                                                  height: 4,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey[200],
+                                                    borderRadius: BorderRadius.circular(2),
+                                                  ),
+                                                  child: FractionallySizedBox(
+                                                    alignment: Alignment.centerLeft,
+                                                    widthFactor: (porcentaje / 100).clamp(0.0, 1.0),
+                                                    child: Container(
+                                                      decoration: BoxDecoration(
+                                                        color: Color(0xFF2196F3),
+                                                        borderRadius: BorderRadius.circular(2),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          
+                                          SizedBox(width: 8),
+                                          
+                                          // 🆕 Información de precio y porcentaje
+                                          Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              // Monto - Con tamaño adaptativo
+                                              FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Text(
+                                                  metricasController.formatearMonto(total),
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: Get.width > 400 ? 16 : 14,
+                                                    color: Color(0xFF2196F3),
+                                                  ),
+                                                  maxLines: 1,
+                                                ),
+                                              ),
+                                              SizedBox(height: 2),
+                                              // Porcentaje
+                                              Text(
+                                                '${porcentaje.toStringAsFixed(1)}%',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    ),
+    barrierDismissible: true,
+  );
+}
+
+  // Métodos para mostrar otros modales existentes
   void _showMenusModal() {
     Get.dialog(
       Dialog(
@@ -537,7 +1159,6 @@ class UserProfileScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Header del modal
               Container(
                 padding: EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -587,7 +1208,6 @@ class UserProfileScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              // Contenido del modal
               Expanded(
                 child: Container(
                   padding: EdgeInsets.all(16),
@@ -616,7 +1236,6 @@ class UserProfileScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Header del modal
               Container(
                 padding: EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -666,10 +1285,9 @@ class UserProfileScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              // Contenido del modal
               Expanded(
                 child: Container(
-                  child:TablesScreen(),
+                  child: TablesScreen(),
                 ),
               ),
             ],
@@ -694,7 +1312,6 @@ class UserProfileScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Header del modal
               Container(
                 padding: EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -744,10 +1361,85 @@ class UserProfileScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              // Contenido del modal
               Expanded(
                 child: Container(
                   child: CategoryListScreen(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: true,
+    );
+  }
+
+  void _showUsersModal() {
+    Get.dialog(
+      Dialog(
+        insetPadding: EdgeInsets.all(16),
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: Get.width,
+          height: Get.height * 0.85,
+          decoration: BoxDecoration(
+            color: Color(0xFFF5F2F0),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Color(0xFF9C27B0),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.people, color: Colors.white, size: 24),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Gestión de Usuarios',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Administra los usuarios del sistema',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Get.back(),
+                      icon: Icon(Icons.close, color: Colors.white),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  child: UserManagementScreen(),
                 ),
               ),
             ],
@@ -893,14 +1585,19 @@ class UserProfileScreen extends StatelessWidget {
               children: [
                 Icon(icon, color: Color(0xFF8B4513)),
                 SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF8B4513),
-                  ),
-                ),
+                Flexible(
+  child: Text(
+    title,
+    style: TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.bold,
+      color: Color(0xFF8B4513),
+    ),
+    overflow: TextOverflow.ellipsis, // Opcional: para evitar desbordamientos
+    maxLines: 1, // Opcional: limita las líneas si es necesario
+  ),
+),
+
               ],
             ),
             SizedBox(height: 16),
@@ -961,3 +1658,4 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 }
+                
