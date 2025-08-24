@@ -767,101 +767,336 @@ class UniversalPrinterService {
            nombre.contains('ticket') ||
            nombre.contains('series');
   }
-  
-Future<void> _imprimirPOSDesktop(Map<String, dynamic> pedido, double total) async {
+  Future<void> diagnosticarImpresoraCompartida() async {
   try {
-    print('🖨️ === INICIANDO IMPRESIÓN POS-58 EN WINDOWS ===');
-    print('🔗 Impresora seleccionada: $selectedPrinterName');
+    print('🔍 === DIAGNÓSTICO IMPRESORA COMPARTIDA ===');
     
-    // ✅ MÉTODO 1: Intentar con texto plano primero (más compatible)
-    String contenidoTicket = _generarTicketTextoPlano(pedido, total);
-    bool exitosoTextoPlano = false;
+    // Verificar estado de la impresora
+    ProcessResult statusResult = await Process.run(
+      'powershell',
+      ['-Command', 'Get-Printer "$selectedPrinterName" | Select-Object Name, PrinterStatus, JobCount, Shared'],
+      runInShell: true,
+    );
     
-    try {
-      print('📄 Intentando impresión con texto plano...');
-      await _imprimirWindowsTextoPlanoMejorado(contenidoTicket);
-      exitosoTextoPlano = true;
-      print('✅ Impresión exitosa con texto plano');
-      return; // Si funciona, salir aquí
-    } catch (e) {
-      print('❌ Error con texto plano: $e');
-    }
+    print('📊 Estado impresora: ${statusResult.stdout}');
     
-    // ✅ MÉTODO 2: Si texto plano falla, intentar ESC/POS
-    if (!exitosoTextoPlano) {
-      print('🔄 Intentando con comandos ESC/POS...');
-      
-      final profile = await CapabilityProfile.load();
-      final generator = Generator(PaperSize.mm58, profile);
-      List<int> bytes = _generarComandosESCPOS(generator, pedido, total);
-      
-      // Crear archivo temporal con comandos ESC/POS
-      final tempDir = Directory.systemTemp;
-      final tempFile = File('${tempDir.path}/ticket_pos_${DateTime.now().millisecondsSinceEpoch}.bin');
-      await tempFile.writeAsBytes(bytes);
-      
-      bool exitosoESCPOS = false;
-      
-      // ✅ MÉTODO 2A: copy /B (mejor para POS)
-      try {
-        print('📡 Intentando copy /B...');
-        ProcessResult result = await Process.run(
-          'copy',
-          ['/B', tempFile.path, '"$selectedPrinterName"'],
-          runInShell: true,
-        );
-        
-        print('📊 copy /B - Código: ${result.exitCode}');
-        print('📊 copy /B - Salida: ${result.stdout}');
-        print('📊 copy /B - Error: ${result.stderr}');
-        
-        if (result.exitCode == 0) {
-          exitosoESCPOS = true;
-          print('✅ Impresión exitosa con copy /B');
-        }
-      } catch (e) {
-        print('❌ Error con copy /B: $e');
-      }
-      
-      // ✅ MÉTODO 2B: Usar puerto directo si copy /B falla
-      if (!exitosoESCPOS) {
-        try {
-          print('📡 Intentando escritura directa al puerto...');
-          String? puertoImpresora = await _detectarPuertoImpresora();
-          
-          if (puertoImpresora != null) {
-            ProcessResult result = await Process.run(
-              'copy',
-              ['/B', tempFile.path, puertoImpresora],
-              runInShell: true,
-            );
-            
-            print('📊 Puerto directo - Código: ${result.exitCode}');
-            if (result.exitCode == 0) {
-              exitosoESCPOS = true;
-              print('✅ Impresión exitosa con puerto directo: $puertoImpresora');
-            }
-          }
-        } catch (e) {
-          print('❌ Error con puerto directo: $e');
-        }
-      }
-      
-      // Limpiar archivo temporal
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
-      
-      if (!exitosoESCPOS) {
-        throw Exception('Falló impresión ESC/POS con todos los métodos');
-      }
+    // Verificar cola de impresión
+    ProcessResult queueResult = await Process.run(
+      'powershell',
+      ['-Command', 'Get-PrintJob -PrinterName "$selectedPrinterName"'],
+      runInShell: true,
+    );
+    
+    print('📋 Cola impresión: ${queueResult.stdout}');
+    
+    // Verificar permisos de recurso compartido
+    ProcessResult shareResult = await Process.run(
+      'net',
+      ['share'],
+      runInShell: true,
+    );
+    
+    if (shareResult.stdout.toString().contains(selectedPrinterName!)) {
+      print('✅ Impresora está compartida correctamente');
     }
     
   } catch (e) {
-    print('❌ Error general en impresión POS desktop: $e');
+    print('❌ Error en diagnóstico: $e');
+  }
+}
+Future<void> _imprimirPOSDesktop(Map<String, dynamic> pedido, double total) async {
+  try {
+    print('🖨️ === INICIANDO IMPRESIÓN POS-58 COMPARTIDA ===');
+    print('🔗 Impresora: $selectedPrinterName');
+    print('🌐 Tipo: Impresora compartida en red');
+    
+    // ✅ PASO 1: Crear contenido del ticket optimizado para POS
+    String contenidoTicket = _generarTicketParaPOSCompartida(pedido, total);
+    
+    // ✅ PASO 2: Crear archivo temporal
+    final tempDir = Directory.systemTemp;
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final tempFile = File('${tempDir.path}/pos58_ticket_$timestamp.txt');
+    
+    // ✅ IMPORTANTE: Usar codificación específica para POS
+    await tempFile.writeAsString(contenidoTicket, encoding: latin1);
+    
+    print('📄 Archivo temporal: ${tempFile.path}');
+    
+    bool exitoso = false;
+    String ultimoError = '';
+    
+    // ✅ MÉTODO 1: print con nombre exacto de impresora compartida
+    try {
+      print('📡 Método 1: print command para impresora compartida...');
+      
+      ProcessResult result = await Process.run(
+        'print',
+        ['/D:"$selectedPrinterName"', tempFile.path],
+        runInShell: true,
+      );
+      
+      print('📊 print - Código: ${result.exitCode}');
+      print('📊 print - Salida: ${result.stdout}');
+      print('📊 print - Error: ${result.stderr}');
+      
+      if (result.exitCode == 0) {
+        exitoso = true;
+        print('✅ ÉXITO: Impresión con print command');
+      } else {
+        ultimoError = 'print: ${result.stderr}';
+      }
+    } catch (e) {
+      print('❌ Error método 1: $e');
+      ultimoError = 'print exception: $e';
+    }
+    
+    // ✅ MÉTODO 2: copy directo al puerto USB002
+    if (!exitoso) {
+      try {
+        print('📡 Método 2: copy directo a puerto USB002...');
+        
+        ProcessResult result = await Process.run(
+          'copy',
+          [tempFile.path, '\\\\localhost\\USB002'],
+          runInShell: true,
+        );
+        
+        print('📊 copy USB002 - Código: ${result.exitCode}');
+        print('📊 copy USB002 - Salida: ${result.stdout}');
+        
+        if (result.exitCode == 0) {
+          exitoso = true;
+          print('✅ ÉXITO: Copy directo a USB002');
+        } else {
+          ultimoError = 'copy USB002: ${result.stderr}';
+        }
+      } catch (e) {
+        print('❌ Error método 2: $e');
+        ultimoError = 'copy USB002 exception: $e';
+      }
+    }
+    
+    // ✅ MÉTODO 3: net use + copy (para impresoras compartidas)
+    if (!exitoso) {
+      try {
+        print('📡 Método 3: net use + copy...');
+        
+        // Primero conectar al recurso compartido
+        ProcessResult connectResult = await Process.run(
+          'net',
+          ['use', 'LPT2:', '\\\\localhost\\$selectedPrinterName'],
+          runInShell: true,
+        );
+        
+        print('📊 net use - Código: ${connectResult.exitCode}');
+        
+        if (connectResult.exitCode == 0) {
+          // Ahora copiar al puerto mapeado
+          ProcessResult copyResult = await Process.run(
+            'copy',
+            [tempFile.path, 'LPT2:'],
+            runInShell: true,
+          );
+          
+          print('📊 copy LPT2 - Código: ${copyResult.exitCode}');
+          
+          if (copyResult.exitCode == 0) {
+            exitoso = true;
+            print('✅ ÉXITO: net use + copy');
+          }
+          
+          // Limpiar conexión
+          await Process.run('net', ['use', 'LPT2:', '/delete'], runInShell: true);
+        } else {
+          ultimoError = 'net use: ${connectResult.stderr}';
+        }
+      } catch (e) {
+        print('❌ Error método 3: $e');
+        ultimoError = 'net use exception: $e';
+      }
+    }
+    
+    // ✅ MÉTODO 4: PowerShell Out-Printer (más robusto para compartidas)
+    if (!exitoso) {
+      try {
+        print('📡 Método 4: PowerShell Out-Printer...');
+        
+        String psCommand = 'Get-Content "${tempFile.path}" -Raw | Out-Printer -Name "$selectedPrinterName"';
+        
+        ProcessResult result = await Process.run(
+          'powershell',
+          ['-Command', psCommand],
+          runInShell: true,
+        );
+        
+        print('📊 PowerShell - Código: ${result.exitCode}');
+        print('📊 PowerShell - Error: ${result.stderr}');
+        
+        if (result.exitCode == 0) {
+          exitoso = true;
+          print('✅ ÉXITO: PowerShell Out-Printer');
+        } else {
+          ultimoError = 'PowerShell: ${result.stderr}';
+        }
+      } catch (e) {
+        print('❌ Error método 4: $e');
+        ultimoError = 'PowerShell exception: $e';
+      }
+    }
+    
+    // ✅ MÉTODO 5: Usar notepad como último recurso (funciona siempre)
+    if (!exitoso) {
+      try {
+        print('📡 Método 5: notepad /p (último recurso)...');
+        
+        ProcessResult result = await Process.run(
+          'notepad',
+          ['/p', tempFile.path],
+          runInShell: true,
+        );
+        
+        print('📊 notepad - Código: ${result.exitCode}');
+        
+        if (result.exitCode == 0) {
+          exitoso = true;
+          print('✅ ÉXITO: notepad /p (puede requerir intervención del usuario)');
+          
+          // Esperar para que notepad procese
+          await Future.delayed(Duration(seconds: 3));
+        } else {
+          ultimoError = 'notepad: ${result.stderr}';
+        }
+      } catch (e) {
+        print('❌ Error método 5: $e');
+        ultimoError = 'notepad exception: $e';
+      }
+    }
+    
+    // ✅ LIMPIAR archivo temporal
+    try {
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+        print('🗑️ Archivo temporal eliminado');
+      }
+    } catch (e) {
+      print('⚠️ No se pudo eliminar archivo temporal: $e');
+    }
+    
+    // ✅ RESULTADO FINAL
+    if (exitoso) {
+      print('🎉 === IMPRESIÓN POS-58 EXITOSA ===');
+    } else {
+      print('❌ === FALLÓ IMPRESIÓN POS-58 ===');
+      print('🔍 Último error: $ultimoError');
+      throw Exception('Falló impresión POS-58 con todos los métodos. Último error: $ultimoError');
+    }
+    
+  } catch (e) {
+    print('💥 Error crítico en _imprimirPOSDesktop: $e');
     rethrow;
   }
 }
+
+// ✅ NUEVA FUNCIÓN: Generar ticket optimizado para POS compartida
+String _generarTicketParaPOSCompartida(Map<String, dynamic> pedido, double total) {
+  StringBuffer ticket = StringBuffer();
+  
+  try {
+    // ✅ Header simple y compatible
+    ticket.writeln('================================');
+    ticket.writeln('       COMEDOR EL JOBO');
+    ticket.writeln('================================');
+    ticket.writeln('');
+    
+    // ✅ Información básica
+    final fecha = DateTime.now();
+    final fechaStr = '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
+    final horaStr = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
+    
+    ticket.writeln('Fecha: $fechaStr');
+    ticket.writeln('Hora: $horaStr');
+    
+    // Información del pedido
+    final mesa = pedido['mesa'] ?? 'N/A';
+    final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
+    final pedidoId = pedido['pedidoId'] ?? 'N/A';
+    
+    ticket.writeln('Mesa: $mesa');
+    ticket.writeln('Pedido: $nombreOrden');
+    ticket.writeln('ID: #$pedidoId');
+    ticket.writeln('');
+    ticket.writeln('--------------------------------');
+    
+    // ✅ Productos con formato simple
+    final detalles = pedido['detalles'] as List? ?? [];
+    double subtotal = 0.0;
+    int contador = 1;
+    
+    for (var detalle in detalles) {
+      try {
+        final status = detalle['statusDetalle'] ?? 'proceso';
+        if (status == 'cancelado') continue;
+        
+        final nombreProducto = detalle['nombreProducto'] ?? 'Producto $contador';
+        final cantidad = (detalle['cantidad'] ?? 1).toInt();
+        final precioUnitario = (detalle['precioUnitario'] ?? 0.0).toDouble();
+        final totalItem = precioUnitario * cantidad;
+        
+        subtotal += totalItem;
+        
+        // Formato simple para evitar problemas de codificación
+        ticket.writeln('$contador. $nombreProducto');
+        ticket.writeln('   Cant: $cantidad x \$${precioUnitario.toStringAsFixed(2)}');
+        ticket.writeln('   Total: \$${totalItem.toStringAsFixed(2)}');
+        
+        // Observaciones si existen
+        final observaciones = detalle['observaciones'];
+        if (observaciones != null && observaciones.toString().trim().isNotEmpty) {
+          ticket.writeln('   * ${observaciones.toString()}');
+        }
+        
+        ticket.writeln('');
+        contador++;
+      } catch (e) {
+        print('❌ Error procesando detalle: $e');
+        continue;
+      }
+    }
+    
+    // ✅ Total grande y visible
+    ticket.writeln('--------------------------------');
+    ticket.writeln('TOTAL A PAGAR:');
+    ticket.writeln('\$${subtotal.toStringAsFixed(2)}');
+    ticket.writeln('================================');
+    ticket.writeln('');
+    ticket.writeln('    ¡Gracias por su visita!');
+    ticket.writeln('');
+    ticket.writeln('  Sistema de Restaurante v1.0');
+    ticket.writeln('  ${DateTime.now().toString().substring(0, 19)}');
+    
+    // ✅ Espacios al final para cortar papel
+    ticket.writeln('');
+    ticket.writeln('');
+    ticket.writeln('');
+    ticket.writeln('');
+    
+    print('📋 Ticket generado: ${detalles.length} productos, Total: \$${subtotal.toStringAsFixed(2)}');
+    
+  } catch (e) {
+    print('❌ Error generando ticket: $e');
+    // Ticket de emergencia
+    ticket.clear();
+    ticket.writeln('ERROR GENERANDO TICKET');
+    ticket.writeln('Pedido ID: ${pedido['pedidoId'] ?? 'N/A'}');
+    ticket.writeln('Total estimado: \$${total.toStringAsFixed(2)}');
+    ticket.writeln('');
+  }
+  
+  return ticket.toString();
+}
+
+
 
 // ✅ NUEVA FUNCIÓN: Impresión de texto plano mejorada
 Future<void> _imprimirWindowsTextoPlanoMejorado(String contenido) async {
