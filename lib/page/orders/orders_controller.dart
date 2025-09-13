@@ -1248,4 +1248,282 @@ int obtenerConteoMesasConPendientes() {
   
   return conteo;
 }
+// 🔧 MÉTODO AUXILIAR: Obtener conteo de mesas con pedidos completados (listos para liberar)
+int obtenerConteoMesasCompletadas() {
+  int conteo = 0;
+  
+  for (var mesa in mesasConPedidos) {
+    final pedidos = mesa['pedidos'] as List;
+    
+    bool todosCompletados = pedidos.every((pedido) {
+      final detalles = pedido['detalles'] as List;
+      // Verificar que TODOS los detalles estén completados (no en proceso, no cancelados)
+      return detalles.every((detalle) {
+        final status = detalle['statusDetalle'] ?? 'proceso';
+        return status == 'completado' || status == 'pagado' || status == 'cancelado';
+      });
+    });
+    
+    // Solo contar la mesa si tiene al menos un producto completado (no solo cancelados)
+    bool tieneProductosCompletados = pedidos.any((pedido) {
+      final detalles = pedido['detalles'] as List;
+      return detalles.any((detalle) {
+        final status = detalle['statusDetalle'] ?? 'proceso';
+        return status == 'completado';
+      });
+    });
+    
+    if (todosCompletados && tieneProductosCompletados) {
+      conteo++;
+    }
+  }
+  
+  return conteo;
+}
+
+// 🔧 MÉTODO ALTERNATIVO: Si quieres solo mesas con productos completados (más simple)
+int obtenerConteoMesasListasParaLiberar() {
+  int conteo = 0;
+  
+  for (var mesa in mesasConPedidos) {
+    final pedidos = mesa['pedidos'] as List;
+    
+    // Verificar si la mesa tiene productos completados y ninguno en proceso
+    bool sinProceso = true;
+    bool tieneCompletados = false;
+    
+    for (var pedido in pedidos) {
+      final detalles = pedido['detalles'] as List;
+      
+      for (var detalle in detalles) {
+        final status = detalle['statusDetalle'] ?? 'proceso';
+        
+        if (status == 'proceso') {
+          sinProceso = false;
+        }
+        
+        if (status == 'completado') {
+          tieneCompletados = true;
+        }
+      }
+    }
+    
+    // Contar la mesa si no tiene productos en proceso Y tiene productos completados
+    if (sinProceso && tieneCompletados) {
+      conteo++;
+    }
+  }
+  
+  return conteo;
+}
+
+Future<void> liberarMesasCompletadas() async {
+  // Evitar múltiples ejecuciones
+  if (isLiberandoTodasLasMesas.value) return;
+  
+  try {
+    // Obtener mesas con pedidos completados (sin productos en proceso)
+    List<Map<String, dynamic>> mesasCompletadas = [];
+    
+    for (var mesa in mesasConPedidos) {
+      final numeroMesa = mesa['numeroMesa'];
+      final pedidos = mesa['pedidos'] as List;
+      
+      // Verificar si la mesa tiene productos completados y ninguno en proceso
+      bool sinProceso = true;
+      bool tieneCompletados = false;
+      
+      for (var pedido in pedidos) {
+        final detalles = pedido['detalles'] as List;
+        
+        for (var detalle in detalles) {
+          final status = detalle['statusDetalle'] ?? 'proceso';
+          
+          if (status == 'proceso') {
+            sinProceso = false;
+          }
+          
+          if (status == 'completado') {
+            tieneCompletados = true;
+          }
+        }
+      }
+      
+      // Agregar mesa si cumple los criterios
+      if (sinProceso && tieneCompletados) {
+        mesasCompletadas.add({
+          'numeroMesa': numeroMesa,
+          'mesa': mesa,
+        });
+        print('✅ Mesa $numeroMesa agregada para liberación (completada)');
+      }
+    }
+    
+    // Validar que hay mesas para liberar
+    if (mesasCompletadas.isEmpty) {
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.info,
+        title: 'Sin Mesas Listas',
+        text: 'No hay mesas con pedidos completados listas para liberar.',
+        confirmBtnText: 'Entendido',
+        confirmBtnColor: Color(0xFF3498DB),
+      );
+      return;
+    }
+    
+    // Mostrar confirmación
+    final totalMesas = mesasCompletadas.length;
+    
+    QuickAlert.show(
+      context: Get.context!,
+      type: QuickAlertType.confirm,
+      title: 'Liberar Mesas Completadas',
+      text: '¿Está seguro de que quiere liberar todas las mesas con pedidos completados?\n\n'
+            'Total de mesas: $totalMesas\n\n'
+            'Esta acción liberará las mesas que tienen todos sus pedidos completados.',
+      confirmBtnText: 'Liberar Todas ($totalMesas)',
+      cancelBtnText: 'Cancelar',
+      confirmBtnColor: Color(0xFF27AE60),
+      onConfirmBtnTap: () async {
+        Get.back(); // Cerrar el diálogo de confirmación
+        await _ejecutarLiberacionMesasCompletadas(mesasCompletadas);
+      },
+    );
+    
+  } catch (e) {
+    print('❌ Error en liberarMesasCompletadas: $e');
+    QuickAlert.show(
+      context: Get.context!,
+      type: QuickAlertType.error,
+      title: 'Error',
+      text: 'Error al procesar la solicitud: $e',
+      confirmBtnText: 'OK',
+      confirmBtnColor: Color(0xFFE74C3C),
+    );
+  }
+}
+Future<void> _ejecutarLiberacionMesasCompletadas(List<Map<String, dynamic>> mesasCompletadas) async {
+  try {
+    // Activar estado de carga
+    isLiberandoTodasLasMesas.value = true;
+    
+    
+    int exitosas = 0;
+    int fallidas = 0;
+    List<String> mesasFallidas = [];
+    
+    // Procesar cada mesa
+    for (var mesaInfo in mesasCompletadas) {
+      final numeroMesa = mesaInfo['numeroMesa'];
+      final mesa = mesaInfo['mesa'];
+      
+      try {
+        // Extraer el ID de la mesa
+        final mesaId = mesa['id'] ?? 
+                      mesa['idnumeroMesa'] ?? 
+                      mesa['mesaId'] ?? 
+                      numeroMesa; // Fallback
+        
+        print('🏪 Liberando Mesa $numeroMesa (ID: $mesaId)...');
+        
+        Uri uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/$mesaId/');
+        final statusData = {'status': true};
+        
+        final response = await http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(statusData),
+        );
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          
+          if (data['success'] == true) {
+            exitosas++;
+            print('✅ Mesa $numeroMesa liberada correctamente');
+          } else {
+            fallidas++;
+            mesasFallidas.add('Mesa $numeroMesa');
+            print('❌ Error liberando Mesa $numeroMesa: ${data['message'] ?? 'Error desconocido'}');
+          }
+        } else {
+          fallidas++;
+          mesasFallidas.add('Mesa $numeroMesa');
+          print('❌ Error HTTP liberando Mesa $numeroMesa: ${response.statusCode}');
+        }
+        
+        // Pausa entre requests
+        await Future.delayed(Duration(milliseconds: 200));
+        
+      } catch (e) {
+        fallidas++;
+        mesasFallidas.add('Mesa $numeroMesa');
+        print('❌ Excepción liberando Mesa $numeroMesa: $e');
+      }
+    }
+    
+    // Cerrar diálogo de progreso
+    Get.back();
+    
+    // Mostrar resultado
+    if (fallidas == 0) {
+      // Todas las mesas fueron liberadas exitosamente
+     
+    } else if (exitosas > 0) {
+      // Algunas mesas fueron liberadas
+      String mensajeFallidas = mesasFallidas.length <= 3 
+          ? mesasFallidas.join(', ')
+          : '${mesasFallidas.take(3).join(', ')} y ${mesasFallidas.length - 3} más';
+      
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.warning,
+        title: 'Liberación Parcial',
+        text: '⚠️ Liberación completada parcialmente\n'
+              'Exitosas: $exitosas\n'
+              'Fallidas: $fallidas\n'
+              'Mesas con error: $mensajeFallidas',
+        confirmBtnText: 'Entendido',
+        confirmBtnColor: Color(0xFFF39C12),
+      );
+    } else {
+      // Ninguna mesa pudo ser liberada
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.error,
+        title: 'Error en Liberación',
+        text: '❌ No se pudo liberar ninguna mesa completada\n'
+              'Total intentadas: ${mesasCompletadas.length}\n'
+              'Verifica la conexión con el servidor.',
+        confirmBtnText: 'Entendido',
+        confirmBtnColor: Color(0xFFE74C3C),
+      );
+    }
+    
+    // Refrescar datos
+    await refrescarDatos();
+    
+  } catch (e) {
+    // Cerrar diálogo de progreso si está abierto
+    if (Get.isDialogOpen ?? false) Get.back();
+    
+    QuickAlert.show(
+      context: Get.context!,
+      type: QuickAlertType.error,
+      title: 'Error Crítico',
+      text: 'Error inesperado al liberar las mesas: $e',
+      confirmBtnText: 'OK',
+      confirmBtnColor: Color(0xFFE74C3C),
+    );
+    
+    print('❌ Error crítico en _ejecutarLiberacionMesasCompletadas: $e');
+  } finally {
+    // Desactivar estado de carga
+    isLiberandoTodasLasMesas.value = false;
+  }
+}
 }

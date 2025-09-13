@@ -585,19 +585,18 @@ Widget _buildMetricasYHistorial() {
       ],
     );
   }
-
-  // 🆕 Modal para mostrar métricas por categorías
-  void _showMetricasModal() {
+// 🆕 Modal para mostrar métricas por categorías CON SELECTOR DE FECHA
+void _showMetricasModal() {
   // Cargar datos al abrir el modal
   metricasController.cargarMetricasPorCategorias();
   
   Get.dialog(
     Dialog(
-      // 🆕 Modal que cubre toda la pantalla
+      // Modal que cubre toda la pantalla
       insetPadding: EdgeInsets.zero,
       backgroundColor: Colors.transparent,
       child: Container(
-        // 🆕 Ocupa todo el ancho y alto de la pantalla
+        // Ocupa todo el ancho y alto de la pantalla
         width: Get.width,
         height: Get.height,
         decoration: BoxDecoration(
@@ -635,7 +634,7 @@ Widget _buildMetricasYHistorial() {
                         ),
                         SizedBox(width: 12),
                         
-                        // 🆕 Títulos con Expanded para evitar overflow
+                        // Títulos con Expanded para evitar overflow
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -650,23 +649,68 @@ Widget _buildMetricasYHistorial() {
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
                               ),
-                              Obx(() => Text(
-                                'Ventas del ${metricasController.fechaFormateada}',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
+                              // Selector de fecha clickeable
+                              GestureDetector(
+                                onTap: () => _mostrarSelectorFecha(),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today,
+                                        size: 12,
+                                        color: Colors.white,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Obx(() => Text(
+                                        metricasController.fechaFormateada,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      )),
+                                      SizedBox(width: 4),
+                                      Icon(
+                                        Icons.arrow_drop_down,
+                                        size: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              )),
+                              ),
                             ],
                           ),
                         ),
                         
-                        // 🆕 Botones en fila horizontal responsiva
+                        // Botones en fila horizontal responsiva
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Botón de fecha rápida (hoy)
+                            Container(
+                              width: 36,
+                              height: 36,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () => _cambiarAFechaHoy(),
+                                icon: Icon(Icons.today, color: Colors.white, size: 18),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.white.withOpacity(0.2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                tooltip: 'Ir a hoy',
+                              ),
+                            ),
+                            SizedBox(width: 8),
                             // Botón de refrescar
                             Container(
                               width: 36,
@@ -711,6 +755,42 @@ Widget _buildMetricasYHistorial() {
                               ),
                             ),
                           ],
+                        ),
+                      ],
+                    ),
+                    
+                    // Navegación rápida de fechas
+                    SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // Botón día anterior
+                        _buildFechaNavButton(
+                          icon: Icons.chevron_left,
+                          label: 'Anterior',
+                          onPressed: () => _cambiarFecha(-1),
+                        ),
+                        // Indicador de fecha actual
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Obx(() => Text(
+                            _obtenerEtiquetaFecha(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          )),
+                        ),
+                        // Botón día siguiente
+                        _buildFechaNavButton(
+                          icon: Icons.chevron_right,
+                          label: 'Siguiente',
+                          onPressed: () => _cambiarFecha(1),
                         ),
                       ],
                     ),
@@ -772,7 +852,6 @@ Widget _buildMetricasYHistorial() {
                             textAlign: TextAlign.center,
                           ),
                           SizedBox(height: 8),
-                          // 🆕 Texto de error con Expanded
                           Flexible(
                             child: Text(
                               metricasController.error.value,
@@ -808,7 +887,7 @@ Widget _buildMetricasYHistorial() {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 🆕 Resumen total responsivo
+                      // Resumen total responsivo con más información
                       Container(
                         width: double.infinity,
                         padding: EdgeInsets.symmetric(
@@ -843,7 +922,6 @@ Widget _buildMetricasYHistorial() {
                               textAlign: TextAlign.center,
                             ),
                             SizedBox(height: 8),
-                            // 🆕 Total con tamaño adaptativo
                             FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
@@ -857,6 +935,25 @@ Widget _buildMetricasYHistorial() {
                                 maxLines: 1,
                               ),
                             ),
+                            // Mostrar cantidad total de items si está disponible
+                            Obx(() {
+                              if (metricasController.cantidadGeneralItems.value > 0) {
+                                return Column(
+                                  children: [
+                                    SizedBox(height: 4),
+                                    Text(
+                                      '${metricasController.cantidadGeneralItems.value} items en total',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                );
+                              }
+                              return SizedBox.shrink();
+                            }),
                           ],
                         ),
                       ),
@@ -875,7 +972,7 @@ Widget _buildMetricasYHistorial() {
                       ),
                       SizedBox(height: 12),
 
-                      // 🆕 Lista completamente expandida
+                      // Lista completamente expandida
                       Expanded(
                         child: metricasController.categorias.isEmpty
                             ? Center(
@@ -920,9 +1017,9 @@ Widget _buildMetricasYHistorial() {
                                 itemCount: metricasController.categorias.length,
                                 itemBuilder: (context, index) {
                                   final categoria = metricasController.categorias[index];
-                                  final nombre = categoria['categoria'] ?? categoria['nombre'] ?? 'Sin categoría';
+                                  final nombre = categoria['categoria'] ?? 'Sin categoría';
                                   final total = categoria['total'] ?? 0.0;
-                                  final cantidad = categoria['cantidad'] ?? categoria['items'] ?? 0;
+                                  final cantidad = categoria['cantidad'] ?? 0;
                                   final porcentaje = metricasController.totalGeneral.value > 0 
                                       ? (total / metricasController.totalGeneral.value * 100) 
                                       : 0.0;
@@ -945,23 +1042,23 @@ Widget _buildMetricasYHistorial() {
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          // Icono
+                                          // Icono con color diferente según categoría
                                           Container(
                                             width: 45,
                                             height: 45,
                                             decoration: BoxDecoration(
-                                              color: Color(0xFF2196F3).withOpacity(0.1),
+                                              color: _obtenerColorCategoria(categoria['clave'] ?? '').withOpacity(0.1),
                                               borderRadius: BorderRadius.circular(10),
                                             ),
                                             child: Icon(
-                                              Icons.restaurant_menu,
-                                              color: Color(0xFF2196F3),
+                                              _obtenerIconoCategoria(categoria['clave'] ?? ''),
+                                              color: _obtenerColorCategoria(categoria['clave'] ?? ''),
                                               size: 22,
                                             ),
                                           ),
                                           SizedBox(width: 12),
                                           
-                                          // 🆕 Contenido principal expandido
+                                          // Contenido principal expandido
                                           Expanded(
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -979,23 +1076,15 @@ Widget _buildMetricasYHistorial() {
                                                 ),
                                                 SizedBox(height: 4),
                                                 
-                                                /*Items vendidos
-                                                Row(
-                                                  children: [
-                                                    Icon(Icons.shopping_cart, size: 14, color: Colors.grey[600]),
-                                                    SizedBox(width: 4),
-                                                    Expanded(
-                                                      child: Text(
-                                                        '$cantidad items vendidos',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors.grey[600],
-                                                        ),
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
+                                                // Información de cantidad si está disponible
+                                                if (cantidad > 0)
+                                                  Text(
+                                                    'cantidad total: $cantidad',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
                                                     ),
-                                                  ],
-                                                ),*/
+                                                  ),
                                                 SizedBox(height: 8),
                                                 
                                                 // Barra de progreso
@@ -1010,7 +1099,7 @@ Widget _buildMetricasYHistorial() {
                                                     widthFactor: (porcentaje / 100).clamp(0.0, 1.0),
                                                     child: Container(
                                                       decoration: BoxDecoration(
-                                                        color: Color(0xFF2196F3),
+                                                        color: _obtenerColorCategoria(categoria['clave'] ?? ''),
                                                         borderRadius: BorderRadius.circular(2),
                                                       ),
                                                     ),
@@ -1022,7 +1111,7 @@ Widget _buildMetricasYHistorial() {
                                           
                                           SizedBox(width: 8),
                                           
-                                          // 🆕 Información de precio y porcentaje
+                                          // Información de precio y porcentaje
                                           Column(
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1035,20 +1124,14 @@ Widget _buildMetricasYHistorial() {
                                                   style: TextStyle(
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: Get.width > 400 ? 16 : 14,
-                                                    color: Color(0xFF2196F3),
+                                                    color: _obtenerColorCategoria(categoria['clave'] ?? ''),
                                                   ),
                                                   maxLines: 1,
                                                 ),
                                               ),
                                               SizedBox(height: 2),
-                                              // Porcentaje
-                                              Text(
-                                                '${porcentaje.toStringAsFixed(1)}%',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey[600],
-                                                ),
-                                              ),
+                                              
+                                             
                                             ],
                                           ),
                                         ],
@@ -1070,6 +1153,114 @@ Widget _buildMetricasYHistorial() {
     barrierDismissible: true,
   );
 }
+
+// Métodos auxiliares para el modal
+
+Widget _buildFechaNavButton({
+  required IconData icon,
+  required String label,
+  required VoidCallback onPressed,
+}) {
+  return Container(
+    child: IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon, color: Colors.white, size: 16),
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white.withOpacity(0.2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        minimumSize: Size(32, 32),
+      ),
+      tooltip: label,
+    ),
+  );
+}
+
+String _obtenerEtiquetaFecha() {
+  return metricasController.etiquetaFecha;
+}
+
+void _cambiarFecha(int dias) {
+  metricasController.navegarFecha(dias);
+}
+
+void _cambiarAFechaHoy() {
+  metricasController.irAHoy();
+}
+
+void _mostrarSelectorFecha() async {
+  final fechaSeleccionada = await showDatePicker(
+    context: Get.context!,
+    initialDate: DateTime.parse(metricasController.fechaConsulta.value),
+    firstDate: DateTime(2020),
+    lastDate: DateTime.now(),
+    locale: Locale('es', 'ES'),
+    builder: (context, child) {
+      return Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(
+            primary: Color(0xFF2196F3),
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Colors.black,
+          ),
+        ),
+        child: child!,
+      );
+    },
+  );
+  
+  if (fechaSeleccionada != null) {
+    await metricasController.cambiarFecha(fechaSeleccionada);
+  }
+}
+
+// Métodos para personalizar iconos y colores por categoría
+IconData _obtenerIconoCategoria(String clave) {
+  switch (clave) {
+    case 'menuPrincipal':
+      return Icons.restaurant;
+    case 'desechables':
+      return Icons.eco;
+    case 'pan':
+      return Icons.bakery_dining;
+    case 'extras':
+      return Icons.add_circle;
+    case 'bebidas':
+      return Icons.local_drink;
+    case 'cafe':
+      return Icons.coffee;
+    case 'postres':
+      return Icons.cake;
+    default:
+      return Icons.restaurant_menu;
+  }
+}
+
+Color _obtenerColorCategoria(String clave) {
+  switch (clave) {
+    case 'menuPrincipal':
+      return Color(0xFF2196F3); // Azul
+    case 'desechables':
+      return Color(0xFF4CAF50); // Verde
+    case 'pan':
+      return Color(0xFFFF9800); // Naranja
+    case 'extras':
+      return Color(0xFF9C27B0); // Púrpura
+    case 'bebidas':
+      return Color(0xFF00BCD4); // Cian
+    case 'cafe':
+      return Color(0xFF795548); // Marrón
+    case 'postres':
+      return Color(0xFFE91E63); // Rosa
+    default:
+      return Color(0xFF607D8B); // Gris azulado
+  }
+}
+
+// 🆕 MÉTODOS AUXILIARES PARA EL SELECTOR DE FECHA
+
 
   // Métodos para mostrar otros modales existentes
   void _showMenusModal() {

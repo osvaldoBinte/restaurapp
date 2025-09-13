@@ -17,11 +17,16 @@ class HistorialController extends GetxController {
   var isLoadingModal = false.obs;
   var historialVentas = <Map<String, dynamic>>[].obs; // 🆕 Reemplaza pedidosPendientes
   var selectedTableData = <Map<String, dynamic>>[].obs;
-  
+  var maxPaginasEstimadas = 10.obs; // Puedes ajustar este valor
+
   // Variables para paginación del historial
   var currentPage = 1.obs;
   var hasMoreData = true.obs;
   var fechaConsulta = DateTime.now().toString().split(' ')[0].obs; // 🆕 Fecha actual
+  var pageSize = 3.obs; // Tamaño de página personalizable
+  var totalPages = 1.obs; // Total de páginas
+  var showPaginationControls = true.obs; // Mostrar/ocultar controles
+  final List<int> pageSizeOptions = [1, 2, 3, 4, 5, 10, 15];
 
   String defaultApiServer = AppConstants.serverBase;
 
@@ -86,6 +91,95 @@ class HistorialController extends GetxController {
       _iniciarAutoRefresh();
     }
   }
+/// Ir a una página específica
+Future<void> irAPagina(int numeroPagina) async {
+  if (numeroPagina < 1) {
+    print('⚠️ Número de página debe ser mayor a 0');
+    return;
+  }
+  
+  if (numeroPagina == currentPage.value) {
+    print('ℹ️ Ya estás en la página $numeroPagina');
+    return;
+  }
+  
+  print('📄 Navegando de página ${currentPage.value} a $numeroPagina');
+  currentPage.value = numeroPagina;
+  
+  // ✅ La API nos dirá si la página existe o no
+  await obtenerHistorialVentas(resetear: true);
+}
+
+/// Página anterior - ✅ Usa información real de la API
+Future<void> paginaAnterior() async {
+  if (currentPage.value > 1) {
+    await irAPagina(currentPage.value - 1);
+  } else {
+    print('⚠️ Ya estás en la primera página');
+  }
+}
+
+/// Página siguiente - ✅ Usa información real de la API
+Future<void> paginaSiguiente() async {
+  // ✅ No necesitamos verificar hasMoreData aquí, 
+  // la API nos responderá con la información correcta
+  await irAPagina(currentPage.value + 1);
+}
+
+/// Primera página
+Future<void> primeraPagina() async {
+  if (currentPage.value != 1) {
+    await irAPagina(1);
+  } else {
+    print('ℹ️ Ya estás en la primera página');
+  }
+}
+
+/// Última página - ✅ Usa totalPages real de la API
+Future<void> ultimaPagina() async {
+  if (currentPage.value != totalPages.value && totalPages.value > 0) {
+    await irAPagina(totalPages.value);
+  } else {
+    print('ℹ️ Ya estás en la última página');
+  }
+}
+
+/// 🔧 MÉTODO cambiarPageSize MEJORADO
+Future<void> cambiarPageSize(int nuevoPageSize) async {
+  if (isLoading.value) {
+    print('⏳ Operación en progreso, espera...');
+    return;
+  }
+
+  print('🔄 Cambiando page_size de ${pageSize.value} a $nuevoPageSize');
+  pageSize.value = nuevoPageSize;
+  
+  // ✅ Al cambiar el tamaño, ir a página 1 para evitar problemas
+  currentPage.value = 1;
+  
+  await obtenerHistorialVentas(resetear: true);
+}
+
+// ✅ NUEVO: Método para saltar a una página específica (opcional)
+Future<void> saltarAPagina(int numeroPagina) async {
+  if (numeroPagina < 1 || numeroPagina > totalPages.value) {
+    print('⚠️ Página $numeroPagina fuera de rango (1-${totalPages.value})');
+    
+    // Mostrar mensaje al usuario
+    if (Get.context != null) {
+      ScaffoldMessenger.of(Get.context!).showSnackBar(
+        SnackBar(
+          content: Text('Página no válida. Rango: 1-${totalPages.value}'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+    return;
+  }
+  
+  await irAPagina(numeroPagina);
+}
 
   /// 🆕 MÉTODO PRINCIPAL: Cargar historial de ventas
   Future<void> cargarDatos() async {
@@ -109,24 +203,29 @@ class HistorialController extends GetxController {
       }
     }
   }
+// 🔧 MÉTODO obtenerHistorialVentas ACTUALIZADO PARA USAR PAGINACIÓN DE LA API
 
-  Future<void> obtenerHistorialVentas({bool resetear = false}) async {
+Future<void> obtenerHistorialVentas({bool resetear = false}) async {
   try {
+    // ✅ Prevenir múltiples cargas simultáneas
+    if (isLoading.value && !resetear) {
+      print('⏳ Ya hay una carga en progreso...');
+      return;
+    }
+
+    // ✅ Establecer loading al inicio
+    isLoading.value = true;
+
     if (resetear) {
-      currentPage.value = 1;
       historialVentas.clear();
       hasMoreData.value = true;
     }
 
-    if (!hasMoreData.value && !resetear) {
-      print('📋 No hay más datos para cargar');
-      return;
-    }
-
-    // URL del endpoint actual
-    Uri uri = Uri.parse('$defaultApiServer/ordenes/ObtenerHistorialVentasPorDia/?fecha=${fechaConsulta.value}&page=${currentPage.value}&page_size=5');
+    // URL con pageSize dinámico
+    Uri uri = Uri.parse('$defaultApiServer/ordenes/ObtenerHistorialVentasPorDia/?fecha=${fechaConsulta.value}&page=${currentPage.value}&page_size=${pageSize.value}');
 
     print('📡 Cargando historial: $uri');
+    print('📊 Parámetros: fecha=${fechaConsulta.value}, página=${currentPage.value}, tamaño=${pageSize.value}');
 
     final response = await http.get(
       uri,
@@ -134,124 +233,134 @@ class HistorialController extends GetxController {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-    );
+    ).timeout(Duration(seconds: 15));
 
     print('📡 Historial ventas - Código: ${response.statusCode}');
     
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       
-      if (data['success'] == true && data.containsKey('mesasOcupadas')) {
-        List<dynamic> mesasOcupadas = data['mesasOcupadas'];
-        
-        // 🆕 CONVERTIR MESAS A HISTORIAL DE VENTAS
-        List<Map<String, dynamic>> ventasConvertidas = [];
-        
-        for (var mesa in mesasOcupadas) {
-          final numeroMesa = mesa['numeroMesa'];
-          final pedidosMesa = mesa['pedidos'] as List;
+      if (data['success'] == true) {
+        // ✅ NUEVO: Extraer información de paginación de la API
+        if (data.containsKey('pagination')) {
+          final paginationInfo = data['pagination'];
           
-          for (var pedido in pedidosMesa) {
-            final pedidoId = pedido['pedidoId'];
-            final nombreOrden = pedido['nombreOrden'];
-            final fechaPedido = pedido['fechaPedido'];
-            final statusPedido = pedido['statusPedido'];
-            final detalles = pedido['detalles'] as List;
-            
-            // Calcular total del pedido
-            double totalPedido = 0.0;
-            int totalItems = 0;
-            List<Map<String, dynamic>> detallesFormateados = [];
-            
-            for (var detalle in detalles) {
-              // Solo incluir items pagados o completados
-              String statusDetalle = detalle['statusDetalle'] ?? 'completado';
+          // ✅ Actualizar variables de paginación con datos reales de la API
+          currentPage.value = paginationInfo['current_page'] ?? currentPage.value;
+          totalPages.value = paginationInfo['total_pages'] ?? 1;
+          hasMoreData.value = paginationInfo['has_next'] ?? false;
+          
+          // ✅ Información adicional útil
+          final totalMesas = paginationInfo['total_mesas'] ?? 0;
+          final hasPrevious = paginationInfo['has_previous'] ?? false;
+          
+          print('✅ Información de paginación de la API:');
+          print('   📍 Página actual: ${currentPage.value}');
+          print('   📄 Total páginas: ${totalPages.value}');
+          print('   📊 Total mesas: $totalMesas');
+          print('   ⬅️ Tiene anterior: $hasPrevious');
+          print('   ➡️ Tiene siguiente: ${hasMoreData.value}');
+        }
+        
+        // ✅ Procesar mesasOcupadas (puede estar vacío)
+        if (data.containsKey('mesasOcupadas')) {
+          List<dynamic> mesasOcupadas = data['mesasOcupadas'];
+          List<Map<String, dynamic>> ventasConvertidas = [];
+          
+          // Procesar solo si hay datos
+          if (mesasOcupadas.isNotEmpty) {
+            for (var mesa in mesasOcupadas) {
+              final numeroMesa = mesa['numeroMesa'];
+              final pedidosMesa = mesa['pedidos'] as List;
               
-              if (statusDetalle != 'cancelado') {
-                double precio = (detalle['precioUnitario'] ?? 0.0).toDouble();
-                int cantidad = (detalle['cantidad'] ?? 1);
-                totalPedido += precio * cantidad;
-                totalItems += cantidad;
+              for (var pedido in pedidosMesa) {
+                final pedidoId = pedido['pedidoId'];
+                final nombreOrden = pedido['nombreOrden'];
+                final fechaPedido = pedido['fechaPedido'];
+                final statusPedido = pedido['statusPedido'];
+                final detalles = pedido['detalles'] as List;
                 
-                detallesFormateados.add({
-                  'detalleId': detalle['detalleId'],
-                  'nombreProducto': detalle['nombreProducto'],
-                  'cantidad': cantidad,
-                  'precioUnitario': precio,
-                  'observaciones': detalle['observaciones'] ?? '',
-                  'statusDetalle': statusDetalle,
-                });
+                double totalPedido = 0.0;
+                int totalItems = 0;
+                List<Map<String, dynamic>> detallesFormateados = [];
+                
+                for (var detalle in detalles) {
+                  String statusDetalle = detalle['statusDetalle'] ?? 'completado';
+                  
+                  if (statusDetalle != 'cancelado') {
+                    double precio = (detalle['precioUnitario'] ?? 0.0).toDouble();
+                    int cantidad = (detalle['cantidad'] ?? 1);
+                    totalPedido += precio * cantidad;
+                    totalItems += cantidad;
+                    
+                    detallesFormateados.add({
+                      'detalleId': detalle['detalleId'],
+                      'nombreProducto': detalle['nombreProducto'],
+                      'cantidad': cantidad,
+                      'precioUnitario': precio,
+                      'observaciones': detalle['observaciones'] ?? '',
+                      'statusDetalle': statusDetalle,
+                    });
+                  }
+                }
+                
+                if (totalPedido > 0) {
+                  ventasConvertidas.add({
+                    'pedidoId': pedidoId,
+                    'id': pedidoId,
+                    'numeroMesa': numeroMesa,
+                    'nombreOrden': nombreOrden,
+                    'cliente': nombreOrden,
+                    'fecha': fechaPedido,
+                    'fechaVenta': fechaPedido,
+                    'total': totalPedido,
+                    'totalVenta': totalPedido,
+                    'status': statusPedido,
+                    'estado': statusPedido,
+                    'detalles': detallesFormateados,
+                    'items': detallesFormateados,
+                    'totalItems': totalItems,
+                  });
+                }
               }
             }
             
-            // Solo agregar pedidos con total > 0
-            if (totalPedido > 0) {
-              ventasConvertidas.add({
-                'pedidoId': pedidoId,
-                'id': pedidoId, // ID alternativo
-                'numeroMesa': numeroMesa,
-                'nombreOrden': nombreOrden,
-                'cliente': nombreOrden, // Campo alternativo
-                'fecha': fechaPedido,
-                'fechaVenta': fechaPedido, // Campo alternativo
-                'total': totalPedido,
-                'totalVenta': totalPedido, // Campo alternativo
-                'status': statusPedido,
-                'estado': statusPedido, // Campo alternativo
-                'detalles': detallesFormateados,
-                'items': detallesFormateados, // Campo alternativo
-                'totalItems': totalItems,
-              });
-            }
-          }
-        }
-        
-        print('📊 Ventas convertidas: ${ventasConvertidas.length}');
-        
-        // Ordenar por fecha (más recientes primero)
-        ventasConvertidas.sort((a, b) {
-          try {
-            final fechaA = DateTime.parse(a['fecha']);
-            final fechaB = DateTime.parse(b['fecha']);
-            return fechaB.compareTo(fechaA);
-          } catch (e) {
-            return 0;
-          }
-        });
-        
-        if (resetear) {
-          historialVentas.value = ventasConvertidas;
-        } else {
-          // Agregar nuevas ventas evitando duplicados
-          for (var venta in ventasConvertidas) {
-            final existeId = historialVentas.any((v) => 
-              v['pedidoId'] == venta['pedidoId']
-            );
+            // Ordenar por fecha
+            ventasConvertidas.sort((a, b) {
+              try {
+                final fechaA = DateTime.parse(a['fecha']);
+                final fechaB = DateTime.parse(b['fecha']);
+                return fechaB.compareTo(fechaA);
+              } catch (e) {
+                return 0;
+              }
+            });
             
-            if (!existeId) {
-              historialVentas.add(venta);
-            }
+            print('✅ Datos procesados: ${ventasConvertidas.length} ventas encontradas');
+          } else {
+            print('📋 No hay datos en mesasOcupadas para página ${currentPage.value}');
           }
-        }
-
-        // Para este endpoint, no hay paginación real, así que marcar como sin más datos
-        hasMoreData.value = false;
-        currentPage.value++;
-
-        print('✅ Historial procesado: ${historialVentas.length} ventas total');
-        
-      } else {
-        print('⚠️ Respuesta sin mesasOcupadas o success=false');
-        if (resetear) {
+          
+          // ✅ Actualizar la lista (puede estar vacía y está bien)
+          historialVentas.value = ventasConvertidas;
+          
+        } else {
+          print('⚠️ Respuesta sin mesasOcupadas');
           historialVentas.clear();
         }
-        hasMoreData.value = false;
+      } else {
+        print('⚠️ success=false en respuesta');
+        historialVentas.clear();
+        // Mantener totalPages si no hay información de paginación
+        if (!data.containsKey('pagination')) {
+          totalPages.value = 1;
+        }
       }
     } else if (response.statusCode == 404) {
-      print('📋 No hay datos de historial para la fecha ${fechaConsulta.value}');
-      if (resetear) {
-        historialVentas.clear();
-      }
+      print('📋 No hay datos (404) para página ${currentPage.value}');
+      historialVentas.clear();
+      // En 404, probablemente no hay paginación, usar valores por defecto
+      totalPages.value = 1;
       hasMoreData.value = false;
     } else {
       throw Exception('Error del servidor: ${response.statusCode}');
@@ -260,7 +369,7 @@ class HistorialController extends GetxController {
   } catch (e) {
     print('❌ Error al obtener historial de ventas: $e');
     
-    // Solo mostrar error si NO es auto-refresh
+    // Solo mostrar alert si no es auto-refresh
     if (_autoRefreshTimer?.isActive != true) {
       QuickAlert.show(
         context: Get.context!,
@@ -271,6 +380,13 @@ class HistorialController extends GetxController {
         confirmBtnColor: Color(0xFF8B4513),
       );
     }
+    
+    // En caso de error, limpiar datos pero mantener estructura
+    historialVentas.clear();
+    if (totalPages.value == 0) totalPages.value = 1;
+  } finally {
+    // ✅ IMPORTANTE: Siempre quitar el loading al final
+    isLoading.value = false;
   }
 }
 

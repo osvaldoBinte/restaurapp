@@ -81,24 +81,485 @@ class HistorialPage extends StatelessWidget {
           );
         }
 
-        return RefreshIndicator(
-          onRefresh: controller.refrescarDatos,
-          color: Color(0xFF8B4513),
-          child: Column(
-            children: [
-              // 🆕 Panel de estadísticas del día
-              _buildEstadisticasPanel(isSmallScreen),
-              
-              // 🆕 Lista de historial de ventas
-              Expanded(
-                child: _buildHistorialList(isSmallScreen, isSmallWidth),
-              ),
-            ],
+          
+      return RefreshIndicator(
+        onRefresh: controller.refrescarDatos,
+        color: Color(0xFF8B4513),
+        child: Column(
+          children: [
+            // Panel de estadísticas existente
+            _buildEstadisticasPanel(isSmallScreen),
+            
+            // USAR UNA DE ESTAS OPCIONES:
+            _buildCompactPaginationControls(),        
+            // _buildMinimalPaginationControls(),     // Opción 2: Minimalista
+            
+            Expanded(
+              child: _buildHistorialList(isSmallScreen, isSmallWidth),
+            ),
+          ],
           ),
         );
       }),
     );
   }
+
+Widget _buildCompactPaginationControls() {
+  return Obx(() {
+    if (!controller.showPaginationControls.value) {
+      return SizedBox.shrink();
+    }
+
+    // Debug: Verificar valores actuales
+    print('🔍 Debug Paginación:');
+    print('   Página actual: ${controller.currentPage.value}');
+    print('   Total páginas: ${controller.totalPages.value}');
+    print('   Hay más datos: ${controller.hasMoreData.value}');
+    print('   Datos en lista: ${controller.historialVentas.length}');
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 2,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Dropdown compacto
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Mostrar:',
+                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+              ),
+              SizedBox(width: 4),
+              Container(
+                height: 28,
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    value: controller.pageSize.value,
+                    style: TextStyle(fontSize: 12, color: Colors.black87),
+                    isDense: true,
+                    onChanged: (int? newValue) {
+                      if (newValue != null && !controller.isLoading.value) {
+                        print('🔄 Cambiando pageSize a: $newValue');
+                        controller.cambiarPageSize(newValue);
+                      }
+                    },
+                    items: controller.pageSizeOptions.map<DropdownMenuItem<int>>((int value) {
+                      return DropdownMenuItem<int>(
+                        value: value,
+                        child: Text('$value', style: TextStyle(fontSize: 12)),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Controles de navegación inteligentes
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildCompactNavButton(
+                icon: Icons.keyboard_double_arrow_left,
+                // ✅ Habilitar si no estamos en página 1 y no está cargando
+                onPressed: (controller.currentPage.value > 1 && !controller.isLoading.value)
+                    ? () {
+                        print('🏠 Ir a primera página');
+                        controller.primeraPagina();
+                      }
+                    : null,
+                size: 16,
+              ),
+              _buildCompactNavButton(
+                icon: Icons.chevron_left,
+                // ✅ Habilitar si no estamos en página 1 y no está cargando
+                onPressed: (controller.currentPage.value > 1 && !controller.isLoading.value)
+                    ? () {
+                        print('⬅️ Página anterior: ${controller.currentPage.value - 1}');
+                        controller.paginaAnterior();
+                      }
+                    : null,
+                size: 16,
+              ),
+              
+              // Información de página con indicador de carga
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: 4),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Color(0xFF8B4513).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (controller.isLoading.value)
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: EdgeInsets.only(right: 4),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1,
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+                        ),
+                      ),
+                    Text(
+                      '${controller.currentPage.value}/${controller.totalPages.value}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF8B4513),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              _buildCompactNavButton(
+                icon: Icons.chevron_right,
+                // ✅ Habilitar si no estamos en la última página y no está cargando
+                onPressed: (controller.currentPage.value < controller.totalPages.value && !controller.isLoading.value)
+                    ? () {
+                        print('➡️ Página siguiente: ${controller.currentPage.value + 1}');
+                        controller.paginaSiguiente();
+                      }
+                    : null,
+                size: 16,
+              ),
+              _buildCompactNavButton(
+                icon: Icons.keyboard_double_arrow_right,
+                // ✅ Habilitar si no estamos en la última página y no está cargando
+                onPressed: (controller.currentPage.value < controller.totalPages.value && !controller.isLoading.value)
+                    ? () {
+                        print('🏁 Ir a última página: ${controller.totalPages.value}');
+                        controller.ultimaPagina();
+                      }
+                    : null,
+                size: 16,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  });
+}
+
+
+Widget _buildCompactNavButton({
+  required IconData icon,
+  required VoidCallback? onPressed,
+  required double size,
+}) {
+  final isEnabled = onPressed != null;
+  
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(2),
+      splashColor: isEnabled ? Color(0xFF8B4513).withOpacity(0.2) : null,
+      highlightColor: isEnabled ? Color(0xFF8B4513).withOpacity(0.1) : null,
+      child: Container(
+        width: 24,
+        height: 24,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(2),
+          border: isEnabled 
+              ? Border.all(color: Color(0xFF8B4513).withOpacity(0.3), width: 0.5)
+              : null,
+        ),
+        child: Icon(
+          icon,
+          size: size,
+          color: isEnabled ? Color(0xFF8B4513) : Colors.grey[400],
+        ),
+      ),
+    ),
+  );
+}
+
+// ✅ WIDGET MEJORADO: Mensaje con información de paginación real
+Widget _buildNoPedidosMessage() {
+  return Obx(() {
+    return Container(
+      padding: EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          SizedBox(height: 16),
+          Text(
+            'No hay pedidos para mostrar',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600],
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Página ${controller.currentPage.value} de ${controller.totalPages.value}',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+          SizedBox(height: 16),
+          
+          // ✅ Información adicional basada en la paginación
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Color(0xFF8B4513).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Color(0xFF8B4513).withOpacity(0.3),
+              ),
+            ),
+            child: Column(
+              children: [
+                if (controller.totalPages.value > 1) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Color(0xFF8B4513),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Hay ${controller.totalPages.value} páginas disponibles',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF8B4513),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                ],
+                Text(
+                  controller.totalPages.value > 1 
+                      ? 'Usa los controles para navegar entre páginas'
+                      : 'Esta es la única página disponible',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF8B4513).withOpacity(0.8),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // ✅ Indicadores de navegación disponible
+          if (controller.totalPages.value > 1)
+            Padding(
+              padding: EdgeInsets.only(top: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (controller.currentPage.value > 1) ...[
+                    Icon(Icons.arrow_back, size: 16, color: Colors.green),
+                    SizedBox(width: 4),
+                    Text(
+                      'Anterior disponible',
+                      style: TextStyle(fontSize: 10, color: Colors.green),
+                    ),
+                  ],
+                  if (controller.currentPage.value > 1 && controller.currentPage.value < controller.totalPages.value)
+                    SizedBox(width: 16),
+                  if (controller.currentPage.value < controller.totalPages.value) ...[
+                    Icon(Icons.arrow_forward, size: 16, color: Colors.green),
+                    SizedBox(width: 4),
+                    Text(
+                      'Siguiente disponible',
+                      style: TextStyle(fontSize: 10, color: Colors.green),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  });
+}
+void _showPageSizeBottomSheet() {
+  Get.bottomSheet(
+    Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Registros por página',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF3E1F08),
+            ),
+          ),
+          SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            children: controller.pageSizeOptions.map((size) {
+              return Obx(() => ChoiceChip(
+                label: Text('$size'),
+                selected: controller.pageSize.value == size,
+                onSelected: (selected) {
+                  if (selected) {
+                    controller.cambiarPageSize(size);
+                    Get.back();
+                  }
+                },
+                selectedColor: Color(0xFF8B4513).withOpacity(0.2),
+                labelStyle: TextStyle(
+                  color: controller.pageSize.value == size 
+                    ? Color(0xFF8B4513) 
+                    : Colors.grey[700],
+                  fontWeight: controller.pageSize.value == size 
+                    ? FontWeight.w600 
+                    : FontWeight.normal,
+                ),
+              ));
+            }).toList(),
+          ),
+          SizedBox(height: 16),
+        ],
+      ),
+    ),
+  );
+}
+
+// OPCIÓN 2: CONTROLES SÚPER MINIMALISTAS
+Widget _buildMinimalPaginationControls() {
+  return Obx(() {
+    if (!controller.showPaginationControls.value || controller.historialVentas.isEmpty) {
+      return SizedBox.shrink();
+    }
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Dropdown súper compacto
+          GestureDetector(
+            onTap: () => _showPageSizeBottomSheet(),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${controller.pageSize.value}',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                  Icon(Icons.expand_more, size: 14, color: Colors.grey[600]),
+                ],
+              ),
+            ),
+          ),
+          
+          SizedBox(width: 8),
+          
+          // Navegación compacta
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildTinyNavButton(Icons.first_page, 
+                  controller.currentPage.value > 1 ? controller.primeraPagina : null),
+                _buildTinyNavButton(Icons.chevron_left, 
+                  controller.currentPage.value > 1 ? controller.paginaAnterior : null),
+                
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  child: Text(
+                    '${controller.currentPage.value}/${controller.totalPages.value}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF8B4513),
+                    ),
+                  ),
+                ),
+                
+                _buildTinyNavButton(Icons.chevron_right, 
+                  controller.currentPage.value < controller.totalPages.value ? controller.paginaSiguiente : null),
+                _buildTinyNavButton(Icons.last_page, 
+                  controller.currentPage.value < controller.totalPages.value ? controller.ultimaPagina : null),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  });
+}
+
+Widget _buildTinyNavButton(IconData icon, VoidCallback? onPressed) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(2),
+      child: Container(
+        width: 20,
+        height: 20,
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 12,
+          color: onPressed != null ? Color(0xFF8B4513) : Colors.grey[400],
+        ),
+      ),
+    ),
+  );
+}
 
   // 🆕 PANEL DE ESTADÍSTICAS DEL DÍA
   Widget _buildEstadisticasPanel(bool isSmallScreen) {
@@ -138,84 +599,12 @@ class HistorialPage extends StatelessWidget {
                 ),
               ),
               // Indicador de auto-refresh
-              Obx(() => controller.isAutoRefreshEnabled.value
-                ? Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Auto',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  )
-                : SizedBox.shrink(),
-              ),
+             
             ],
           ),
           SizedBox(height: 12),
           
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total del Día',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: isSmallScreen ? 12 : 14,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Obx(() => Text(
-                      '\$${controller.totalVentasDelDia.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: isSmallScreen ? 18 : 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )),
-                  ],
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 40,
-                color: Colors.white.withOpacity(0.3),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Órdenes',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: isSmallScreen ? 12 : 14,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Obx(() => Text(
-                      '${controller.totalOrdenesDelDia}',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: isSmallScreen ? 18 : 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )),
-                  ],
-                ),
-              ),
-            ],
-          ),
+         
         ],
       ),
     );
@@ -325,6 +714,208 @@ class HistorialPage extends StatelessWidget {
     );
   }
 
+Widget _buildPaginationControls() {
+  return Obx(() {
+    if (!controller.showPaginationControls.value || controller.historialVentas.isEmpty) {
+      return SizedBox.shrink();
+    }
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Selector de page_size
+          Row(
+            children: [
+              Text(
+                'Mostrar:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF3E1F08),
+                ),
+              ),
+              SizedBox(width: 8),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    value: controller.pageSize.value,
+                    onChanged: (int? newValue) {
+                      if (newValue != null) {
+                        controller.cambiarPageSize(newValue);
+                      }
+                    },
+                    items: controller.pageSizeOptions.map<DropdownMenuItem<int>>((int value) {
+                      return DropdownMenuItem<int>(
+                        value: value,
+                        child: Text('$value'),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              Text(
+                ' registros por página',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          
+          SizedBox(height: 12),
+          
+          // Controles de navegación
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Botones de navegación izquierda
+              Row(
+                children: [
+                  _buildNavButton(
+                    icon: Icons.first_page,
+                    onPressed: controller.currentPage.value > 1 
+                      ? controller.primeraPagina 
+                      : null,
+                    tooltip: 'Primera página',
+                  ),
+                  SizedBox(width: 4),
+                  _buildNavButton(
+                    icon: Icons.chevron_left,
+                    onPressed: controller.currentPage.value > 1 
+                      ? controller.paginaAnterior 
+                      : null,
+                    tooltip: 'Página anterior',
+                  ),
+                ],
+              ),
+              
+              // Información de página actual
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Color(0xFF8B4513).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Página ${controller.currentPage.value} de ${controller.totalPages.value}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF8B4513),
+                  ),
+                ),
+              ),
+              
+              // Botones de navegación derecha
+              Row(
+                children: [
+                  _buildNavButton(
+                    icon: Icons.chevron_right,
+                    onPressed: controller.currentPage.value < controller.totalPages.value 
+                      ? controller.paginaSiguiente 
+                      : null,
+                    tooltip: 'Página siguiente',
+                  ),
+                  SizedBox(width: 4),
+                  _buildNavButton(
+                    icon: Icons.last_page,
+                    onPressed: controller.currentPage.value < controller.totalPages.value 
+                      ? controller.ultimaPagina 
+                      : null,
+                    tooltip: 'Última página',
+                  ),
+                ],
+              ),
+            ],
+          ),
+          
+          // Input directo de página (opcional)
+          SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Ir a página:',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              SizedBox(width: 8),
+              Container(
+                width: 60,
+                height: 30,
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 4),
+                    hintText: '${controller.currentPage.value}',
+                    hintStyle: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                  ),
+                  onSubmitted: (value) {
+                    final pageNumber = int.tryParse(value);
+                    if (pageNumber != null && pageNumber >= 1 && pageNumber <= controller.totalPages.value) {
+                      controller.irAPagina(pageNumber);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  });
+}
+
+Widget _buildNavButton({
+  required IconData icon,
+  required VoidCallback? onPressed,
+  required String tooltip,
+}) {
+  return Tooltip(
+    message: tooltip,
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          padding: EdgeInsets.all(4),
+          child: Icon(
+            icon,
+            size: 20,
+            color: onPressed != null 
+              ? Color(0xFF8B4513) 
+              : Colors.grey[400],
+          ),
+        ),
+      ),
+    ),
+  );
+}
   // 🆕 CARD DE VENTA INDIVIDUALWidget 
   _buildVentaCard(Map<String, dynamic> venta, bool isSmallScreen, bool isSmallWidth) {
   final pedidoId = venta['pedidoId']?.toString() ?? venta['id']?.toString() ?? 'N/A';

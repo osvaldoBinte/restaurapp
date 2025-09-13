@@ -52,43 +52,47 @@ Widget build(BuildContext context) {
     },
   );
 }
-  Widget _buildHeader(TableDetailsController controller,OrdersController OrdersController) {
-    return Padding(
-      padding: EdgeInsets.all(16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Mesa ${controller.numeroMesa}',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF8B4513),
-                ),
+
+
+
+Widget _buildHeader(TableDetailsController controller, OrdersController ordersController) {
+  return Padding(
+    padding: EdgeInsets.all(16),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Mesa ${controller.numeroMesa}',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF8B4513),
               ),
-              Text(
-                '${controller.pedidos.length} pedido${controller.pedidos.length != 1 ? 's' : ''} activo${controller.pedidos.length != 1 ? 's' : ''}',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
+            ),
+            Text(
+              '${controller.pedidos.length} pedido${controller.pedidos.length != 1 ? 's' : ''} activo${controller.pedidos.length != 1 ? 's' : ''}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
               ),
-            ],
-          ),
-          
-          Row(
-            children: [
-              Obx(() {
+            ),
+          ],
+        ),
+        
+        Row(
+          children: [
+            // Botón Atender Mesa (solo si hay productos en proceso)
+            Obx(() {
               final tieneProductosEnProceso = controller.mesaTieneProductosEnProceso();
               
               if (tieneProductosEnProceso) {
                 return IconButton(
-                  onPressed: () => OrdersController.atenderTodosLosPedidosMesa(controller.numeroMesa),
+                  onPressed: () => ordersController.atenderTodosLosPedidosMesa(controller.numeroMesa),
                   icon: Icon(Icons.cleaning_services),
-                  tooltip: 'Adender mesa',
+                  tooltip: 'Atender mesa',
                   style: IconButton.styleFrom(
                     backgroundColor: Color(0xFFE74C3C).withOpacity(0.1),
                     foregroundColor: Color(0xFFE74C3C),
@@ -97,46 +101,69 @@ Widget build(BuildContext context) {
               }
               return SizedBox.shrink();
             }),
+            
             SizedBox(width: 8),
-              // Botón para agregar productos
-              Obx(() => IconButton(
-                onPressed: controller.manejarBotonAgregarProductos,
-                icon: Icon(Icons.add_shopping_cart),
-                tooltip: controller.selectedOrderIndex.value == -1 
-                    ? (controller.pedidos.length == 1 ? 'Agregar Productos' : 'Nuevo Pedido')
-                    : 'Agregar Productos',
-                style: IconButton.styleFrom(
-                  backgroundColor: Color(0xFF2196F3).withOpacity(0.1),
-                  foregroundColor: Color(0xFF2196F3),
-                ),
-              )),
+            
+            // ✅ NUEVO: Botón Liberar Mesa (solo si NO hay productos en proceso)
+            Obx(() {
+              final tieneProductosEnProceso = controller.mesaTieneProductosEnProceso();
               
-              // Botón actualizar
-              Obx(() => IconButton(
-                onPressed: controller.isUpdating.value 
-                    ? null 
-                    : controller.actualizarDatosManualmente,
-                icon: controller.isUpdating.value
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(Icons.refresh),
-                tooltip: 'Actualizar',
-              )),
-              
-              // Botón cerrar
-              IconButton(
-                onPressed: () => Get.back(),
-                icon: Icon(Icons.close),
+              // Solo mostrar si NO hay productos en proceso
+              if (!tieneProductosEnProceso) {
+                return IconButton(
+                  onPressed: () => controller.confirmarLiberarMesa(),
+                  icon: Icon(Icons.restore),
+                  tooltip: 'Liberar Mesa ${controller.numeroMesa}',
+                  style: IconButton.styleFrom(
+                    backgroundColor: Color(0xFF27AE60).withOpacity(0.1),
+                    foregroundColor: Color(0xFF27AE60),
+                  ),
+                );
+              }
+              return SizedBox.shrink();
+            }),
+            
+            SizedBox(width: 8),
+            
+            // Botón para agregar productos
+            Obx(() => IconButton(
+              onPressed: controller.manejarBotonAgregarProductos,
+              icon: Icon(Icons.add_shopping_cart),
+              tooltip: controller.selectedOrderIndex.value == -1 
+                  ? (controller.pedidos.length == 1 ? 'Agregar Productos' : 'Nuevo Pedido')
+                  : 'Agregar Productos',
+              style: IconButton.styleFrom(
+                backgroundColor: Color(0xFF2196F3).withOpacity(0.1),
+                foregroundColor: Color(0xFF2196F3),
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            )),
+            
+            // Botón actualizar
+            Obx(() => IconButton(
+              onPressed: controller.isUpdating.value 
+                  ? null 
+                  : controller.actualizarDatosManualmente,
+              icon: controller.isUpdating.value
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(Icons.refresh),
+              tooltip: 'Actualizar',
+            )),
+            
+            // Botón cerrar
+            IconButton(
+              onPressed: () => Get.back(),
+              icon: Icon(Icons.close),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 Widget _buildOrderSelector(TableDetailsController controller) {
   return Container(
     height: 60,
@@ -650,28 +677,52 @@ Widget _buildFooter(TableDetailsController controller) {
               
               if (controller.puedeSerPagado(pedido)) {
                 // Si puede ser pagado, mostrar botón "PAGAR Y LIBERAR"
-                return SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => controller.confirmarPagoYLiberacion(pedido),
-                    icon: Icon(Icons.payment, color: Colors.white),
-                    label: Text(
-                      'PAGAR Y LIBERAR MESA',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF27AE60),
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                );
+               return Obx(() => SizedBox(
+  width: double.infinity,
+  child: ElevatedButton.icon(
+    // Deshabilitar botón cuando está cargando
+    onPressed: controller.isUpdating.value 
+        ? null 
+        : () => controller.confirmarPagoYLiberacion(pedido),
+    
+    // Cambiar icono según el estado
+    icon: controller.isUpdating.value
+        ? SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          )
+        : Icon(Icons.payment, color: Colors.white),
+    
+    // Cambiar texto según el estado
+    label: Text(
+      controller.isUpdating.value 
+          ? 'PROCESANDO...'
+          : 'PAGAR Y LIBERAR MESA',
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+      ),
+    ),
+    
+    style: ElevatedButton.styleFrom(
+      // Cambiar color cuando está deshabilitado
+      backgroundColor: controller.isUpdating.value 
+          ? Colors.grey[400] 
+          : Color(0xFF27AE60),
+      padding: EdgeInsets.symmetric(vertical: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      // Quitar elevación cuando está cargando
+      elevation: controller.isUpdating.value ? 0 : null,
+    ),
+  ),
+));
               } else if (!tieneProductosEnProceso) {
                 // Si no puede ser pagado pero no hay productos en proceso, solo liberar
                 return SizedBox(
@@ -730,88 +781,135 @@ Widget _buildFooter(TableDetailsController controller) {
               }
             }
           } else {
-            // Vista de pedido específico
-            final pedido = controller.pedidos[controller.selectedOrderIndex.value];
+           // Vista de pedido específico
+final pedido = controller.pedidos[controller.selectedOrderIndex.value];
+
+return Obx(() {
+  final tipoBoton = controller.getTipoBotonPago();
+  final productosSeleccionados = controller.getProductosSeleccionadosDelPedidoActual();
+  final totalSeleccionados = controller.calcularTotalProductosSeleccionadosDelPedido();
+  
+  // ✅ AGREGAR: Variable para controlar el estado de carga
+  final isProcessingPayment = controller.isUpdating.value; // O crear una nueva variable específica
+  
+  if (tipoBoton == 'ninguno') {
+    // Si no hay productos seleccionados, mostrar botón tradicional
+    if (controller.puedeSerPagado(pedido)) {
+      final esUltimoPendiente = controller.esUltimoPedidoPendiente(pedido);
+      
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          // ✅ MODIFICAR: Deshabilitar botón mientras carga
+          onPressed: isProcessingPayment ? null : (esUltimoPendiente 
+              ? () => controller.confirmarPagoYLiberacion(pedido)
+              : () => controller.confirmarPagoPedido(pedido)),
+          
+          // ✅ MODIFICAR: Mostrar spinner o icono según el estado
+          icon: isProcessingPayment 
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Icon(Icons.payment, color: Colors.white),
+          
+          // ✅ MODIFICAR: Cambiar texto mientras carga
+          label: Text(
+            isProcessingPayment 
+                ? 'PROCESANDO...'
+                : (esUltimoPendiente ? 'PAGAR Y LIBERAR MESA' : 'PAGAR PEDIDO'),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            // ✅ MODIFICAR: Cambiar color mientras carga
+            backgroundColor: isProcessingPayment 
+                ? Colors.grey[400] 
+                : Color(0xFF27AE60),
+            padding: EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            // ✅ AGREGAR: Desactivar elevation mientras carga
+            elevation: isProcessingPayment ? 0 : null,
+          ),
+        ),
+      );
+    } else {
+      return SizedBox.shrink();
+    }
+  } else {
+    // Hay productos seleccionados
+    String textoBoton = tipoBoton == 'pagar_y_liberar' 
+        ? 'PAGAR Y LIBERAR MESA'
+        : 'PAGAR SELECCIONADOS';
+    
+    IconData iconoBoton = tipoBoton == 'pagar_y_liberar' 
+        ? Icons.home 
+        : Icons.payment;
+    
+    Color colorBoton = tipoBoton == 'pagar_y_liberar' 
+        ? Color(0xFF27AE60) 
+        : Color(0xFF2196F3);
+    
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            // ✅ MODIFICAR: Deshabilitar botón mientras carga
+            onPressed: isProcessingPayment 
+                ? null 
+                : () => controller.confirmarPagoProductosSeleccionados(),
             
-            return Obx(() {
-              final tipoBoton = controller.getTipoBotonPago();
-              final productosSeleccionados = controller.getProductosSeleccionadosDelPedidoActual();
-              final totalSeleccionados = controller.calcularTotalProductosSeleccionadosDelPedido();
-              
-              if (tipoBoton == 'ninguno') {
-                // Si no hay productos seleccionados, mostrar botón tradicional
-                if (controller.puedeSerPagado(pedido)) {
-                  final esUltimoPendiente = controller.esUltimoPedidoPendiente(pedido);
-                  
-                  return SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: esUltimoPendiente 
-                          ? () => controller.confirmarPagoYLiberacion(pedido)
-                          : () => controller.confirmarPagoPedido(pedido),
-                      icon: Icon(Icons.payment, color: Colors.white),
-                      label: Text(
-                        esUltimoPendiente ? 'PAGAR Y LIBERAR MESA' : 'PAGAR PEDIDO',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF27AE60),
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
+            // ✅ MODIFICAR: Mostrar spinner o icono según el estado
+            icon: isProcessingPayment 
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
-                  );
-                } else {
-                  return SizedBox.shrink();
-                }
-              } else {
-                // Hay productos seleccionados
-                String textoBoton = tipoBoton == 'pagar_y_liberar' 
-                    ? 'PAGAR Y LIBERAR MESA'
-                    : 'PAGAR SELECCIONADOS';
-                
-                IconData iconoBoton = tipoBoton == 'pagar_y_liberar' 
-                    ? Icons.home 
-                    : Icons.payment;
-                
-                Color colorBoton = tipoBoton == 'pagar_y_liberar' 
-                    ? Color(0xFF27AE60) 
-                    : Color(0xFF2196F3);
-                
-                return Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => controller.confirmarPagoProductosSeleccionados(),
-                        icon: Icon(iconoBoton, color: Colors.white),
-                        label: Text(
-                          textoBoton,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colorBoton,
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
-            });
+                  )
+                : Icon(iconoBoton, color: Colors.white),
+            
+            // ✅ MODIFICAR: Cambiar texto mientras carga
+            label: Text(
+              isProcessingPayment 
+                  ? 'PROCESANDO...'
+                  : textoBoton,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              // ✅ MODIFICAR: Cambiar color mientras carga
+              backgroundColor: isProcessingPayment 
+                  ? Colors.grey[400] 
+                  : colorBoton,
+              padding: EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              // ✅ AGREGAR: Desactivar elevation mientras carga
+              elevation: isProcessingPayment ? 0 : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+});
           }
         }),
         

@@ -1,8 +1,6 @@
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:get/get.dart';
 import 'package:restaurapp/common/settings/enviroment.dart';
 import 'package:restaurapp/framework/preferences_service.dart';
 

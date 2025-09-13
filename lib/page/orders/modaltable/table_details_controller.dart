@@ -15,7 +15,8 @@ class TableDetailsController extends GetxController {
   final productosSeleccionados = <int>{}.obs;
   final isUpdating = false.obs;
   final isBluetoothConnected = false.obs;
-  
+  final isLiberandoTodasLasMesas = false.obs;
+
   // Services
   final UniversalPrinterService printerService = UniversalPrinterService();
   
@@ -25,8 +26,13 @@ class TableDetailsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _setupOrdersListener();
+    _setupOrdersListener(); 
   }
+int obtenerConteoMesasConPendientes() {
+      final ordersController = Get.find<OrdersController>();
+
+  return ordersController.mesasConPedidos.length;
+}
 
 void inicializarConMesa(Map<String, dynamic> mesa) {
   _mesaActual = mesa;
@@ -618,7 +624,196 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
       },
     );
   }
+void liberarTodasLasMesas() {
+  final totalMesas = obtenerConteoMesasConPendientes();
+  
+  if (totalMesas == 0) {
+    Get.snackbar(
+      'Sin mesas por liberar',
+      'No hay mesas con pedidos pendientes',
+      backgroundColor: Colors.orange.withOpacity(0.8),
+      colorText: Colors.white,
+      duration: Duration(seconds: 2),
+    );
+    return;
+  }
+  
+  QuickAlert.show(
+    context: Get.context!,
+    type: QuickAlertType.confirm,
+    title: 'Liberar Todas las Mesas',
+    text: '¿Está seguro de que quiere liberar TODAS las mesas con pedidos?\n\n'
+          'Total de mesas: $totalMesas\n\n'
+          '⚠️ Esta acción liberará todas las mesas y las marcará como disponibles.\n\n'
+          'Solo se recomienda hacer esto al final del día o en casos especiales.',
+    confirmBtnText: 'Liberar Todas ($totalMesas)',
+    cancelBtnText: 'Cancelar',
+    confirmBtnColor: Color(0xFFE74C3C),
+    onConfirmBtnTap: () async {
+      Get.back(); // Cerrar el diálogo de confirmación
+      await _ejecutarLiberacionTodasLasMesas();
+    },
+  );
+}
 
+/// Método privado que ejecuta la liberación de todas las mesas
+Future<void> _ejecutarLiberacionTodasLasMesas() async {
+  if (isLiberandoTodasLasMesas.value) return; // Prevenir ejecuciones múltiples
+  
+  isLiberandoTodasLasMesas.value = true;
+  
+  try {
+    // Obtener snapshot de las mesas actuales
+    final controller = Get.find<OrdersController>();
+    final mesasParaLiberar = List<Map<String, dynamic>>.from(controller.mesasConPedidos);
+    final totalMesas = mesasParaLiberar.length;
+    
+    // Mostrar diálogo de progreso
+    Get.dialog(
+      AlertDialog(
+        title: Text(
+          'Liberando Mesas',
+          style: TextStyle(
+            color: Color(0xFF8B4513),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+            ),
+            SizedBox(height: 16),
+            Text('Liberando $totalMesas mesas...'),
+            SizedBox(height: 8),
+            Text(
+              'Por favor espere...',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+      barrierDismissible: false,
+    );
+    
+    int exitosas = 0;
+    int fallidas = 0;
+    List<String> mesasFallidas = [];
+    
+    // Procesar cada mesa
+    for (var mesa in mesasParaLiberar) {
+      try {
+        final numeroMesa = mesa['numeroMesa'];
+        final idMesa = mesa['id'] as int? ?? 0;
+        
+        // Llamar al endpoint para liberar la mesa individual
+        Uri uri = Uri.parse('${controller.defaultApiServer}/mesas/liberarMesa/$idMesa/');
+        final statusData = {'status': true};
+        
+        final response = await http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(statusData),
+        );
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          
+          if (data['success'] == true) {
+            exitosas++;
+            print('✅ Mesa $numeroMesa liberada correctamente');
+          } else {
+            fallidas++;
+            mesasFallidas.add('Mesa $numeroMesa');
+            print('❌ Error liberando Mesa $numeroMesa: ${data['message'] ?? 'Error desconocido'}');
+          }
+        } else {
+          fallidas++;
+          mesasFallidas.add('Mesa $numeroMesa');
+          print('❌ Error HTTP liberando Mesa $numeroMesa: ${response.statusCode}');
+        }
+        
+        // Pequeña pausa entre requests para no saturar el servidor
+        await Future.delayed(Duration(milliseconds: 200));
+        
+      } catch (e) {
+        fallidas++;
+        final numeroMesa = mesa['numeroMesa'] ?? 'N/A';
+        mesasFallidas.add('Mesa $numeroMesa');
+        print('❌ Excepción liberando Mesa $numeroMesa: $e');
+      }
+    }
+    
+    // Cerrar diálogo de progreso
+    Get.back();
+    
+    // Mostrar resultado
+    if (fallidas == 0) {
+      // Todas las mesas fueron liberadas exitosamente
+      Get.snackbar(
+        'Liberación Exitosa',
+        '🎉 Todas las mesas fueron liberadas correctamente\n'
+        'Mesas liberadas: $exitosas',
+        backgroundColor: Colors.green.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: Duration(seconds: 4),
+      );
+    } else if (exitosas > 0) {
+      // Algunas mesas fueron liberadas
+      String mensajeFallidas = mesasFallidas.length <= 3 
+          ? mesasFallidas.join(', ')
+          : '${mesasFallidas.take(3).join(', ')} y ${mesasFallidas.length - 3} más';
+      
+      Get.snackbar(
+        'Liberación Parcial',
+        '⚠️ Liberación completada parcialmente\n'
+        'Exitosas: $exitosas\n'
+        'Fallidas: $fallidas\n'
+        'Mesas con error: $mensajeFallidas',
+        backgroundColor: Colors.orange.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: Duration(seconds: 6),
+      );
+    } else {
+      // Ninguna mesa pudo ser liberada
+      Get.snackbar(
+        'Error en Liberación',
+        '❌ No se pudo liberar ninguna mesa\n'
+        'Total intentadas: $totalMesas\n'
+        'Por favor, intente liberar las mesas individualmente.',
+        backgroundColor: Colors.red.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: Duration(seconds: 5),
+      );
+    }
+    
+    // Refrescar datos para ver los cambios
+    await controller.refrescarDatos();
+    
+  } catch (e) {
+    // Cerrar diálogo de progreso si está abierto
+    if (Get.isDialogOpen ?? false) Get.back();
+    
+    Get.snackbar(
+      'Error Crítico',
+      'Error inesperado al liberar las mesas: $e',
+      backgroundColor: Colors.red.withOpacity(0.8),
+      colorText: Colors.white,
+      duration: Duration(seconds: 4),
+    );
+    
+    print('❌ Error crítico en liberarTodasLasMesas: $e');
+  } finally {
+    isLiberandoTodasLasMesas.value = false;
+  }
+}
   Future<void> _liberarMesa() async {
     final controller = Get.find<OrdersController>();
     
@@ -1282,7 +1477,25 @@ double calcularTotalProductosSeleccionadosDelPedido() {
   return total;
 }
 void confirmarPagoProductosSeleccionados() {
+  // Validación previa simple
+  if (isUpdating.value) {
+    print('⚠️ Operación en progreso, ignorando nueva solicitud');
+    return;
+  }
+
   final productosSeleccionados = getProductosSeleccionadosDelPedidoActual();
+  
+  if (productosSeleccionados.isEmpty) {
+    Get.snackbar(
+      'Sin productos',
+      'No hay productos seleccionados para pagar',
+      backgroundColor: Colors.orange.withOpacity(0.8),
+      colorText: Colors.white,
+      duration: Duration(seconds: 2),
+    );
+    return;
+  }
+
   final pedido = pedidos[selectedOrderIndex.value];
   final pedidoId = pedido['pedidoId'];
   final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
@@ -1320,36 +1533,40 @@ void confirmarPagoProductosSeleccionados() {
     cancelBtnText: 'Cancelar',
     confirmBtnColor: Color(0xFF27AE60),
     onConfirmBtnTap: () async {
+      // Cerrar el diálogo INMEDIATAMENTE sin verificaciones complejas
       Get.back();
       
-      if (tipoBoton == 'pagar_y_liberar') {
-        await _pagarSeleccionadosYLiberarMesa(productosSeleccionados, pedido, total);
-      } else {
-        await _pagarProductosSeleccionados(productosSeleccionados, pedido, total);
+      // Marcar como procesando
+      isUpdating.value = true;
+      
+      try {
+        if (tipoBoton == 'pagar_y_liberar') {
+          await _pagarSeleccionadosYLiberarMesa(productosSeleccionados, pedido, total);
+        } else {
+          await _pagarProductosSeleccionados(productosSeleccionados, pedido, total);
+        }
+      } catch (e) {
+        print('❌ Error en operación de pago: $e');
+        Get.snackbar(
+          'Error',
+          'Error durante el proceso de pago: $e',
+          backgroundColor: Colors.red.withOpacity(0.8),
+          colorText: Colors.white,
+          duration: Duration(seconds: 3),
+        );
+      } finally {
+        isUpdating.value = false;
       }
     },
+    // Eliminar onCancelBtnTap personalizado - dejar que QuickAlert maneje el cierre
   );
 }
-
 Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, Map<String, dynamic> pedido, double totalEstimado) async {
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];
   
   try {
-    Get.dialog(
-      AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Procesando pago de productos seleccionados...'),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    );
-
+    
     // ✅ AGREGAR: Conectar impresora para productos seleccionados también
     final impresoraConectada = await printerService.conectarImpresoraAutomaticamente();
     if (!impresoraConectada) {
@@ -1375,7 +1592,7 @@ Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, 
       }
     }
 
-    Get.back(); // Cerrar diálogo de progreso
+   // Get.back(); // Cerrar diálogo de progreso
 
     // ✅ NUEVO: Imprimir ticket para productos seleccionados si todo fue exitoso
     if (fallidos == 0 && impresoraConectada) {
@@ -1482,13 +1699,16 @@ Map<String, dynamic> _crearPedidoParaTicket(List<Map<String, dynamic>> productos
   
   return pedidoParaTicket;
 }
-
-
 Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> productos, Map<String, dynamic> pedido, double totalEstimado) async {
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];
   
+  // ✅ VARIABLES DE CONTROL para el flujo de cierre
+  bool dialogoProgresoAbierto = false;
+  bool debeRefrescarDatos = false;
+  
   try {
+    // ✅ PASO 1: Abrir diálogo de progreso
     Get.dialog(
       AlertDialog(
         content: Column(
@@ -1502,6 +1722,7 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
       ),
       barrierDismissible: false,
     );
+    dialogoProgresoAbierto = true;
 
     // Conectar impresora
     final impresoraConectada = await printerService.conectarImpresoraAutomaticamente();
@@ -1509,7 +1730,7 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
     double totalReal = 0.0;
     int exitosos = 0;
     int fallidos = 0;
-    List<Map<String, dynamic>> productosRecienPagados = []; // ✅ Solo productos de esta transacción
+    List<Map<String, dynamic>> productosRecienPagados = [];
 
     // Pagar productos seleccionados
     for (var producto in productos) {
@@ -1517,7 +1738,6 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
         final detalleId = producto['detalleId'] as int;
         final statusActual = producto['statusDetalle'] as String? ?? 'proceso';
         
-        // ✅ FILTRO: Solo procesar si NO está ya pagado
         if (statusActual != 'pagado') {
           await controller.actualizarEstadoOrden(detalleId, 'pagado');
           
@@ -1526,7 +1746,6 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
           totalReal += precioUnitario * cantidad;
           exitosos++;
           
-          // Agregar solo productos recién pagados
           productosRecienPagados.add({
             ...producto,
             'statusDetalle': 'pagado',
@@ -1565,7 +1784,7 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
       }
     }
 
-    // ✅ Imprimir ticket SOLO con productos recién pagados en esta transacción
+    // Imprimir ticket si todo fue exitoso
     if (fallidos == 0 && impresoraConectada && productosRecienPagados.isNotEmpty) {
       try {
         print('🎫 Imprimiendo ticket solo con ${productosRecienPagados.length} productos recién pagados');
@@ -1582,10 +1801,21 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
       }
     }
 
-    Get.back(); 
-    Get.back(); 
+    // ✅ PASO 2: Cerrar diálogo de progreso SIEMPRE
+    if (dialogoProgresoAbierto) {
+      Get.back(); // Cerrar diálogo "Procesando..."
+      dialogoProgresoAbierto = false;
+    }
     
+    // ✅ PASO 3: Limpiar selección SIEMPRE
+    productosSeleccionados.clear();
+    debeRefrescarDatos = true;
+    
+    // ✅ PASO 4: Mostrar resultado y cerrar modal según el resultado
     if (fallidos == 0 && mesaLiberada) {
+      // ✅ ÉXITO COMPLETO: Cerrar modal de detalles
+      Get.back(); // Cerrar TableDetailsModal
+      
       String mensaje = '🎉 Mesa $numeroMesa liberada exitosamente!\n'
                       'Productos seleccionados pagados: $exitosos\n'
                       'Total de esta transacción: \$${totalReal.toStringAsFixed(2)}';
@@ -1602,15 +1832,19 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
         duration: Duration(seconds: 4),
       );
       
-      // Limpiar selección y cerrar modal
-      productosSeleccionados.clear();
-      Get.back();
-      await controller.refrescarDatos();
+    } else if (fallidos == 0 && !mesaLiberada) {
+      // ✅ PAGO EXITOSO PERO ERROR EN LIBERACIÓN: NO cerrar modal
+      Get.snackbar(
+        'Pago Exitoso - Error al Liberar',
+        'Productos pagados correctamente pero no se pudo liberar la mesa automáticamente',
+        backgroundColor: Colors.orange.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: Duration(seconds: 4),
+      );
       
     } else {
-      String mensaje = fallidos == 0 
-          ? 'Productos pagados correctamente pero no se pudo liberar la mesa'
-          : 'Error en el proceso de pago y liberación';
+      // ✅ ERROR EN PAGO: NO cerrar modal
+      String mensaje = 'Error en el proceso de pago y liberación';
       
       Get.snackbar(
         'Error Parcial',
@@ -1619,14 +1853,18 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
         colorText: Colors.white,
         duration: Duration(seconds: 4),
       );
-      
-      // Limpiar selección aunque haya errores
-      productosSeleccionados.clear();
-      await controller.refrescarDatos();
     }
 
   } catch (e) {
-    if (Get.isDialogOpen ?? false) Get.back();
+    // ✅ MANEJO DE ERRORES: Asegurar cierre de diálogo
+    if (dialogoProgresoAbierto && (Get.isDialogOpen ?? false)) {
+      Get.back(); // Cerrar diálogo "Procesando..."
+      dialogoProgresoAbierto = false;
+    }
+    
+    // Limpiar selección en caso de error
+    productosSeleccionados.clear();
+    debeRefrescarDatos = true;
     
     Get.snackbar(
       'Error',
@@ -1636,7 +1874,13 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
       duration: Duration(seconds: 3),
     );
   } finally {
+    // ✅ CLEANUP: Siempre ejecutar estas acciones
     await printerService.desconectar();
+    
+    // Refrescar datos si es necesario
+    if (debeRefrescarDatos) {
+      await controller.refrescarDatos();
+    }
   }
 }
 }

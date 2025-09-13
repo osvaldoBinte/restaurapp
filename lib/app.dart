@@ -10,13 +10,21 @@ import 'package:restaurapp/page/orders/crear/crear_orden_controller.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
 import 'package:restaurapp/page/table/table_controller.dart';
 
+import 'package:flutter_localizations/flutter_localizations.dart'; // AGREGAR ESTA IMPORTACIÓN
 
 class App extends StatelessWidget {
   const App({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
+    return GetMaterialApp( locale: const Locale('es', 'ES'),
+      supportedLocales: [
+        const Locale('es', 'ES'),
+      ], localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       debugShowCheckedModeBanner: false,
       theme: AdminColors.themeData, 
       initialBinding: BindingsBuilder(() {
