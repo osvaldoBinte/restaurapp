@@ -45,17 +45,11 @@ class HistorialPage extends StatelessWidget {
             tooltip: 'Cambiar fecha',
           ),
           // Botón de auto-refresh toggle
-          Obx(() => IconButton(
-            icon: Icon(
-              controller.isAutoRefreshEnabled.value 
-                ? Icons.sync 
-                : Icons.sync_disabled,
-            ),
-            onPressed: controller.toggleAutoRefresh,
-            tooltip: controller.isAutoRefreshEnabled.value 
-              ? 'Auto-refresh activado' 
-              : 'Auto-refresh desactivado',
-          )),
+           IconButton(
+    icon: Icon(Icons.refresh),
+    onPressed: controller.refrescarDatos,
+    tooltip: 'Recargar datos',
+  ),
         ],
       ),
       

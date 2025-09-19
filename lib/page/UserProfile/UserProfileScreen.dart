@@ -196,39 +196,42 @@ class UserProfileScreen extends StatelessWidget {
   }
 
 
-
-  // 🆕 NUEVO MÉTODO: Mostrar modal de historial de ventas
-  void _showHistorialModal() {
-    // Asegurar que el controller esté inicializado
-    Get.put(HistorialController(), permanent: false);
-    
-    Get.dialog(
-      Dialog(
-        insetPadding: EdgeInsets.zero,
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: Get.width,
-          height: Get.height,
-          decoration: BoxDecoration(
-            color: Color(0xFFF5F2F0),
-          ),
-          child: Column(
-            children: [
-            
-              
-              // Contenido: HistorialPage
-              Expanded(
-                child: ClipRRect(
-                  child: HistorialPage(),
-                ),
+void _showHistorialModal() {
+  // Asegurar que el controller esté inicializado y forzar carga
+  Get.delete<HistorialController>();
+  
+  // Crear nueva instancia
+  final historialCtrl = Get.put(HistorialController());
+  
+  // Forzar carga inmediata
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    historialCtrl.cargarDatos();
+  });
+  Get.dialog(
+    Dialog(
+      insetPadding: EdgeInsets.zero,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: Get.width,
+        height: Get.height,
+        decoration: BoxDecoration(
+          color: Color(0xFFF5F2F0),
+        ),
+        child: Column(
+          children: [
+            // ... resto del código
+            Expanded(
+              child: ClipRRect(
+                child: HistorialPage(),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-      barrierDismissible: true,
-    );
-  }
+    ),
+    barrierDismissible: true,
+  );
+}
   // 🆕 Widget para mostrar la sección de ventas CON MÉTRICAS
 
   

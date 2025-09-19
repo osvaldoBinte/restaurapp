@@ -61,7 +61,7 @@ Widget _buildHeader(TableDetailsController controller, OrdersController ordersCo
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
+         Expanded(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -80,7 +80,8 @@ Widget _buildHeader(TableDetailsController controller, OrdersController ordersCo
               ),
             ),
           ],
-        ),
+        ),),
+        
         
         Row(
           children: [
@@ -112,11 +113,12 @@ Widget _buildHeader(TableDetailsController controller, OrdersController ordersCo
               if (!tieneProductosEnProceso) {
                 return IconButton(
                   onPressed: () => controller.confirmarLiberarMesa(),
-                  icon: Icon(Icons.restore),
+                  icon: Icon(Icons.table_restaurant),
                   tooltip: 'Liberar Mesa ${controller.numeroMesa}',
                   style: IconButton.styleFrom(
-                    backgroundColor: Color(0xFF27AE60).withOpacity(0.1),
-                    foregroundColor: Color(0xFF27AE60),
+                  
+                    backgroundColor: Color(0xFFE74C3C).withOpacity(0.1),
+                    foregroundColor: Color(0xFFE74C3C),
                   ),
                 );
               }

@@ -493,7 +493,8 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
     final controller = Get.find<OrdersController>();
     
     try {
-    
+    isUpdating.value = true; // Activar loading
+
 
       Uri uri = Uri.parse('${controller.defaultApiServer}/ordenes/detalle/$detalleId/actualizarCantidad/');
       
@@ -526,6 +527,11 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
       
       print('❌ Error al actualizar cantidad: $e');
       _mostrarErrorCantidad('Error de conexión: $e');
+    }finally {
+    isUpdating.value = false; // Desactivar loading
+
+      if (Get.isDialogOpen ?? false) Get.back();
+      
     }
   }
 
@@ -552,10 +558,8 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
     final controller = Get.find<OrdersController>();
     
     try {
-      Get.dialog(
-        Center(child: CircularProgressIndicator()),
-        barrierDismissible: false,
-      );
+       isUpdating.value = true; // Activar loading
+
 
       Uri uri = Uri.parse('${controller.defaultApiServer}/pedidos/eliminar-detalle/$detalleId/');
       
@@ -594,6 +598,9 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
       
       print('❌ Error al eliminar producto: $e');
       _mostrarErrorCantidad('Error de conexión: $e');
+    } finally{
+          isUpdating.value = false; // Desactivar loading
+
     }
   }
 
@@ -1059,7 +1066,15 @@ Color getStatusColor(String status) {
     if (categoriaLower.contains('extra')) return '🥄';
     return '🌮';
   }
-  void confirmarPagoYLiberacion(Map<String, dynamic> pedido) {
+  
+
+void confirmarPagoYLiberacion(Map<String, dynamic> pedido) {
+  // ✅ VALIDACIÓN: Prevenir ejecuciones concurrentes
+  if (isUpdating.value) {
+    print('⚠️ Ya hay una operación en progreso');
+    return;
+  }
+
   final pedidoId = pedido['pedidoId'];
   final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
   final total = calcularTotalPedido(pedido);
@@ -1085,31 +1100,48 @@ Color getStatusColor(String status) {
     cancelBtnText: 'Cancelar',
     confirmBtnColor: Color(0xFF27AE60),
     onConfirmBtnTap: () async {
-      Get.back();
-      Get.back();
-      await _pagarYLiberarMesa(pedido, detalleIds, total);
+      // ✅ CERRAR DIÁLOGO INMEDIATAMENTE
+      Navigator.of(Get.context!).pop();
+      
+      // ✅ ESPERAR un frame
+      await Future.delayed(Duration(milliseconds: 100));
+      
+      // ✅ VERIFICAR NUEVAMENTE
+      if (isUpdating.value) {
+        print('⚠️ Operación ya en progreso');
+        return;
+      }
+      
+      // ✅ MARCAR COMO PROCESANDO
+      isUpdating.value = true;
+      
+      try {
+        await _pagarYLiberarMesa(pedido, detalleIds, total);
+      } catch (e) {
+        print('❌ Error: $e');
+        Get.snackbar(
+          'Error',
+          'Error al procesar: $e',
+          backgroundColor: Colors.red.withOpacity(0.8),
+          colorText: Colors.white,
+        );
+      } finally {
+        isUpdating.value = false;
+      }
+    },
+    onCancelBtnTap: () {
+      Navigator.of(Get.context!).pop();
     },
   );
 }
+
+
 Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleIds, double totalEstimado) async {
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];
   
   try {
-    // Mostrar diálogo de progreso
-    Get.dialog(
-      AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Procesando pago y liberando mesa...'),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    );
+    isUpdating.value = true; // Activar loading en el botón
 
     // Paso 1: Conectar impresora
     final impresoraConectada = await printerService.conectarImpresoraAutomaticamente();
@@ -1117,22 +1149,19 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       print('⚠️ Impresora no disponible, continuando sin imprimir...');
     }
 
-    // Paso 2: Procesar el pago SOLO de los productos completados (no pagados anteriormente)
+    // Paso 2: Procesar el pago
     double totalReal = 0.0;
     int exitosos = 0;
     int fallidos = 0;
-    List<Map<String, dynamic>> productosRecienPagados = []; // ✅ NUEVO: Solo productos de ESTA transacción
+    List<Map<String, dynamic>> productosRecienPagados = [];
 
     for (int detalleId in detalleIds) {
       try {
-        // Buscar el detalle ANTES de marcarlo como pagado para obtener su estado actual
         final detalle = _buscarDetallePorId(detalleId);
         if (detalle != null) {
           final statusActual = detalle['statusDetalle'] as String? ?? 'proceso';
           
-          // ✅ FILTRO CRÍTICO: Solo procesar si NO está ya pagado
           if (statusActual != 'pagado') {
-            // Marcar el producto como pagado
             await controller.actualizarEstadoOrden(detalleId, 'pagado');
             
             final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
@@ -1140,15 +1169,10 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
             totalReal += precioUnitario * cantidad;
             exitosos++;
             
-            // ✅ CLAVE: Solo agregar productos que se pagaron EN ESTA transacción
             productosRecienPagados.add({
               ...detalle,
-              'statusDetalle': 'pagado', // Marcar como recién pagado para el ticket
+              'statusDetalle': 'pagado',
             });
-            
-            print('✅ Producto pagado en esta transacción: ${detalle['nombreProducto']} x$cantidad = \$${(precioUnitario * cantidad).toStringAsFixed(2)}');
-          } else {
-            print('⏭️ Producto ya pagado anteriormente, omitiendo: ${detalle['nombreProducto']}');
           }
         }
       } catch (e) {
@@ -1182,41 +1206,33 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       }
     }
 
-    // Paso 4: Imprimir ticket SOLO con productos recién pagados
+    // Paso 4: Imprimir ticket
     if (fallidos == 0 && impresoraConectada && productosRecienPagados.isNotEmpty) {
       try {
-        print('🎫 Creando ticket SOLO con ${productosRecienPagados.length} productos recién pagados (total: \$${totalReal.toStringAsFixed(2)})');
-        
-        // ✅ USAR SOLO productos recién pagados, NO todos los del pedido
         final pedidoParaTicket = _crearPedidoParaTicketConFiltro(
           productosRecienPagados, 
           pedido, 
           totalReal,
-          'pago_final_liberacion' // Tipo especial para diferenciarlo
+          'pago_final_liberacion'
         );
         
         await printerService.imprimirTicket(pedidoParaTicket, totalReal);
-        print('✅ Ticket impreso SOLO con productos de esta transacción');
       } catch (e) {
         print('❌ Error en impresión: $e');
       }
     }
 
-    // Cerrar diálogo de progreso
-    Get.back();
-    Get.back();
-
-    // Paso 5: Mostrar resultado
+    // Paso 5: Mostrar resultado y cerrar modal SOLO si fue exitoso
     if (fallidos == 0 && mesaLiberada) {
-      // Éxito completo
+      // ✅ ÉXITO COMPLETO - Cerrar modal aquí
+      Get.back(); // Cerrar TableDetailsModal
+      
       String mensaje = 'Mesa $numeroMesa liberada exitosamente\n'
                       'Productos finales pagados: $exitosos\n'
-                      'Total de esta transacción: \$${totalReal.toStringAsFixed(2)}';
+                      'Total: \$${totalReal.toStringAsFixed(2)}';
       
       if (impresoraConectada && productosRecienPagados.isNotEmpty) {
-        mensaje += '\n✅ Ticket impreso con productos de esta transacción';
-      } else if (productosRecienPagados.isEmpty) {
-        mensaje += '\n📋 No había productos pendientes por pagar';
+        mensaje += '\n✅ Ticket impreso';
       }
       
       Get.snackbar(
@@ -1227,15 +1243,13 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
         duration: Duration(seconds: 4),
       );
       
-      // Cerrar el modal y refrescar datos
-      Get.back();
       await controller.refrescarDatos();
       
     } else if (fallidos == 0 && !mesaLiberada) {
-      // Pago exitoso pero error liberando mesa
+      // Pago exitoso pero error liberando mesa - NO cerrar modal
       Get.snackbar(
         'Pago Exitoso - Error al Liberar',
-        'Productos pagados correctamente\nTotal: \$${totalReal.toStringAsFixed(2)}\n\n❌ No se pudo liberar la mesa automáticamente',
+        'Productos pagados correctamente\n\n❌ No se pudo liberar la mesa automáticamente',
         backgroundColor: Colors.orange.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 4),
@@ -1244,10 +1258,10 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       await controller.refrescarDatos();
       
     } else {
-      // Error en el pago
+      // Error en el pago - NO cerrar modal
       Get.snackbar(
         'Error en la Operación',
-        'No se pudo completar el pago\nExitosos: $exitosos items\nFallidos: $fallidos items',
+        'No se pudo completar el pago',
         backgroundColor: Colors.red.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 4),
@@ -1255,9 +1269,6 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
     }
 
   } catch (e) {
-    // Cerrar diálogo de progreso si está abierto
-    if (Get.isDialogOpen ?? false) Get.back();
-    
     Get.snackbar(
       'Error',
       'Error al procesar pago y liberación: $e',
@@ -1266,6 +1277,7 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       duration: Duration(seconds: 3),
     );
   } finally {
+    isUpdating.value = false; // Desactivar loading
     await printerService.desconectar();
   }
 }
@@ -1476,11 +1488,14 @@ double calcularTotalProductosSeleccionadosDelPedido() {
   
   return total;
 }
+
+
+
 void confirmarPagoProductosSeleccionados() {
-  // Validación previa simple
+  // ✅ VALIDACIÓN CRÍTICA: Prevenir ejecuciones múltiples
   if (isUpdating.value) {
-    print('⚠️ Operación en progreso, ignorando nueva solicitud');
-    return;
+    print('⚠️ Ya hay una operación en progreso, ignorando nueva solicitud');
+    return; // Salir inmediatamente si ya hay algo procesando
   }
 
   final productosSeleccionados = getProductosSeleccionadosDelPedidoActual();
@@ -1533,10 +1548,19 @@ void confirmarPagoProductosSeleccionados() {
     cancelBtnText: 'Cancelar',
     confirmBtnColor: Color(0xFF27AE60),
     onConfirmBtnTap: () async {
-      // Cerrar el diálogo INMEDIATAMENTE sin verificaciones complejas
-      Get.back();
+      // ✅ CERRAR DIÁLOGO INMEDIATAMENTE
+      Navigator.of(Get.context!).pop(); // Usar Navigator.pop para asegurar cierre
       
-      // Marcar como procesando
+      // ✅ ESPERAR un frame para asegurar que el diálogo se cerró
+      await Future.delayed(Duration(milliseconds: 100));
+      
+      // ✅ VERIFICAR NUEVAMENTE antes de procesar
+      if (isUpdating.value) {
+        print('⚠️ Operación ya en progreso, cancelando nueva solicitud');
+        return;
+      }
+      
+      // ✅ MARCAR COMO PROCESANDO INMEDIATAMENTE
       isUpdating.value = true;
       
       try {
@@ -1555,19 +1579,28 @@ void confirmarPagoProductosSeleccionados() {
           duration: Duration(seconds: 3),
         );
       } finally {
+        // ✅ SIEMPRE liberar el lock
         isUpdating.value = false;
       }
     },
-    // Eliminar onCancelBtnTap personalizado - dejar que QuickAlert maneje el cierre
+    onCancelBtnTap: () {
+      // ✅ CERRAR DIÁLOGO de forma segura
+      Navigator.of(Get.context!).pop();
+    },
   );
 }
-Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, Map<String, dynamic> pedido, double totalEstimado) async {
+// Mueve la función fuera del método confirmarPagoProductosSeleccionados
+Future<void> _pagarProductosSeleccionados(
+  List<Map<String, dynamic>> productos, 
+  Map<String, dynamic> pedido, 
+  double totalEstimado
+) async {
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];
   
   try {
+    isUpdating.value = true; // Activar loading
     
-    // ✅ AGREGAR: Conectar impresora para productos seleccionados también
     final impresoraConectada = await printerService.conectarImpresoraAutomaticamente();
     if (!impresoraConectada) {
       print('⚠️ Impresora no disponible para productos seleccionados');
@@ -1592,12 +1625,8 @@ Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, 
       }
     }
 
-   // Get.back(); // Cerrar diálogo de progreso
-
-    // ✅ NUEVO: Imprimir ticket para productos seleccionados si todo fue exitoso
     if (fallidos == 0 && impresoraConectada) {
       try {
-        // Crear estructura de pedido para ticket con solo los productos seleccionados
         final pedidoParaTicket = _crearPedidoParaTicket(productos, pedido, totalReal);
         await printerService.imprimirTicket(pedidoParaTicket, totalReal);
         print('✅ Ticket impreso para productos seleccionados');
@@ -1609,7 +1638,6 @@ Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, 
     if (fallidos == 0) {
       String mensaje = 'Productos pagados correctamente\nPedido #$pedidoId\n$exitosos productos pagados\nTotal: \$${totalReal.toStringAsFixed(2)}';
       
-      // ✅ AGREGAR: Incluir información de impresión
       if (impresoraConectada) {
         mensaje += '\n✅ Ticket impreso';
       }
@@ -1622,7 +1650,6 @@ Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, 
         duration: Duration(seconds: 3),
       );
       
-      // Limpiar selección
       productosSeleccionados.clear();
       await controller.refrescarDatos();
       
@@ -1637,8 +1664,6 @@ Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, 
     }
 
   } catch (e) {
-    if (Get.isDialogOpen ?? false) Get.back();
-    
     Get.snackbar(
       'Error',
       'Error al procesar pago: $e',
@@ -1647,7 +1672,7 @@ Future<void> _pagarProductosSeleccionados(List<Map<String, dynamic>> productos, 
       duration: Duration(seconds: 3),
     );
   } finally {
-    // ✅ AGREGAR: Desconectar impresora
+    isUpdating.value = false; // Desactivar loading
     await printerService.desconectar();
   }
 }
@@ -1699,32 +1724,21 @@ Map<String, dynamic> _crearPedidoParaTicket(List<Map<String, dynamic>> productos
   
   return pedidoParaTicket;
 }
-Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> productos, Map<String, dynamic> pedido, double totalEstimado) async {
+
+
+Future<void> _pagarSeleccionadosYLiberarMesa(
+  List<Map<String, dynamic>> productos, 
+  Map<String, dynamic> pedido, 
+  double totalEstimado
+) async {
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];
   
-  // ✅ VARIABLES DE CONTROL para el flujo de cierre
-  bool dialogoProgresoAbierto = false;
   bool debeRefrescarDatos = false;
   
   try {
-    // ✅ PASO 1: Abrir diálogo de progreso
-    Get.dialog(
-      AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Procesando pago seleccionados y liberando mesa...'),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    );
-    dialogoProgresoAbierto = true;
+    isUpdating.value = true; // Activar loading (en lugar de Get.dialog)
 
-    // Conectar impresora
     final impresoraConectada = await printerService.conectarImpresoraAutomaticamente();
 
     double totalReal = 0.0;
@@ -1750,11 +1764,8 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
             ...producto,
             'statusDetalle': 'pagado',
           });
-        } else {
-          print('⏭️ Producto seleccionado ya estaba pagado: ${producto['nombreProducto']}');
         }
       } catch (e) {
-        print('❌ Error pagando producto: $e');
         fallidos++;
       }
     }
@@ -1784,10 +1795,9 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
       }
     }
 
-    // Imprimir ticket si todo fue exitoso
+    // Imprimir ticket
     if (fallidos == 0 && impresoraConectada && productosRecienPagados.isNotEmpty) {
       try {
-        print('🎫 Imprimiendo ticket solo con ${productosRecienPagados.length} productos recién pagados');
         final pedidoParaTicket = _crearPedidoParaTicketConFiltro(
           productosRecienPagados, 
           pedido, 
@@ -1795,60 +1805,39 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
           'productos_seleccionados_liberacion'
         );
         await printerService.imprimirTicket(pedidoParaTicket, totalReal);
-        print('✅ Ticket impreso para pago y liberación de seleccionados');
       } catch (e) {
         print('❌ Error en impresión: $e');
       }
     }
-
-    // ✅ PASO 2: Cerrar diálogo de progreso SIEMPRE
-    if (dialogoProgresoAbierto) {
-      Get.back(); // Cerrar diálogo "Procesando..."
-      dialogoProgresoAbierto = false;
-    }
     
-    // ✅ PASO 3: Limpiar selección SIEMPRE
     productosSeleccionados.clear();
     debeRefrescarDatos = true;
     
-    // ✅ PASO 4: Mostrar resultado y cerrar modal según el resultado
+    // Mostrar resultado
     if (fallidos == 0 && mesaLiberada) {
-      // ✅ ÉXITO COMPLETO: Cerrar modal de detalles
       Get.back(); // Cerrar TableDetailsModal
-      
-      String mensaje = '🎉 Mesa $numeroMesa liberada exitosamente!\n'
-                      'Productos seleccionados pagados: $exitosos\n'
-                      'Total de esta transacción: \$${totalReal.toStringAsFixed(2)}';
-      
-      if (impresoraConectada && productosRecienPagados.isNotEmpty) {
-        mensaje += '\n✅ Ticket impreso con productos de esta transacción';
-      }
       
       Get.snackbar(
         'Operación Exitosa',
-        mensaje,
+        '🎉 Mesa $numeroMesa liberada exitosamente!\nProductos: $exitosos\nTotal: \$${totalReal.toStringAsFixed(2)}',
         backgroundColor: Colors.green.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 4),
       );
       
     } else if (fallidos == 0 && !mesaLiberada) {
-      // ✅ PAGO EXITOSO PERO ERROR EN LIBERACIÓN: NO cerrar modal
       Get.snackbar(
         'Pago Exitoso - Error al Liberar',
-        'Productos pagados correctamente pero no se pudo liberar la mesa automáticamente',
+        'Productos pagados pero no se pudo liberar la mesa',
         backgroundColor: Colors.orange.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 4),
       );
       
     } else {
-      // ✅ ERROR EN PAGO: NO cerrar modal
-      String mensaje = 'Error en el proceso de pago y liberación';
-      
       Get.snackbar(
         'Error Parcial',
-        mensaje,
+        'Error en el proceso',
         backgroundColor: Colors.orange.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 4),
@@ -1856,28 +1845,20 @@ Future<void> _pagarSeleccionadosYLiberarMesa(List<Map<String, dynamic>> producto
     }
 
   } catch (e) {
-    // ✅ MANEJO DE ERRORES: Asegurar cierre de diálogo
-    if (dialogoProgresoAbierto && (Get.isDialogOpen ?? false)) {
-      Get.back(); // Cerrar diálogo "Procesando..."
-      dialogoProgresoAbierto = false;
-    }
-    
-    // Limpiar selección en caso de error
     productosSeleccionados.clear();
     debeRefrescarDatos = true;
     
     Get.snackbar(
       'Error',
-      'Error al procesar pago y liberación: $e',
+      'Error al procesar: $e',
       backgroundColor: Colors.red.withOpacity(0.8),
       colorText: Colors.white,
       duration: Duration(seconds: 3),
     );
   } finally {
-    // ✅ CLEANUP: Siempre ejecutar estas acciones
+    isUpdating.value = false; // Desactivar loading
     await printerService.desconectar();
     
-    // Refrescar datos si es necesario
     if (debeRefrescarDatos) {
       await controller.refrescarDatos();
     }
