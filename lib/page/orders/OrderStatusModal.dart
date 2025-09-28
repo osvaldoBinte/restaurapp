@@ -56,7 +56,7 @@ class OrderStatusModal extends StatelessWidget {
             Container(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => controller.actualizarEstadoOrden(pedidoId, 'completado'),
+                onPressed: () => _actualizarYCerrar(controller, pedidoId, 'completado'),
                 icon: Icon(Icons.check_circle, color: Colors.white),
                 label: Text(
                   'Marcar como Completado',
@@ -78,7 +78,7 @@ class OrderStatusModal extends StatelessWidget {
             Container(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => controller.actualizarEstadoOrden(pedidoId, 'cancelado'),
+                onPressed: () => _actualizarYCerrar(controller, pedidoId, 'cancelado'),
                 icon: Icon(Icons.cancel, color: Colors.white),
                 label: Text(
                   'Cancelar Pedido',
@@ -112,5 +112,20 @@ class OrderStatusModal extends StatelessWidget {
         ),
       ),
     );
+  }
+  
+  // Método para actualizar estado y cerrar modal
+  Future<void> _actualizarYCerrar(OrdersController controller, int pedidoId, String nuevoEstado) async {
+    try {
+      // Cerrar modal inmediatamente para mejor UX
+      Get.back();
+      
+      // Ejecutar actualización
+      await controller.actualizarEstadoOrden(pedidoId, nuevoEstado);
+      
+    } catch (e) {
+      print('Error al actualizar estado: $e');
+      // En caso de error, el controller ya maneja la visualización del error
+    }
   }
 }

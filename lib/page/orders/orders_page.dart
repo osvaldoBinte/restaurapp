@@ -11,187 +11,631 @@ import 'dart:convert';
 
 import 'package:restaurapp/common/constants/constants.dart';
 import 'package:restaurapp/common/services/BluetoothPrinterService.dart';
+import 'package:restaurapp/page/orders/configuracion.dart';
 import 'package:restaurapp/page/orders/modaltable/table_details_controller.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
 
 class OrdersDashboardScreen extends StatelessWidget {
   final controller = Get.find<OrdersController>();
-    final controllerTableDetailsController = Get.find<OrdersController>();
+  final controllerTableDetailsController = Get.find<OrdersController>();
 
   OrdersDashboardScreen({Key? key}) : super(key: key);
+  final configuracionController = Get.put(ConfiguracionController());
 
+  @override
+  Widget build(BuildContext context) {
+    // 🎯 RESPONSIVIDAD: Detectar tamaño de pantalla
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenHeight < 600;
+    final isVerySmallScreen = screenHeight < 500;
+    final isSmallWidth = screenWidth < 400;
 
-@override
-Widget build(BuildContext context) {
-  // 🎯 RESPONSIVIDAD: Detectar tamaño de pantalla
-  final screenHeight = MediaQuery.of(context).size.height;
-  final screenWidth = MediaQuery.of(context).size.width;
-  final isSmallScreen = screenHeight < 600;
-  final isVerySmallScreen = screenHeight < 500;
-  final isSmallWidth = screenWidth < 400;
-  
-  // 📐 ALTURA MÍNIMA ADAPTATIVA para el carousel
-  double minCarouselHeight;
-  double maxCarouselHeight;
-  
-  if (isVerySmallScreen) {
-    minCarouselHeight = 140; // Aumentado para que el texto se vea mejor
-    maxCarouselHeight = 180;
-  } else if (isSmallScreen) {
-    minCarouselHeight = 160; 
-    maxCarouselHeight = 200;
-  } else {
-    minCarouselHeight = 180; 
-    maxCarouselHeight = 240;
-  }
-
-  return Scaffold(
-    backgroundColor: Color(0xFFF5F2F0),
-    appBar: AppBar(
-      backgroundColor: Color(0xFF8B4513),
-      title: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(isSmallWidth ? 6 : 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              'EJ',
-              style: TextStyle(
-                color: Color(0xFF8B4513),
-                fontWeight: FontWeight.bold,
-                fontSize: isSmallWidth ? 14 : 16,
+    return Scaffold(
+      backgroundColor: Color(0xFFF5F2F0),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF8B4513),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(isSmallWidth ? 6 : 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'EJ',
+                style: TextStyle(
+                  color: Color(0xFF8B4513),
+                  fontWeight: FontWeight.bold,
+                  fontSize: isSmallWidth ? 14 : 16,
+                ),
               ),
             ),
+            SizedBox(width: isSmallWidth ? 8 : 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Comedor "El Jobo"',
+                    style: TextStyle(
+                      fontSize: isSmallWidth ? 16 : 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.refresh,
+              color: Colors.white,
+              size: isSmallWidth ? 20 : 24,
+            ),
+            onPressed: () => controller.refrescarDatos(),
           ),
-          SizedBox(width: isSmallWidth ? 8 : 12),
-          
-          Expanded(
+        ],
+      ),
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return Center(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+                ),
+                SizedBox(height: 16),
                 Text(
-                  'Comedor "El Jobo"',
+                  'Cargando órdenes...',
                   style: TextStyle(
-                    fontSize: isSmallWidth ? 16 : 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Color(0xFF8B4513),
+                    fontSize: isSmallScreen ? 14 : 16,
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-      actions: [
-        IconButton(
-          icon: Icon(
-            Icons.refresh, 
-            color: Colors.white,
-            size: isSmallWidth ? 20 : 24,
-          ),
-          onPressed: () => controller.refrescarDatos(),
-        ),
-      ],
-    ),
-    body: Obx(() {
-      if (controller.isLoading.value) {
-        return Center(
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: controller.refrescarDatos,
+          color: Color(0xFF8B4513),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B4513)),
+              // ✅ CAROUSEL CON ALTURA DINÁMICA BASADA EN CONFIGURACIÓN
+              Obx(() {
+                final minCarouselHeight = configuracionController.obtenerAlturaMinCarousel(isVerySmallScreen, isSmallScreen);
+                final maxCarouselHeight = configuracionController.obtenerAlturaMaxCarousel(isVerySmallScreen, isSmallScreen);
+                
+                return Container(
+                  constraints: BoxConstraints(
+                    minHeight: minCarouselHeight,
+                    maxHeight: maxCarouselHeight,
+                  ),
+                  child: _buildPendingOrdersCarousel(
+                    isSmallScreen,
+                    isVerySmallScreen,
+                    isSmallWidth,
+                  ),
+                );
+              }),
+
+              // 📋 LISTA DE MESAS - Usa el espacio restante
+              Expanded(child: _buildTablesList(isSmallScreen, isSmallWidth)),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+  Widget _buildPendingOrdersCarousel(
+    bool isSmallScreen,
+    bool isVerySmallScreen,
+    bool isSmallWidth,
+  ) {
+    return Column(
+      children: [
+        // Header del carousel - MODIFICADO con botón Liberar Todo
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 12 : 16,
+            vertical: isSmallScreen ? 8 : 10,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.restaurant_menu,
+                color: Color(0xFF8B4513),
+                size: isSmallWidth ? 18 : 22,
               ),
-              SizedBox(height: 16),
-              Text(
-                'Cargando órdenes...',
-                style: TextStyle(
-                  color: Color(0xFF8B4513),
-                  fontSize: isSmallScreen ? 14 : 16,
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Pedidos Pendientes',
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? 14 : 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8B4513),
+                  ),
+                ),
+              ),
+
+              Obx(() {
+                final conteoMesas = controller
+                    .obtenerConteoMesasConPendientes();
+                final isLoading = controller.isLiberandoTodasLasMesas.value;
+
+                if (conteoMesas > 0) {
+                  return Container(
+                    margin: EdgeInsets.only(right: 8),
+                    child: InkWell(
+                      onTap: isLoading
+                          ? null
+                          : () => controller
+                                .liberarTodasLasMesas(), // ✅ Deshabilitar si está cargando
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallWidth ? 8 : 10,
+                          vertical: isSmallWidth ? 4 : 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isLoading
+                              ? Colors.grey[400] // ✅ Color gris mientras carga
+                              : Color(0xFFE74C3C), // Color normal
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: isLoading
+                              ? [] // ✅ Sin sombra mientras carga
+                              : [
+                                  BoxShadow(
+                                    color: Color(0xFFE74C3C).withOpacity(0.3),
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // ✅ Mostrar loader o ícono normal
+                            isLoading
+                                ? SizedBox(
+                                    width: isSmallWidth ? 14 : 16,
+                                    height: isSmallWidth ? 14 : 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.done_all,
+                                    color: Colors.white,
+                                    size: isSmallWidth ? 14 : 16,
+                                  ),
+                            SizedBox(width: 4),
+                            Text(
+                              isLoading
+                                  ? (isSmallWidth
+                                        ? 'Proc...'
+                                        : 'Procesando...') // ✅ Texto mientras carga
+                                  : (isSmallWidth
+                                        ? 'Todo'
+                                        : 'Liberar Todo'), // Texto normal
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isSmallWidth ? 10 : 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            // ✅ Solo mostrar contador si NO está cargando
+                            if (!isLoading && !isSmallWidth) ...[
+                              SizedBox(width: 4),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$conteoMesas',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              }),
+
+              //boton para cambiar estilo 
+                Container(
+                margin: EdgeInsets.only(left: 8),
+                child: InkWell(
+                  onTap: () => configuracionController.mostrarModalConfiguracion(),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallWidth ? 6 : 8,
+                      vertical: isSmallWidth ? 4 : 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF8B4513),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0xFF8B4513).withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.settings,
+                      color: Colors.white,
+                      size: isSmallWidth ? 14 : 16,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-        );
-      }
+        ),
 
-      return RefreshIndicator(
-        onRefresh: controller.refrescarDatos,
-        color: Color(0xFF8B4513),
-        child: Column(
-          children: [
-            // 🎯 CAROUSEL CON ALTURA FLEXIBLE - SOLUCIÓN PRINCIPAL
-            Container(
-              constraints: BoxConstraints(
-                minHeight: minCarouselHeight,
-                maxHeight: maxCarouselHeight, // Altura máxima más flexible
+        // Lista flexible que se adapta al contenido (sin cambios)
+        Flexible(
+          child: Obx(() {
+            if (controller.pedidosIndividuales.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: isSmallScreen ? 24 : 32,
+                      color: Colors.green,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'No hay pedidos pendientes',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: isSmallScreen ? 11 : 13,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ScrollConfiguration(
+              behavior: ScrollConfiguration.of(Get.context!).copyWith(
+                dragDevices: {
+                  PointerDeviceKind.touch,
+                  PointerDeviceKind.mouse,
+                  PointerDeviceKind.trackpad,
+                },
+                scrollbars: true,
               ),
-              child: _buildPendingOrdersCarousel(isSmallScreen, isVerySmallScreen, isSmallWidth),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 8 : 12,
+                ),
+                itemCount: controller.pedidosIndividuales.length,
+                itemBuilder: (context, index) {
+                  final pedido = controller.pedidosIndividuales[index];
+                  return _buildCarouselCardIndividual(
+                    pedido,
+                    isSmallScreen,
+                    isVerySmallScreen,
+                    isSmallWidth,
+                  );
+                },
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCarouselCardIndividual(
+  Map<String, dynamic> detalle,
+  bool isSmallScreen,
+  bool isVerySmallScreen,
+  bool isSmallWidth,
+) {
+  final numeroMesa = detalle['numeroMesa'];
+  final nombreOrden = detalle['nombreOrden'] ?? 'Sin nombre';
+  final pedidoId = detalle['detalleId'];
+  final nombreProducto = detalle['nombreProducto'] ?? 'Producto';
+  final cantidad = detalle['cantidad'] ?? 1;
+  final precio = (detalle['precio'] ?? 0.0).toDouble();
+  final observaciones = detalle['observaciones'] ?? '';
+  final fecha = DateTime.parse(detalle['fecha']);
+  final timeString =
+      '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
+
+  return Container(
+    child: Obx(() {
+      final cardWidth = configuracionController.obtenerAnchoCard(isSmallWidth, isSmallScreen);
+      
+      return Container(
+        width: cardWidth,
+        margin: EdgeInsets.only(right: 12, bottom: isVerySmallScreen ? 4 : 8),
+        child: Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: InkWell(
+            onTap: () => controller.mostrarModalEstadoOrden(pedidoId),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [Color(0xFFFFB74D), Color(0xFFFF8A65)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              // ✅ ALTURA FIJA CON SCROLL INTERNO
+              height: _calcularAlturaCard(isVerySmallScreen, isSmallScreen),
+              child: SingleChildScrollView(
+                physics: BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ✅ NOMBRE DEL PRODUCTO - TAMAÑO Y COLOR PERSONALIZABLES
+                    Obx(() => Text(
+                      nombreProducto,
+                      style: TextStyle(
+                        color: configuracionController.obtenerColorTexto(),
+                        fontSize: configuracionController.obtenerTamanoFuente(isSmallWidth, isSmallScreen),
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                      ),
+                    )),
+
+                    SizedBox(height: 6),
+
+                    // ✅ CANTIDAD - TAMAÑO SECUNDARIO Y COLOR PERSONALIZABLES
+                    Obx(() => Text(
+                      'Cant: $cantidad',
+                      style: TextStyle(
+                        color: configuracionController.obtenerColorTexto().withOpacity(0.9),
+                        fontSize: configuracionController.obtenerTamanoFuenteSecundario(isSmallWidth, isSmallScreen),
+                        fontWeight: FontWeight.w500,
+                        height: 1.2,
+                      ),
+                    )),
+
+                    SizedBox(height: 8),
+
+                    // Mesa - Badge (mantiene color blanco para contraste)
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 6 : 8,
+                        vertical: isSmallScreen ? 3 : 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'MESA $numeroMesa',
+                        style: TextStyle(
+                          color: Colors.white, // Mantener blanco para legibilidad
+                          fontSize: isSmallWidth ? 10 : (isSmallScreen ? 11 : 12),
+                          fontWeight: FontWeight.bold,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+
+                    // ✅ OBSERVACIONES - TAMAÑO SECUNDARIO Y COLOR PERSONALIZABLES
+                    if (observaciones.isNotEmpty) ...[
+                      SizedBox(height: 6),
+                      Obx(() => Text(
+                        '$observaciones',
+                        style: TextStyle(
+                          color: configuracionController.obtenerColorTexto().withOpacity(0.7),
+                          fontSize: configuracionController.obtenerTamanoFuenteSecundario(isSmallWidth, isSmallScreen),
+                          height: 1.2,
+                        ),
+                        // ✅ TEXTO SIN RESTRICCIONES - EL SCROLL MANEJA EL OVERFLOW
+                      )),
+                    ],
+                    
+                    // ✅ ESPACIADO ADICIONAL PARA MEJOR SCROLL
+                    SizedBox(height: 8),
+                  ],
+                ),
+              ),
             ),
-            
-            // 📋 LISTA DE MESAS - Usa el espacio restante
-            Expanded(
-              child: _buildTablesList(isSmallScreen, isSmallWidth),
-            ),
-          ],
+          ),
         ),
       );
     }),
   );
 }
-Widget _buildPendingOrdersCarousel(bool isSmallScreen, bool isVerySmallScreen, bool isSmallWidth) {
-  return Column(
-    children: [
-      // Header del carousel - MODIFICADO con botón Liberar Todo
-      Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isSmallScreen ? 12 : 16,
-          vertical: isSmallScreen ? 8 : 10,
+
+// ✅ FUNCIÓN AUXILIAR PARA CALCULAR ALTURA FIJA DE LA CARD
+double _calcularAlturaCard(bool isVerySmallScreen, bool isSmallScreen) {
+  if (isVerySmallScreen) {
+    return 120; // Altura fija más pequeña para pantallas muy pequeñas
+  } else if (isSmallScreen) {
+    return 140; // Altura fija para pantallas pequeñas
+  } else {
+    return 160; // Altura fija para pantallas normales
+  }
+}
+  Widget _buildTablesList(bool isSmallScreen, bool isSmallWidth) {
+    return Column(
+      children: [
+        // Header adaptativo para diferentes tamaños de pantalla
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 12 : 16,
+            vertical: isSmallScreen ? 6 : 8,
+          ),
+          child: isSmallWidth
+              ? _buildCompactHeader(
+                  isSmallScreen,
+                ) // Layout compacto para pantallas muy pequeñas
+              : _buildNormalHeader(isSmallScreen), // Layout normal
         ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.restaurant_menu, 
-              color: Color(0xFF8B4513),
-              size: isSmallWidth ? 18 : 22,
+
+        // Lista de mesas
+        Expanded(
+          child: Obx(() {
+            if (controller.mesasConPedidos.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.table_restaurant,
+                      size: isSmallScreen ? 48 : 64,
+                      color: Colors.grey[400],
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'No hay mesas con pedidos activos',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 14 : 16,
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.builder(
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 12 : 16,
+              ),
+              itemCount: controller.mesasConPedidos.length,
+              itemBuilder: (context, index) {
+                final mesa = controller.mesasConPedidos[index];
+                return _buildTableCard(mesa, isSmallScreen, isSmallWidth);
+              },
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  // Header normal para pantallas medianas y grandes
+  Widget _buildNormalHeader(bool isSmallScreen) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: Colors.grey[400])),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16),
+          child: Text(
+            'Lista de Mesas',
+            style: TextStyle(
+              fontSize: isSmallScreen ? 16 : 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF3E1F08),
             ),
-            SizedBox(width: 6),
-            Expanded(
+          ),
+        ),
+        _buildLiberarButton(false), // No es pantalla muy pequeña
+        Expanded(child: Divider(color: Colors.grey[400])),
+      ],
+    );
+  }
+
+  // Header compacto para pantallas muy pequeñas
+  Widget _buildCompactHeader(bool isSmallScreen) {
+    return Column(
+      children: [
+        // Título centrado
+        Row(
+          children: [
+            Expanded(child: Divider(color: Colors.grey[400])),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                'Pedidos Pendientes',
+                'Mesas', // Título más corto
                 style: TextStyle(
-                  fontSize: isSmallScreen ? 14 : 16,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF8B4513),
+                  color: Color(0xFF3E1F08),
                 ),
               ),
             ),
-            
-            Obx(() {
-  final conteoMesas = controller.obtenerConteoMesasConPendientes();
-  final isLoading = controller.isLiberandoTodasLasMesas.value;
-  
-  if (conteoMesas > 0) {
-    return Container(
-      margin: EdgeInsets.only(right: 8),
-      child: InkWell(
-        onTap: isLoading ? null : () => controller.liberarTodasLasMesas(), // ✅ Deshabilitar si está cargando
+            Expanded(child: Divider(color: Colors.grey[400])),
+          ],
+        ),
+
+        // Botón debajo del título si hay mesas completadas
+        Obx(() {
+          final conteoMesasCompletadas = controller
+              .obtenerConteoMesasListasParaLiberar();
+          if (conteoMesasCompletadas > 0) {
+            return Container(
+              margin: EdgeInsets.only(top: 8),
+              child: _buildLiberarButton(true), // Es pantalla muy pequeña
+            );
+          }
+          return SizedBox(height: 8); // Espaciado mínimo si no hay botón
+        }),
+      ],
+    );
+  }
+
+  // Widget del botón liberar reutilizable
+  Widget _buildLiberarButton(bool isVerySmall) {
+    return Obx(() {
+      final conteoMesasCompletadas = controller
+          .obtenerConteoMesasListasParaLiberar();
+      final isLoading = controller.isLiberandoTodasLasMesas.value;
+
+      if (conteoMesasCompletadas == 0) {
+        return SizedBox.shrink();
+      }
+
+      return InkWell(
+        onTap: isLoading ? null : () => controller.liberarMesasCompletadas(),
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: EdgeInsets.symmetric(
-            horizontal: isSmallWidth ? 8 : 10,
-            vertical: isSmallWidth ? 4 : 6,
+            horizontal: isVerySmall ? 12 : 10,
+            vertical: isVerySmall ? 8 : 6,
           ),
           decoration: BoxDecoration(
-            color: isLoading 
-                ? Colors.grey[400] // ✅ Color gris mientras carga
-                : Color(0xFFE74C3C), // Color normal
+            color: isLoading ? Colors.grey[400] : Color(0xFFE74C3C),
             borderRadius: BorderRadius.circular(8),
-            boxShadow: isLoading 
-                ? [] // ✅ Sin sombra mientras carga
+            boxShadow: isLoading
+                ? []
                 : [
                     BoxShadow(
                       color: Color(0xFFE74C3C).withOpacity(0.3),
@@ -203,368 +647,34 @@ Widget _buildPendingOrdersCarousel(bool isSmallScreen, bool isVerySmallScreen, b
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ✅ Mostrar loader o ícono normal
-              isLoading 
+              isLoading
                   ? SizedBox(
-                      width: isSmallWidth ? 14 : 16,
-                      height: isSmallWidth ? 14 : 16,
+                      width: 16,
+                      height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : Icon(
-                      Icons.done_all,
-                      color: Colors.white,
-                      size: isSmallWidth ? 14 : 16,
-                    ),
-              SizedBox(width: 4),
-              Text(
-                isLoading 
-                    ? (isSmallWidth ? 'Proc...' : 'Procesando...')  // ✅ Texto mientras carga
-                    : (isSmallWidth ? 'Todo' : 'Liberar Todo'),     // Texto normal
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isSmallWidth ? 10 : 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              // ✅ Solo mostrar contador si NO está cargando
-              if (!isLoading && !isSmallWidth) ...[
-                SizedBox(width: 4),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$conteoMesas',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  return SizedBox.shrink();
-}),
-            
-            // Auto-refresh indicator (existente)
-            Obx(() {
-              if (controller.isAutoRefreshEnabled.value) {
-                return Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isSmallWidth ? 4 : 6, 
-                    vertical: 2
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      SizedBox(width: 3),
-                      Text(
-                        'Auto',
-                        style: TextStyle(
-                          fontSize: 8,
-                          color: Colors.green[700],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return SizedBox.shrink();
-            }),
-          ],
-        ),
-      ),
-      
-      // Lista flexible que se adapta al contenido (sin cambios)
-      Flexible(
-        child: Obx(() {
-          if (controller.pedidosIndividuales.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.check_circle, 
-                    size: isSmallScreen ? 24 : 32,
-                    color: Colors.green
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'No hay pedidos pendientes',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: isSmallScreen ? 11 : 13,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ScrollConfiguration(
-            behavior: ScrollConfiguration.of(Get.context!).copyWith(
-              dragDevices: {
-                PointerDeviceKind.touch,
-                PointerDeviceKind.mouse,
-                PointerDeviceKind.trackpad,
-              },
-              scrollbars: true,
-            ),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              physics: BouncingScrollPhysics(),
-              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 8 : 12),
-              itemCount: controller.pedidosIndividuales.length,
-              itemBuilder: (context, index) {
-                final pedido = controller.pedidosIndividuales[index];
-                return _buildCarouselCardIndividual(pedido, isSmallScreen, isVerySmallScreen, isSmallWidth);
-              },
-            ),
-          );
-        }),
-      ),
-    ],
-  );
-}
-
-Widget _buildCarouselCardIndividual(Map<String, dynamic> detalle, bool isSmallScreen, bool isVerySmallScreen, bool isSmallWidth) {
-  final numeroMesa = detalle['numeroMesa'];
-  final nombreOrden = detalle['nombreOrden'] ?? 'Sin nombre';
-  final pedidoId = detalle['detalleId'];
-  final nombreProducto = detalle['nombreProducto'] ?? 'Producto';
-  final cantidad = detalle['cantidad'] ?? 1;
-  final precio = (detalle['precio'] ?? 0.0).toDouble();
-  final observaciones = detalle['observaciones'] ?? '';
-  final fecha = DateTime.parse(detalle['fecha']);
-  final timeString = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
-       
-  // 📐 DIMENSIONES BASE - Solo ancho, altura será automática
-  double cardWidth;
-  
-  if (isSmallWidth) {
-    cardWidth = 150;
-  } else if (isSmallScreen) {
-    cardWidth = 170;
-  } else {
-    cardWidth = 190;
-  }
-       
-  return Container(
-    width: cardWidth,
-    // ✅ REMOVIDO: constraints con minHeight - ahora es completamente flexible
-    margin: EdgeInsets.only(right: 12, bottom: isVerySmallScreen ? 4 : 8),
-    child: Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: () => controller.mostrarModalEstadoOrden(pedidoId),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          // ✅ REMOVIDO: constraints - la altura será automática
-          padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              colors: [Color(0xFFFFB74D), Color(0xFFFF8A65)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min, // ✅ IMPORTANTE: min para que se ajuste al contenido
-            children: [
-              // 🔧 Nombre del producto - SIN límite de líneas
-              Text(
-                nombreProducto,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isSmallWidth ? 12 : (isSmallScreen ? 13 : 14),
-                  fontWeight: FontWeight.w600,
-                  height: 1.3,
-                ),
-                // ✅ REMOVIDO: maxLines y overflow - ahora se expande automáticamente
-              ),
-              
-              SizedBox(height: 6),
-                           
-              // 🔧 Cantidad
-              Text(
-                'Cant: $cantidad',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isSmallWidth ? 10 : (isSmallScreen ? 11 : 12),
-                  fontWeight: FontWeight.w500,
-                  height: 1.2,
-                ),
-              ),
-             
-              SizedBox(height: 8),
-                           
-              // 🔧 Mesa - Badge
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isSmallScreen ? 6 : 8, 
-                  vertical: isSmallScreen ? 3 : 4
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                  : Icon(Icons.check_circle, color: Colors.white, size: 16),
+              SizedBox(width: 6),
+              Flexible(
                 child: Text(
-                  'MESA $numeroMesa',
+                  isLoading
+                      ? 'Liberando...'
+                      : (isVerySmall ? 'Liberar Completadas' : 'Liberar mesas'),
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: isSmallWidth ? 10 : (isSmallScreen ? 11 : 12),
-                    fontWeight: FontWeight.bold,
-                    height: 1.1,
+                    fontSize: isVerySmall ? 13 : 12,
+                    fontWeight: FontWeight.w600,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-                           
-              // 🔧 Observaciones - SIN restricciones de líneas
-              if (observaciones.isNotEmpty) ...[
-                SizedBox(height: 6),
-                Flexible(
-                  child: Text(
-                 '$observaciones',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    height: 1.2,
-                  ),
-                  // ✅ REMOVIDO: maxLines y overflow - se expande automáticamente
-                ),
-                  )  // ✅ Flexible para que se ajuste al contenido
-               
-              ],
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-// 📋 LISTA DE MESAS RESPONSIVA
-Widget _buildTablesList(bool isSmallScreen, bool isSmallWidth) {
-  return Column(
-    children: [
-      // Header con divider adaptativo y botón Liberar Todo
-      Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isSmallScreen ? 12 : 16, 
-          vertical: isSmallScreen ? 6 : 8
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Divider(color: Colors.grey[400]),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16),
-              child: Text(
-                'Lista de Mesas',
-                style: TextStyle(
-                  fontSize: isSmallScreen ? 16 : 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF3E1F08),
-                ),
-              ),
-            ),
-            
-            // Botón Liberar Todo - Aparece solo si hay mesas
-           // Botón Liberar Todo - Aparece solo si hay mesas con pedidos completados
-Obx(() {
-  final conteoMesasCompletadas = controller.obtenerConteoMesasListasParaLiberar();
-  final isLoading = controller.isLiberandoTodasLasMesas.value; // Usar el mismo controller
-  
-  if (conteoMesasCompletadas > 0) {
-    return Container(
-      margin: EdgeInsets.only(left: 8),
-      child: InkWell(
-        // ✅ CAMBIO PRINCIPAL: Usar el método correcto
-        onTap: isLoading ? null : () => controller.liberarMesasCompletadas(),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isSmallWidth ? 8 : 10,
-            vertical: isSmallWidth ? 4 : 6,
-          ),
-          decoration: BoxDecoration(
-            // Color verde para indicar que están completados
-            color: isLoading 
-                ? Colors.grey[400]
-                : Color(0xFFE74C3C), // Verde para mesas completadas
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: isLoading 
-                ? []
-                : [
-                    BoxShadow(
-                      color: Color(0xFF27AE60).withOpacity(0.3),
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Mostrar loader o ícono normal
-              isLoading 
-                  ? SizedBox(
-                      width: isSmallWidth ? 14 : 16,
-                      height: isSmallWidth ? 14 : 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Icon(
-                      Icons.check_circle, // Icono de check para completados
-                      color: Colors.white,
-                      size: isSmallWidth ? 14 : 16,
-                    ),
-              SizedBox(width: 4),
-              Text(
-                isLoading 
-                    ? (isSmallWidth ? 'Lib...' : 'Liberando...')
-                    : (isSmallWidth ? 'Listos' : 'Liberar mesas'), // Texto más claro
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isSmallWidth ? 10 : 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              // Mostrar contador si no está cargando
-              if (!isLoading && !isSmallWidth) ...[
-                SizedBox(width: 4),
+              if (!isLoading) ...[
+                SizedBox(width: 6),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(10),
@@ -573,7 +683,7 @@ Obx(() {
                     '$conteoMesasCompletadas',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 9,
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -582,61 +692,16 @@ Obx(() {
             ],
           ),
         ),
-      ),
-    );
+      );
+    });
   }
-  return SizedBox.shrink();
-}),
-            
-            Expanded(
-              child: Divider(color: Colors.grey[400]),
-            ),
-          ],
-        ),
-      ),
-      
-      // Lista de mesas
-      Expanded(
-        child: Obx(() {
-          if (controller.mesasConPedidos.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.table_restaurant, 
-                    size: isSmallScreen ? 48 : 64,
-                    color: Colors.grey[400]
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'No hay mesas con pedidos activos',
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 14 : 16,
-                      color: Colors.grey[600],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
-          }
 
-          return ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16),
-            itemCount: controller.mesasConPedidos.length,
-            itemBuilder: (context, index) {
-              final mesa = controller.mesasConPedidos[index];
-              return _buildTableCard(mesa, isSmallScreen, isSmallWidth);
-            },
-          );
-        }),
-      ),
-    ],
-  );
-}
   // 🏪 CARD DE MESA RESPONSIVA
-  Widget _buildTableCard(Map<String, dynamic> mesa, bool isSmallScreen, bool isSmallWidth) {
+  Widget _buildTableCard(
+    Map<String, dynamic> mesa,
+    bool isSmallScreen,
+    bool isSmallWidth,
+  ) {
     final numeroMesa = mesa['numeroMesa'];
     final pedidos = mesa['pedidos'] as List;
     final totalMesa = controller.calcularTotalMesa(mesa);
@@ -652,7 +717,9 @@ Obx(() {
 
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: EdgeInsets.all(isSmallScreen ? 12 : 16), // Padding adaptativo
+            padding: EdgeInsets.all(
+              isSmallScreen ? 12 : 16,
+            ), // Padding adaptativo
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey[300]!),
@@ -684,7 +751,9 @@ Obx(() {
                         Text(
                           'Total: \$${totalMesa.toStringAsFixed(2)}',
                           style: TextStyle(
-                            fontSize: isSmallScreen ? 12 : 14, // Font adaptativo
+                            fontSize: isSmallScreen
+                                ? 12
+                                : 14, // Font adaptativo
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF8B4513),
                           ),
@@ -726,7 +795,7 @@ Obx(() {
     final numeroMesa = mesaPedidos['numeroMesa'];
     final pedidos = mesaPedidos['pedidos'] as List;
     final primerPedido = pedidos.isNotEmpty ? pedidos.first : null;
-    
+
     return Container(
       width: 160,
       margin: EdgeInsets.only(right: 12, bottom: 8),
@@ -747,7 +816,9 @@ Obx(() {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                primerPedido != null ? primerPedido['nombreOrden'] ?? 'Sin nombre' : 'Sin pedidos',
+                primerPedido != null
+                    ? primerPedido['nombreOrden'] ?? 'Sin nombre'
+                    : 'Sin pedidos',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 14,
@@ -775,10 +846,7 @@ Obx(() {
               Spacer(),
               Text(
                 '${pedidos.length} pedido${pedidos.length != 1 ? 's' : ''}',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 11),
               ),
             ],
           ),
@@ -786,5 +854,4 @@ Obx(() {
       ),
     );
   }
-  
 }
