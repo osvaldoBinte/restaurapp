@@ -31,14 +31,16 @@ class ConfiguracionController extends GetxController {
   final List<Color> coloresPredefinidos = [
     Colors.white,
     Colors.black,
-    Colors.red,
-    Colors.blue,
-    Colors.green,
-    Colors.orange,
-    Colors.purple,
-    Colors.yellow,
-    Colors.pink,
-    Colors.teal,
+   Colors.grey[700]!,          // Gris oscuro
+  Color(0xFF5D4E75),          // Púrpura suave
+  Color(0xFF2E7D95),          // Azul océano
+  Color(0xFF4A7C59),          // Verde bosque
+  Color(0xFF8B6F47),          // Marrón cálido
+  Color(0xFF7A4F4F),          // Rojo ladrillo
+  Color(0xFF6B5B95),          // Lavanda
+  Color(0xFF2C5F2D),          // Verde oscuro
+  Color(0xFF4B6EAF),          // Azul slate
+  Color(0xFF8B7355),     
   ];
   
   // Clave para SharedPreferences
@@ -503,7 +505,7 @@ class ConfiguracionController extends GetxController {
                             Slider(
                               value: anchoCardPersonalizado.value,
                               min: obtenerAnchoMinimo(false, false), // Ancho mínimo basado en pantalla
-                              max: 300.0, // Ancho máximo
+                              max: 350.0, // Ancho máximo
                               divisions: ((300 - obtenerAnchoMinimo(false, false)) / 10).round(),
                               activeColor: Color(0xFF8B4513),
                               onChanged: (value) {
