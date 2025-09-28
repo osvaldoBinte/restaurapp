@@ -272,15 +272,19 @@ class ConfiguracionController extends GetxController {
   
   // Mostrar modal de configuración
   void mostrarModalConfiguracion() {
-    Get.dialog(
-      Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+     Get.dialog(
+    Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      insetPadding: EdgeInsets.all(10), // Margen mínimo desde los bordes
+      child: Container(
+        width: double.infinity, // Ocupa todo el ancho disponible
+        padding: EdgeInsets.all(20),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(Get.context!).size.height * 0.9, // 90% de altura
         ),
-        child: Container(
-          padding: EdgeInsets.all(20),
-          constraints: BoxConstraints(maxHeight: 600), // Limitar altura
-          child: SingleChildScrollView(
+        child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -613,91 +617,6 @@ class ConfiguracionController extends GetxController {
                 
                 SizedBox(height: 16),
                 
-                // VISTA PREVIA
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    gradient: LinearGradient(
-                      colors: [Color(0xFFFFB74D), Color(0xFFFF8A65)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Vista Previa',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      
-                      // Título del producto
-                      Obx(() => Text(
-                        'Tacos al Pastor',
-                        style: TextStyle(
-                          color: obtenerColorTexto(),
-                          fontSize: obtenerTamanoFuente(false, false),
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                        ),
-                      )),
-                      
-                      SizedBox(height: 4),
-                      
-                      // Cantidad con tamaño secundario
-                      Obx(() => Text(
-                        'Cant: 3',
-                        style: TextStyle(
-                          color: obtenerColorTexto().withOpacity(0.9),
-                          fontSize: obtenerTamanoFuenteSecundario(false, false),
-                          fontWeight: FontWeight.w500,
-                          height: 1.2,
-                        ),
-                      )),
-                      
-                      SizedBox(height: 8),
-                      
-                      // Badge de mesa (mantiene estilo original)
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'MESA 5',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            height: 1.1,
-                          ),
-                        ),
-                      ),
-                      
-                      SizedBox(height: 6),
-                      
-                      // Observaciones con tamaño secundario
-                      Obx(() => Text(
-                        'Sin cebolla, extra salsa',
-                        style: TextStyle(
-                          color: obtenerColorTexto().withOpacity(0.7),
-                          fontSize: obtenerTamanoFuenteSecundario(false, false),
-                          height: 1.2,
-                        ),
-                      )),
-                    ],
-                  ),
-                ),
-                
-                SizedBox(height: 20),
                 
                 // Botones de acción
                 Row(
