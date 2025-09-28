@@ -361,7 +361,7 @@ class ConfiguracionController extends GetxController {
                             Slider(
                               value: tamanoFuentePersonalizado.value,
                               min: 10.0,
-                              max: 24.0,
+                              max: 32.0,
                               divisions: 14,
                               activeColor: Color(0xFF8B4513),
                               onChanged: (value) {
@@ -428,7 +428,7 @@ class ConfiguracionController extends GetxController {
                             Slider(
                               value: tamanoFuenteSecundario.value,
                               min: 8.0,
-                              max: 20.0,
+                              max: 27.0,
                               divisions: 12,
                               activeColor: Color(0xFF8B4513),
                               onChanged: (value) {
