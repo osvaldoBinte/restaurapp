@@ -165,42 +165,61 @@ class OrdersController extends GetxController {
     }
   }
 
-  /// NUEVA FUNCIÓN: Extraer pedidos individuales para el carrusel
-  void _extraerPedidosIndividuales() {
-    List<Map<String, dynamic>> detallesFlat = [];
+/// FUNCIÓN MEJORADA: Extraer y ordenar pedidos por fecha (más reciente primero)
+void _extraerPedidosIndividuales() {
+  List<Map<String, dynamic>> detallesFlat = [];
+  
+  for (var mesaPedidos in pedidosPendientes) {
+    final numeroMesa = mesaPedidos['numeroMesa'];
+    final pedidos = mesaPedidos['pedidos'] as List;
     
-    for (var mesaPedidos in pedidosPendientes) {
-      final numeroMesa = mesaPedidos['numeroMesa'];
-      final pedidos = mesaPedidos['pedidos'] as List;
+    for (var pedido in pedidos) {
+      final detalles = pedido['detalles'] as List;
+      final pedidoInfo = {
+        'pedidoId': pedido['pedidoId'],
+        'nombreOrden': pedido['nombreOrden'],
+        'fecha': pedido['fecha'],
+        'status': pedido['status'],
+        'total': pedido['total'],
+      };
       
-      for (var pedido in pedidos) {
-        final detalles = pedido['detalles'] as List;
-        final pedidoInfo = {
-          'pedidoId': pedido['pedidoId'],
-          'nombreOrden': pedido['nombreOrden'],
-          'fecha': pedido['fecha'],
-          'status': pedido['status'],
-          'total': pedido['total'],
-        };
+      // Extraer cada detalle individual
+      for (var detalle in detalles) {
+        Map<String, dynamic> detalleConInfo = Map.from(detalle);
+        // Agregar información de mesa y pedido al detalle
+        detalleConInfo['numeroMesa'] = numeroMesa;
+        detalleConInfo['pedidoId'] = pedidoInfo['pedidoId'];
+        detalleConInfo['nombreOrden'] = pedidoInfo['nombreOrden'];
+        detalleConInfo['fecha'] = pedidoInfo['fecha'];
+        detalleConInfo['status'] = pedidoInfo['status'];
+        detalleConInfo['totalPedido'] = pedidoInfo['total'];
         
-        // Extraer cada detalle individual
-        for (var detalle in detalles) {
-          Map<String, dynamic> detalleConInfo = Map.from(detalle);
-          // Agregar información de mesa y pedido al detalle
-          detalleConInfo['numeroMesa'] = numeroMesa;
-          detalleConInfo['pedidoId'] = pedidoInfo['pedidoId'];
-          detalleConInfo['nombreOrden'] = pedidoInfo['nombreOrden'];
-          detalleConInfo['fecha'] = pedidoInfo['fecha'];
-          detalleConInfo['status'] = pedidoInfo['status'];
-          detalleConInfo['totalPedido'] = pedidoInfo['total'];
-          
-          detallesFlat.add(detalleConInfo);
-        }
+        detallesFlat.add(detalleConInfo);
       }
     }
-    
-    pedidosIndividuales.value = detallesFlat;
   }
+  
+  // ✅ ORDENAR POR FECHA: Más reciente primero (descendente)
+  detallesFlat.sort((a, b) {
+    try {
+      final fechaA = DateTime.parse(a['fecha']);
+      final fechaB = DateTime.parse(b['fecha']);
+      return fechaB.compareTo(fechaA); // Descendente (más reciente primero)
+    } catch (e) {
+      print('⚠️ Error al ordenar por fecha: $e');
+      return 0; // Mantener orden si hay error
+    }
+  });
+  
+  // Actualizar la lista observable
+  pedidosIndividuales.assignAll(detallesFlat);
+  
+  print('✅ Pedidos individuales ordenados por fecha: ${detallesFlat.length}');
+  if (detallesFlat.isNotEmpty) {
+    print('  📅 Más reciente: ${detallesFlat.first['fecha']}');
+    print('  📅 Más antiguo: ${detallesFlat.last['fecha']}');
+  }
+}
 
   void mostrarModalEstadoOrden(int detalleId) {
     print(detalleId);

@@ -419,7 +419,7 @@ Widget _buildProductCard(TableDetailsController controller, Map<String, dynamic>
                     ],
                                    
                 // Controles de cantidad (solo si NO está cancelado NI pagado)
-                 if (statusDetalle.trim().toLowerCase() == 'proceso' ) ...[
+                 if (statusDetalle.trim().toLowerCase() == 'proceso' || statusDetalle.trim().toLowerCase() == 'completado' ) ...[
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

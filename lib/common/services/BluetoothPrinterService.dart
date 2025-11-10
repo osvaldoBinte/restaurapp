@@ -659,8 +659,12 @@ class UniversalPrinterService {
   
   bytes += generator.text('');
   bytes += generator.text('¡Gracias por su visita!',
+  
       styles: PosStyles(align: PosAlign.center, bold: true));
   
+  bytes += generator.text('No incluye propina',
+  
+      styles: PosStyles(align: PosAlign.center, bold: true));
   bytes += generator.feed(2);
   bytes += generator.cut();
   
