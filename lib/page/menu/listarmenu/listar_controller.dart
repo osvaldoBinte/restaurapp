@@ -16,8 +16,9 @@ class Menu {
   final String precio;
   final int tiempoPreparacion;
   final String imagen;
-  final int categoriaId; // Cambiado de categoria a categoriaId como int
-  final String? categoriaNombre; // Nuevo campo opcional para el nombre de la categoría
+  final int categoriaId;
+  final String? categoriaNombre;
+  final bool mostrarEnListado; // ✅ NUEVO CAMPO
 
   Menu({
     required this.id,
@@ -28,6 +29,7 @@ class Menu {
     required this.imagen,
     required this.categoriaId,
     this.categoriaNombre,
+    required this.mostrarEnListado, // ✅ NUEVO CAMPO
   });
 
   factory Menu.fromJson(Map<String, dynamic> json) {
@@ -38,8 +40,9 @@ class Menu {
       precio: json['precio'] ?? '0.00',
       tiempoPreparacion: json['tiempoPreparacion'] ?? 0,
       imagen: json['imagen'] ?? '',
-      categoriaId: json['categoriaId'] ?? json['categoria_id'] ?? 0, // Flexible para diferentes formatos de API
+      categoriaId: json['categoriaId'] ?? json['categoria_id'] ?? 0,
       categoriaNombre: json['categoriaNombre'] ?? json['categoria_nombre'] ?? json['categoria'] ?? '',
+      mostrarEnListado: json['mostrarEnListado'] ?? true, // ✅ NUEVO CAMPO CON DEFAULT TRUE
     );
   }
 
@@ -50,7 +53,6 @@ class Menu {
 class Categoria {
   final int id;
   final String nombre;
-  
 
   Categoria({
     required this.id,
@@ -70,15 +72,15 @@ class ListarMenuController extends GetxController {
   var isLoading = false.obs;
   var isDeleting = false.obs;
   var isLoadingCategorias = false.obs;
+  var isTogglingVisibility = false.obs; // ✅ NUEVO LOADING STATE
   var menus = <Menu>[].obs;
   var categorias = <Categoria>[].obs;
   var filteredMenus = <Menu>[].obs;
   var searchText = ''.obs;
-  var selectedCategoryId = 0.obs; // 0 significa "Todas"
+  var selectedCategoryId = 0.obs;
   
   String defaultApiServer = AppConstants.serverBase;
   
-  // Lista de categorías para el filtro (incluyendo "Todas")
   List<Map<String, dynamic>> get categoriasParaFiltro {
     final cats = <Map<String, dynamic>>[
       {'id': 0, 'nombre': 'Todas'}
@@ -92,12 +94,10 @@ class ListarMenuController extends GetxController {
     super.onInit();
     _initializeData();
     
-    // Escuchar cambios en búsqueda y filtro
     ever(searchText, (_) => filtrarMenus());
     ever(selectedCategoryId, (_) => filtrarMenus());
   }
 
-  /// Inicializar datos
   Future<void> _initializeData() async {
     await Future.wait([
       cargarCategorias(),
@@ -105,7 +105,6 @@ class ListarMenuController extends GetxController {
     ]);
   }
 
-  /// Método para cargar las categorías
   Future<void> cargarCategorias() async {
     try {
       isLoadingCategorias.value = true;
@@ -140,7 +139,6 @@ class ListarMenuController extends GetxController {
     }
   }
 
-  /// Método para obtener todos los menús
   Future<void> listarTodoMenu() async {
     try {
       isLoading.value = true;
@@ -162,11 +160,9 @@ class ListarMenuController extends GetxController {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         menus.value = data.map((json) => Menu.fromJson(json)).toList();
-        filtrarMenus(); // Aplicar filtros iniciales
+        filtrarMenus();
         
         print('✅ ${menus.length} menús cargados exitosamente');
-      } else {
-       
       }
 
     } catch (e) {
@@ -184,7 +180,105 @@ class ListarMenuController extends GetxController {
     }
   }
 
-  /// Método para eliminar un menú
+  // ✅ NUEVO MÉTODO PARA CAMBIAR VISIBILIDAD DEL MENÚ
+  Future<bool> cambiarVisibilidadMenu(int menuId, bool nuevoEstado) async {
+    try {
+      isTogglingVisibility.value = true;
+
+      Uri uri = Uri.parse('$defaultApiServer/ordenes/cambiarStatusDetallePedido/');
+      print('👁️ Cambiando visibilidad del menú $menuId a $nuevoEstado desde: $uri');
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'status': nuevoEstado,
+          'detalleId': menuId,
+        }),
+      );
+
+      print('📡 Código de respuesta: ${response.statusCode}');
+      print('📄 Respuesta del servidor: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Actualizar el menú localmente
+        final menuIndex = menus.indexWhere((m) => m.id == menuId);
+        if (menuIndex != -1) {
+          final menuActualizado = Menu(
+            id: menus[menuIndex].id,
+            nombre: menus[menuIndex].nombre,
+            descripcion: menus[menuIndex].descripcion,
+            precio: menus[menuIndex].precio,
+            tiempoPreparacion: menus[menuIndex].tiempoPreparacion,
+            imagen: menus[menuIndex].imagen,
+            categoriaId: menus[menuIndex].categoriaId,
+            categoriaNombre: menus[menuIndex].categoriaNombre,
+            mostrarEnListado: nuevoEstado,
+          );
+          
+          menus[menuIndex] = menuActualizado;
+          filtrarMenus();
+        }
+
+        // Actualizar otros controllers si existen
+        try {
+          final controller3 = Get.find<OrdersController>();
+          controller3.cargarDatos();
+        } catch (e) {
+          print('ℹ️ OrdersController no encontrado');
+        }
+
+        try {
+          final controller2 = Get.find<CreateOrderController>();
+          controller2.cargarDatosIniciales();
+        } catch (e) {
+          print('ℹ️ CreateOrderController no encontrado');
+        }
+
+      
+
+        return true;
+      } else {
+        String errorMessage = 'Error al cambiar visibilidad (${response.statusCode})';
+        
+        try {
+          final errorData = jsonDecode(response.body);
+          errorMessage = errorData['message'] ?? errorData['error'] ?? errorMessage;
+        } catch (e) {
+          // Si no es JSON válido, usar mensaje por defecto
+        }
+
+        QuickAlert.show(
+          context: Get.context!,
+          type: QuickAlertType.error,
+          title: 'Error',
+          text: errorMessage,
+          confirmBtnText: 'OK',
+          confirmBtnColor: Color(0xFFE74C3C),
+        );
+
+        return false;
+      }
+
+    } catch (e) {
+      print('🚨 Error al cambiar visibilidad: $e');
+      QuickAlert.show(
+        context: Get.context!,
+        type: QuickAlertType.error,
+        title: 'Error de Conexión',
+        text: 'No se pudo conectar para cambiar la visibilidad',
+        confirmBtnText: 'OK',
+        confirmBtnColor: Color(0xFFE74C3C),
+      );
+      return false;
+    } finally {
+      isTogglingVisibility.value = false;
+    }
+  }
+
   Future<bool> eliminarMenu(int menuId) async {
     try {
       isDeleting.value = true;
@@ -204,11 +298,10 @@ class ListarMenuController extends GetxController {
       print('📄 Respuesta del servidor: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        // Eliminar de la lista local
         menus.removeWhere((menu) => menu.id == menuId);
         filtrarMenus();
         final controller3 = Get.find<OrdersController>();
-          controller3.cargarDatos();
+        controller3.cargarDatos();
         QuickAlert.show(
           context: Get.context!,
           type: QuickAlertType.success,
@@ -258,7 +351,6 @@ class ListarMenuController extends GetxController {
     }
   }
 
-  /// Método para filtrar menús
   void filtrarMenus() {
     var filtered = menus.where((menu) {
       final matchesSearch = searchText.value.isEmpty ||
@@ -274,23 +366,19 @@ class ListarMenuController extends GetxController {
     filteredMenus.value = filtered;
   }
 
-  /// Método para cambiar texto de búsqueda
   void cambiarBusqueda(String text) {
     searchText.value = text;
   }
 
-  /// Método para cambiar categoría seleccionada
   void cambiarCategoria(int categoriaId) {
     selectedCategoryId.value = categoriaId;
   }
 
-  /// Método para obtener el nombre de una categoría por su ID
   String obtenerNombreCategoria(int categoriaId) {
     final categoria = categorias.firstWhereOrNull((cat) => cat.id == categoriaId);
-    return categoria?.nombre ?? 'Sin categoría ${categoria?.nombre}';
+    return categoria?.nombre ?? 'Sin categoría';
   }
 
-  /// Método para refrescar lista
   Future<void> refrescarLista() async {
     await _initializeData();
   }
@@ -310,7 +398,8 @@ class ListarTodoMenuPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return isEmbedded ? _buildEmbeddedVersion() : _buildFullScreenVersion();
   }
- Widget _buildLoadingWidget() {
+
+  Widget _buildLoadingWidget() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -339,15 +428,13 @@ class ListarTodoMenuPage extends StatelessWidget {
     );
   }
 
-   Widget _buildEmbeddedVersion() {
+  Widget _buildEmbeddedVersion() {
     final controller = Get.find<ListarMenuController>();
     return Column(
       children: [
-        // Header compacto con búsqueda
         _buildCompactHeader(controller),
         SizedBox(height: 12),
         
-        // ✅ AGREGADO: RefreshIndicator envolviendo la lista
         Expanded(
           child: RefreshIndicator(
             onRefresh: controller.refrescarLista,
@@ -361,7 +448,6 @@ class ListarTodoMenuPage extends StatelessWidget {
               }
               
               if (controller.filteredMenus.isEmpty) {
-                // ✅ IMPORTANTE: SingleChildScrollView para que funcione el pull-to-refresh
                 return SingleChildScrollView(
                   physics: AlwaysScrollableScrollPhysics(),
                   child: Container(
@@ -407,7 +493,7 @@ class ListarTodoMenuPage extends StatelessWidget {
               }
               
               return ListView.builder(
-                physics: AlwaysScrollableScrollPhysics(), // ✅ IMPORTANTE
+                physics: AlwaysScrollableScrollPhysics(),
                 itemCount: controller.filteredMenus.length,
                 itemBuilder: (context, index) {
                   final menu = controller.filteredMenus[index];
@@ -420,8 +506,8 @@ class ListarTodoMenuPage extends StatelessWidget {
       ],
     );
   }
+
   Widget _buildFullScreenVersion() {
-    
     final controller = Get.find<ListarMenuController>();
     return Scaffold(
       backgroundColor: Color(0xFFF5F2F0),
@@ -488,15 +574,11 @@ class ListarTodoMenuPage extends StatelessWidget {
         padding: EdgeInsets.all(20),
         child: Column(
           children: [
-            // Estadísticas y búsqueda completas
             _buildFullHeader(controller),
             SizedBox(height: 20),
-            
-            // Filtros por categoría
             _buildCategoryFilters(controller),
             SizedBox(height: 20),
             
-            // Lista de menús más detallada
             Expanded(
               child: Obx(() {
                 if (controller.isLoading.value) {
@@ -593,7 +675,6 @@ class ListarTodoMenuPage extends StatelessWidget {
           ],
         ),
       ),
-      // Botón flotante para crear menú
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateMenuModal(),
         backgroundColor: Color(0xFF8B4513),
@@ -633,7 +714,6 @@ class ListarTodoMenuPage extends StatelessWidget {
           ),
         ),
         SizedBox(width: 8),
-        // Botón crear compacto
         GestureDetector(
           onTap: () => _showCreateMenuModal(),
           child: Container(
@@ -694,7 +774,6 @@ class ListarTodoMenuPage extends StatelessWidget {
   Widget _buildFullHeader(ListarMenuController controller) {
     return Column(
       children: [
-        // Estadísticas
         Obx(() {
           final totalMenus = controller.menus.length;
           final totalValue = controller.menus.fold(0.0, (sum, menu) => sum + menu.precioNumerico);
@@ -715,7 +794,6 @@ class ListarTodoMenuPage extends StatelessWidget {
         
         SizedBox(height: 16),
         
-        // Barra de búsqueda
         TextField(
           onChanged: controller.cambiarBusqueda,
           decoration: InputDecoration(
@@ -832,12 +910,9 @@ class ListarTodoMenuPage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Imagen del menú
           _buildMenuImage(menu, 50),
-          
           SizedBox(width: 12),
           
-          // Información del menú
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -854,7 +929,7 @@ class ListarTodoMenuPage extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                   '${menu.categoriaNombre}',
+                  '${menu.categoriaNombre}',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 12,
@@ -873,10 +948,29 @@ class ListarTodoMenuPage extends StatelessWidget {
             ),
           ),
           
-          // Botones de acción
+          // ✅ BOTONES DE ACCIÓN ACTUALIZADOS
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ✅ BOTÓN DE VISIBILIDAD (OJO)
+              GestureDetector(
+                onTap: () => _showToggleVisibilityConfirmation(menu, controller),
+                child: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: menu.mostrarEnListado 
+                        ? Color(0xFF4CAF50).withOpacity(0.1)
+                        : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    menu.mostrarEnListado ? Icons.visibility : Icons.visibility_off,
+                    color: menu.mostrarEnListado ? Color(0xFF4CAF50) : Colors.grey,
+                    size: 16,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
               // Botón editar
               GestureDetector(
                 onTap: () => _showEditMenuModal(menu),
@@ -933,17 +1027,53 @@ class ListarTodoMenuPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Imagen del menú
-          Container(
-            height: 120,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: _buildMenuImage(menu, double.infinity, height: 120),
+          // ✅ BADGE DE ESTADO EN LA IMAGEN
+          Stack(
+            children: [
+              Container(
+                height: 120,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: _buildMenuImage(menu, double.infinity, height: 120),
+              ),
+              // ✅ BADGE DE VISIBILIDAD
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: menu.mostrarEnListado 
+                        ? Color(0xFF4CAF50)
+                        : Colors.grey[700],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        menu.mostrarEnListado ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.white,
+                        size: 12,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        menu.mostrarEnListado ? 'Visible' : 'Oculto',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           
-          // Información del menú
           Expanded(
             child: Padding(
               padding: EdgeInsets.all(12),
@@ -993,7 +1123,6 @@ class ListarTodoMenuPage extends StatelessWidget {
                   
                   Spacer(),
                   
-                  // Precio y botones de acción
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1008,6 +1137,25 @@ class ListarTodoMenuPage extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // ✅ BOTÓN DE VISIBILIDAD
+                          GestureDetector(
+                            onTap: () => _showToggleVisibilityConfirmation(menu, controller),
+                            child: Container(
+                              padding: EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: menu.mostrarEnListado 
+                                    ? Color(0xFF4CAF50).withOpacity(0.1)
+                                    : Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Icon(
+                                menu.mostrarEnListado ? Icons.visibility : Icons.visibility_off,
+                                color: menu.mostrarEnListado ? Color(0xFF4CAF50) : Colors.grey,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 8),
                           // Botón editar
                           GestureDetector(
                             onTap: () => _showEditMenuModal(menu),
@@ -1097,9 +1245,14 @@ class ListarTodoMenuPage extends StatelessWidget {
     );
   }
 
-  // Modal para crear menú
+  // ✅ NUEVO MÉTODO PARA CONFIRMAR CAMBIO DE VISIBILIDAD
+  void _showToggleVisibilityConfirmation(Menu menu, ListarMenuController controller) async {
+    final nuevoEstado = !menu.mostrarEnListado;
+    await controller.cambiarVisibilidadMenu(menu.id, nuevoEstado);
+  }
+
   void _showCreateMenuModal() {
-   final controller2 = Get.find<CreateOrderController>();
+    final controller2 = Get.find<CreateOrderController>();
     showDialog(
       context: Get.context!,
       barrierDismissible: false,
@@ -1111,7 +1264,6 @@ class ListarTodoMenuPage extends StatelessWidget {
             height: MediaQuery.of(context).size.height * 0.9,
             child: Column(
               children: [
-                // Header del modal
                 Container(
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -1139,7 +1291,6 @@ class ListarTodoMenuPage extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Contenido del modal
                 Expanded(
                   child: CreateEditMenuScreen(isModal: true),
                 ),
@@ -1149,13 +1300,12 @@ class ListarTodoMenuPage extends StatelessWidget {
         );
       },
     ).then((result) {
-      // Si se creó exitosamente, refrescar la lista
       if (result == true) {
         final controller = Get.find<ListarMenuController>();
         controller2.cargarDatosIniciales();
         controller.refrescarLista();
-final controller3 = Get.find<OrdersController>();
-          controller3.cargarDatos();
+        final controller3 = Get.find<OrdersController>();
+        controller3.cargarDatos();
         if (onMenuUpdated != null) {
           onMenuUpdated!();
         }
@@ -1163,16 +1313,14 @@ final controller3 = Get.find<OrdersController>();
     });
   }
 
-  // Modal para editar menú
   void _showEditMenuModal(Menu menu) {
-    // Convertir Menu a Map para pasarlo al modal
     Map<String, dynamic> menuData = {
       'id': menu.id,
       'nombre': menu.nombre,
       'descripcion': menu.descripcion,
       'precio': menu.precioNumerico,
       'tiempoPreparacion': menu.tiempoPreparacion,
-      'categoriaId': menu.categoriaId, // Ahora es int
+      'categoriaId': menu.categoriaId,
       'imagen': menu.imagen,
     };
 
@@ -1187,7 +1335,6 @@ final controller3 = Get.find<OrdersController>();
             height: MediaQuery.of(context).size.height * 0.9,
             child: Column(
               children: [
-                // Header del modal
                 Container(
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -1227,7 +1374,6 @@ final controller3 = Get.find<OrdersController>();
                     ],
                   ),
                 ),
-                // Contenido del modal
                 Expanded(
                   child: CreateEditMenuScreen(
                     menuData: menuData,
@@ -1240,13 +1386,12 @@ final controller3 = Get.find<OrdersController>();
         );
       },
     ).then((result) {
-      // Si se editó exitosamente, refrescar la lista
       if (result == true) {
         final controller = Get.find<ListarMenuController>();
         controller.refrescarLista();
 
-          final controller3 = Get.find<OrdersController>();
-          controller3.cargarDatos();
+        final controller3 = Get.find<OrdersController>();
+        controller3.cargarDatos();
         if (onMenuUpdated != null) {
           onMenuUpdated!();
         }
@@ -1264,7 +1409,7 @@ final controller3 = Get.find<OrdersController>();
       cancelBtnText: 'Cancelar',
       confirmBtnColor: Colors.red,
       onConfirmBtnTap: () async {
-        Get.back(); // Cerrar el diálogo
+        Get.back();
         
         final success = await controller.eliminarMenu(menu.id);
         if (success && onMenuUpdated != null) {
