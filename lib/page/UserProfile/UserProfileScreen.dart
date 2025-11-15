@@ -1267,81 +1267,84 @@ Color _obtenerColorCategoria(String clave) {
 
   // Métodos para mostrar otros modales existentes
   void _showMenusModal() {
-    Get.dialog(
-      Dialog(
-        insetPadding: EdgeInsets.all(16),
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: Get.width,
-          height: Get.height * 0.85,
-          decoration: BoxDecoration(
-            color: Color(0xFFF5F2F0),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Color(0xFF2196F3),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.restaurant_menu, color: Colors.white, size: 24),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Menús Disponibles',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'Explora todos los menús del restaurante',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Get.back(),
-                      icon: Icon(Icons.close, color: Colors.white),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.2),
-                      ),
-                    ),
-                  ],
-                ),
+  Get.dialog(
+    Dialog(
+      // ✅ CAMBIO 1: Eliminar insetPadding para cubrir toda la pantalla
+      insetPadding: EdgeInsets.zero,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        // ✅ CAMBIO 2: Usar dimensiones completas
+        width: Get.width,
+        height: Get.height,
+        decoration: BoxDecoration(
+          color: Color(0xFFF5F2F0),
+          // ✅ CAMBIO 3: Eliminar borderRadius para pantalla completa
+          // O usar borderRadius solo si quieres esquinas redondeadas
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Color(0xFF2196F3),
+                // ✅ CAMBIO 4: Sin borderRadius en el header (opcional)
               ),
-              Expanded(
-                child: Container(
-                  padding: EdgeInsets.all(16),
-                  child: ListarTodoMenuPage(isEmbedded: true),
-                ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.restaurant_menu, color: Colors.white, size: 24),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Menús Disponibles',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Explora todos los menús del restaurante',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Get.back(),
+                    icon: Icon(Icons.close, color: Colors.white),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            Expanded(
+              child: Container(
+                padding: EdgeInsets.all(16),
+                child: ListarTodoMenuPage(isEmbedded: true),
+              ),
+            ),
+          ],
         ),
       ),
-      barrierDismissible: true,
-    );
-  }
+    ),
+    barrierDismissible: true,
+  );
+}
 
   void _showTablesModal() {
     Get.dialog(

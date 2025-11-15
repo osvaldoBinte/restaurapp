@@ -78,7 +78,7 @@ class ListarMenuController extends GetxController {
   var filteredMenus = <Menu>[].obs;
   var searchText = ''.obs;
   var selectedCategoryId = 0.obs;
-  
+    var showOnlyHidden = false.obs;
   String defaultApiServer = AppConstants.serverBase;
   
   List<Map<String, dynamic>> get categoriasParaFiltro {
@@ -96,6 +96,7 @@ class ListarMenuController extends GetxController {
     
     ever(searchText, (_) => filtrarMenus());
     ever(selectedCategoryId, (_) => filtrarMenus());
+     ever(showOnlyHidden, (_) => filtrarMenus());
   }
 
   Future<void> _initializeData() async {
@@ -351,7 +352,7 @@ class ListarMenuController extends GetxController {
     }
   }
 
-  void filtrarMenus() {
+void filtrarMenus() {
     var filtered = menus.where((menu) {
       final matchesSearch = searchText.value.isEmpty ||
           menu.nombre.toLowerCase().contains(searchText.value.toLowerCase()) ||
@@ -360,12 +361,22 @@ class ListarMenuController extends GetxController {
       final matchesCategory = selectedCategoryId.value == 0 ||
           menu.categoriaId == selectedCategoryId.value;
       
-      return matchesSearch && matchesCategory;
+      // ✅ NUEVO: Filtro de visibilidad
+      final matchesVisibility = !showOnlyHidden.value || !menu.mostrarEnListado;
+      
+      return matchesSearch && matchesCategory && matchesVisibility;
     }).toList();
     
     filteredMenus.value = filtered;
   }
+ void toggleHiddenFilter() {
+    showOnlyHidden.value = !showOnlyHidden.value;
+  }
 
+  // ✅ NUEVO MÉTODO: Obtener conteo de menús ocultos
+  int get menuOcultosCount {
+    return menus.where((menu) => !menu.mostrarEnListado).length;
+  }
   void cambiarBusqueda(String text) {
     searchText.value = text;
   }
@@ -429,83 +440,83 @@ class ListarTodoMenuPage extends StatelessWidget {
   }
 
   Widget _buildEmbeddedVersion() {
-    final controller = Get.find<ListarMenuController>();
-    return Column(
-      children: [
-        _buildCompactHeader(controller),
-        SizedBox(height: 12),
-        
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: controller.refrescarLista,
-            color: Color(0xFF8B4513),
-            backgroundColor: Colors.white,
-            displacement: 40.0,
-            strokeWidth: 2.5,
-            child: Obx(() {
-              if (controller.isLoading.value) {
-                return _buildLoadingWidget();
-              }
-              
-              if (controller.filteredMenus.isEmpty) {
-                return SingleChildScrollView(
-                  physics: AlwaysScrollableScrollPhysics(),
-                  child: Container(
-                    height: MediaQuery.of(Get.context!).size.height * 0.5,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.restaurant_menu, size: 48, color: Colors.grey[400]),
+  final controller = Get.find<ListarMenuController>();
+  return Column(
+    children: [
+      _buildCompactHeader(controller),
+      SizedBox(height: 12),
+      
+      Expanded(
+        child: RefreshIndicator(
+          onRefresh: controller.refrescarLista,
+          color: Color(0xFF8B4513),
+          backgroundColor: Colors.white,
+          displacement: 40.0,
+          strokeWidth: 2.5,
+          child: Obx(() {
+            if (controller.isLoading.value) {
+              return _buildLoadingWidget();
+            }
+            
+            if (controller.filteredMenus.isEmpty) {
+              return SingleChildScrollView(
+                physics: AlwaysScrollableScrollPhysics(),
+                child: Container(
+                  height: MediaQuery.of(Get.context!).size.height * 0.5,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          controller.showOnlyHidden.value 
+                              ? Icons.visibility_off 
+                              : Icons.restaurant_menu,
+                          size: 48,
+                          color: Colors.grey[400],
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          controller.showOnlyHidden.value
+                              ? 'No hay menús ocultos'
+                              : (controller.menus.isEmpty
+                                  ? 'No hay menús registrados'
+                                  : 'No se encontraron menús'),
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                        // ✅ Botón para desactivar filtro si está activo
+                        if (controller.showOnlyHidden.value) ...[
                           SizedBox(height: 16),
-                          Text(
-                            controller.menus.isEmpty
-                                ? 'No hay menús registrados'
-                                : 'No se encontraron menús',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Desliza hacia abajo para actualizar',
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
+                          ElevatedButton.icon(
+                            onPressed: () => controller.toggleHiddenFilter(),
+                            icon: Icon(Icons.visibility),
+                            label: Text('Ver todos los menús'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF8B4513),
+                              foregroundColor: Colors.white,
                             ),
                           ),
-                          if (controller.menus.isEmpty) ...[
-                            SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: () => _showCreateMenuModal(),
-                              icon: Icon(Icons.add),
-                              label: Text('Crear Primer Menú'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF8B4513),
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ],
                         ],
-                      ),
+                      ],
                     ),
                   ),
-                );
-              }
-              
-              return ListView.builder(
-                physics: AlwaysScrollableScrollPhysics(),
-                itemCount: controller.filteredMenus.length,
-                itemBuilder: (context, index) {
-                  final menu = controller.filteredMenus[index];
-                  return _buildCompactMenuCard(menu, controller);
-                },
+                ),
               );
-            }),
-          ),
+            }
+            
+            return ListView.builder(
+              physics: AlwaysScrollableScrollPhysics(),
+              itemCount: controller.filteredMenus.length,
+              itemBuilder: (context, index) {
+                final menu = controller.filteredMenus[index];
+                return _buildCompactMenuCard(menu, controller);
+              },
+            );
+          }),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   Widget _buildFullScreenVersion() {
     final controller = Get.find<ListarMenuController>();
@@ -686,134 +697,272 @@ class ListarTodoMenuPage extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildCompactHeader(ListarMenuController controller) {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 40,
-            child: TextField(
-              onChanged: controller.cambiarBusqueda,
-              decoration: InputDecoration(
-                hintText: 'Buscar menús...',
-                prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF8B4513)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+Widget _buildCompactHeader(ListarMenuController controller) {
+  return Column(
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 40,
+              child: TextField(
+                onChanged: controller.cambiarBusqueda,
+                decoration: InputDecoration(
+                  hintText: 'Buscar menús...',
+                  prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF8B4513)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Color(0xFF8B4513)),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  fillColor: Color(0xFFF5F2F0),
+                  filled: true,
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Color(0xFF8B4513)),
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                fillColor: Color(0xFFF5F2F0),
-                filled: true,
+                style: TextStyle(fontSize: 14),
               ),
-              style: TextStyle(fontSize: 14),
             ),
           ),
-        ),
-        SizedBox(width: 8),
-        GestureDetector(
-          onTap: () => _showCreateMenuModal(),
-          child: Container(
-            height: 40,
-            width: 40,
-            decoration: BoxDecoration(
-              color: Color(0xFF8B4513),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.add, color: Colors.white),
-          ),
-        ),
-        SizedBox(width: 8),
-        Obx(() => GestureDetector(
-            onTap: controller.isLoading.value ? null : () => controller.refrescarLista(),
+          SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _showCreateMenuModal(),
             child: Container(
               height: 40,
               width: 40,
               decoration: BoxDecoration(
-                color: controller.isLoading.value ? Colors.grey[400] : Color(0xFF2196F3),
+                color: Color(0xFF8B4513),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: controller.isLoading.value
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Icon(Icons.refresh, color: Colors.white, size: 20),
+              child: Icon(Icons.add, color: Colors.white),
+            ),
+          ),
+          SizedBox(width: 8),
+          Obx(() => GestureDetector(
+              onTap: controller.isLoading.value ? null : () => controller.refrescarLista(),
+              child: Container(
+                height: 40,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: controller.isLoading.value ? Colors.grey[400] : Color(0xFF2196F3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: controller.isLoading.value
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(Icons.refresh, color: Colors.white, size: 20),
+              ),
+            )),
+          SizedBox(width: 8),
+          Obx(() => Container(
+            height: 40,
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Color(0xFF3498DB),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                '${controller.filteredMenus.length}',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
             ),
           )),
-        SizedBox(width: 8),
-        Obx(() => Container(
-          height: 40,
-          padding: EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Color(0xFF3498DB),
+        ],
+      ),
+      
+      // ✅ NUEVO: Botón para filtrar ocultos (solo si hay menús ocultos)
+      Obx(() {
+        final ocultosCount = controller.menuOcultosCount;
+        
+        if (ocultosCount == 0) return SizedBox.shrink();
+        
+        return Container(
+          margin: EdgeInsets.only(top: 8),
+          child: InkWell(
+            onTap: () => controller.toggleHiddenFilter(),
             borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Text(
-              '${controller.filteredMenus.length}',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: controller.showOnlyHidden.value 
+                    ? Color(0xFFFF9800) 
+                    : Color(0xFFFF9800).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Color(0xFFFF9800),
+                  width: controller.showOnlyHidden.value ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    controller.showOnlyHidden.value 
+                        ? Icons.visibility_off 
+                        : Icons.visibility_off_outlined,
+                    color: controller.showOnlyHidden.value 
+                        ? Colors.white 
+                        : Color(0xFFFF9800),
+                    size: 18,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    controller.showOnlyHidden.value 
+                        ? 'Mostrando ocultos ($ocultosCount)'
+                        : 'Ver menús ocultos ($ocultosCount)',
+                    style: TextStyle(
+                      color: controller.showOnlyHidden.value 
+                          ? Colors.white 
+                          : Color(0xFFFF9800),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (controller.showOnlyHidden.value) ...[
+                    SizedBox(width: 8),
+                    Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
-        )),
-      ],
-    );
-  }
-
-  Widget _buildFullHeader(ListarMenuController controller) {
-    return Column(
-      children: [
-        Obx(() {
-          final totalMenus = controller.menus.length;
-          final totalValue = controller.menus.fold(0.0, (sum, menu) => sum + menu.precioNumerico);
-          final avgPrice = totalMenus > 0 ? totalValue / totalMenus : 0.0;
-          
-          return Row(
-            children: [
-              Expanded(child: _buildStatCard('Total Menús', totalMenus.toString(), Icons.restaurant_menu, Color(0xFF8B4513))),
-              SizedBox(width: 12),
-              Expanded(child: _buildStatCard('Categorías', controller.categorias.length.toString(), Icons.category, Color(0xFF2196F3))),
-              SizedBox(width: 12),
-              Expanded(child: _buildStatCard('Precio Promedio', '\$${avgPrice.toStringAsFixed(2)}', Icons.monetization_on, Color(0xFF4CAF50))),
-              SizedBox(width: 12),
-              Expanded(child: _buildStatCard('Filtrados', controller.filteredMenus.length.toString(), Icons.filter_list, Color(0xFFFF9800))),
-            ],
-          );
-        }),
+        );
+      }),
+    ],
+  );
+}
+ Widget _buildFullHeader(ListarMenuController controller) {
+  return Column(
+    children: [
+      Obx(() {
+        final totalMenus = controller.menus.length;
+        final totalValue = controller.menus.fold(0.0, (sum, menu) => sum + menu.precioNumerico);
+        final avgPrice = totalMenus > 0 ? totalValue / totalMenus : 0.0;
+        final ocultosCount = controller.menuOcultosCount;
         
-        SizedBox(height: 16),
-        
-        TextField(
-          onChanged: controller.cambiarBusqueda,
-          decoration: InputDecoration(
-            hintText: 'Buscar por nombre o descripción...',
-            prefixIcon: Icon(Icons.search, color: Color(0xFF8B4513)),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Color(0xFF8B4513), width: 2),
-            ),
-            fillColor: Colors.white,
-            filled: true,
+        return Row(
+          children: [
+            Expanded(child: _buildStatCard('Total Menús', totalMenus.toString(), Icons.restaurant_menu, Color(0xFF8B4513))),
+            SizedBox(width: 12),
+            Expanded(child: _buildStatCard('Categorías', controller.categorias.length.toString(), Icons.category, Color(0xFF2196F3))),
+            SizedBox(width: 12),
+            Expanded(child: _buildStatCard('Precio Promedio', '\$${avgPrice.toStringAsFixed(2)}', Icons.monetization_on, Color(0xFF4CAF50))),
+            SizedBox(width: 12),
+            // ✅ MODIFICADO: Mostrar ocultos en vez de filtrados
+            Expanded(child: _buildStatCard('Ocultos', ocultosCount.toString(), Icons.visibility_off, Color(0xFFFF9800))),
+          ],
+        );
+      }),
+      
+      SizedBox(height: 16),
+      
+      // Barra de búsqueda
+      TextField(
+        onChanged: controller.cambiarBusqueda,
+        decoration: InputDecoration(
+          hintText: 'Buscar por nombre o descripción...',
+          prefixIcon: Icon(Icons.search, color: Color(0xFF8B4513)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Color(0xFF8B4513), width: 2),
+          ),
+          fillColor: Colors.white,
+          filled: true,
         ),
-      ],
-    );
-  }
-
+      ),
+      
+      // ✅ NUEVO: Botón para filtrar ocultos (versión full screen)
+      Obx(() {
+        final ocultosCount = controller.menuOcultosCount;
+        
+        if (ocultosCount == 0) return SizedBox.shrink();
+        
+        return Container(
+          margin: EdgeInsets.only(top: 16),
+          child: InkWell(
+            onTap: () => controller.toggleHiddenFilter(),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: controller.showOnlyHidden.value 
+                    ? Color(0xFFFF9800) 
+                    : Color(0xFFFF9800).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Color(0xFFFF9800),
+                  width: controller.showOnlyHidden.value ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    controller.showOnlyHidden.value 
+                        ? Icons.visibility_off 
+                        : Icons.visibility_off_outlined,
+                    color: controller.showOnlyHidden.value 
+                        ? Colors.white 
+                        : Color(0xFFFF9800),
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    controller.showOnlyHidden.value 
+                        ? 'Mostrando solo menús ocultos ($ocultosCount)'
+                        : 'Ver menús ocultos ($ocultosCount)',
+                    style: TextStyle(
+                      color: controller.showOnlyHidden.value 
+                          ? Colors.white 
+                          : Color(0xFFFF9800),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (controller.showOnlyHidden.value) ...[
+                    SizedBox(width: 8),
+                    Container(
+                      padding: EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    ],
+  );
+}
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
       padding: EdgeInsets.all(12),
