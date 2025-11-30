@@ -585,13 +585,13 @@ Future<void> buscarProductos(String query) async {
           print('⚠️ No se pudo refrescar OrdersController: $e');
         }
         
-        await _mostrarAlertaAsync(
+      /*  await _mostrarAlertaAsync(
           QuickAlertType.success,
           '¡Productos Agregados!',
           'Los productos han sido agregados exitosamente al pedido #${pedidoId.value}',
           'Perfecto',
           Color(0xFF4CAF50),
-        );
+        );*/
 
         return true;
 

@@ -9,6 +9,7 @@ import 'package:restaurapp/common/constants/constants.dart';
 import 'package:restaurapp/page/orders/OrderStatusModal.dart';
 import 'package:restaurapp/page/orders/modaltable/TableDetailsModal.dart';
 import 'package:restaurapp/page/orders/orders_page.dart';
+import 'package:restaurapp/page/orders/serivios/orden_service.dart';
 
 // Controller GetX para órdenes - ACTUALIZADO CON AUTO-REFRESH
 class OrdersController extends GetxController {
@@ -19,6 +20,7 @@ class OrdersController extends GetxController {
   var mesasConPedidos = <Map<String, dynamic>>[].obs;
   var selectedTableData = <Map<String, dynamic>>[].obs;
   var isLiberandoTodasLasMesas = false.obs;
+  final OrdenService ordenService = OrdenService();
 
   String defaultApiServer = AppConstants.serverBase;
 
@@ -304,15 +306,15 @@ void _extraerPedidosIndividuales() {
   }
   
   // Ordenar por fecha (más reciente primero)
-  detallesFlat.sort((a, b) {
-    try {
-      final fechaA = DateTime.parse(a['fecha']);
-      final fechaB = DateTime.parse(b['fecha']);
-      return fechaB.compareTo(fechaA);
-    } catch (e) {
-      return 0;
-    }
-  });
+detallesFlat.sort((a, b) {
+  try {
+    final fechaA = DateTime.parse(a['fecha']);
+    final fechaB = DateTime.parse(b['fecha']);
+    return fechaA.compareTo(fechaB); // ✅ CAMBIADO: fechaA con fechaB (era fechaB con fechaA)
+  } catch (e) {
+    return 0;
+  }
+});
   
   pedidosIndividuales.assignAll(detallesFlat);
   
@@ -1618,4 +1620,5 @@ Future<void> _ejecutarLiberacionMesasCompletadas(List<Map<String, dynamic>> mesa
     isLiberandoTodasLasMesas.value = false;
   }
 }
+
 }
