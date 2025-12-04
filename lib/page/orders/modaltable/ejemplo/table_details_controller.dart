@@ -8,6 +8,7 @@ import 'package:restaurapp/common/services/BluetoothPrinterService.dart';
 import 'package:restaurapp/page/orders/AddProductsToOrder/AddProductsToOrderController.dart';
 import 'package:restaurapp/page/orders/AddProductsToOrder/AddProductsToOrderScreen.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
+import 'package:restaurapp/page/orders/serivios/orden_service.dart';
 
 class TableDetailsController extends GetxController {
   // Observables
@@ -16,6 +17,7 @@ class TableDetailsController extends GetxController {
   final isUpdating = false.obs;
   final isBluetoothConnected = false.obs;
   final isLiberandoTodasLasMesas = false.obs;
+  final OrdenService _ordenService = OrdenService();
 
   // Services
   final UniversalPrinterService printerService = UniversalPrinterService();
@@ -448,26 +450,24 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
       isUpdating.value = false;
     }
   }
+
 void cambiarEstadoProducto(Map<String, dynamic> producto, String nuevoEstado) async {
   final detalleId = producto['detalleId'] as int;
   final nombreProducto = producto['nombreProducto'] ?? 'Producto';
-  final pedidoId = producto['pedidoId'];
+  final numeroMesaProducto = producto['numeroMesa'] ?? numeroMesa;
   
-  String titulo = nuevoEstado == 'completado' ? 'Completar Producto' : 'Cancelar Producto';
-  String mensaje = nuevoEstado == 'completado' 
-      ? '¿Marcar "$nombreProducto" como completado?'
-      : '¿Está seguro de que quiere cancelar "$nombreProducto"?\n\nEsta acción no se puede deshacer.';
+  // ✅ SI ES CANCELAR → ELIMINAR en lugar de cambiar estado
+  if (nuevoEstado == 'cancelado') {
+    _confirmarEliminarProducto(producto);
+    return;
+  }
   
-  String textoBoton = nuevoEstado == 'completado' ? 'Completar' : 'Cancelar';
-  Color colorBoton = nuevoEstado == 'completado' ? Colors.green : Colors.red;
-  
-  final controller = Get.find<OrdersController>();
-  await controller.actualizarEstadoOrden(detalleId, nuevoEstado);
-  
-  // ✅ NUEVO: Verificar si todos los productos están cancelados/pagados
-  await _verificarYCerrarModalSiNoHayProductosActivos();
+  // ✅ SI ES COMPLETAR → Actualizar estado directamente SIN confirmación
+  if (nuevoEstado == 'completado') {
+    final controller = Get.find<OrdersController>();
+    await controller.actualizarEstadoOrden(detalleId, nuevoEstado);
+  }
 }
-
   // Métodos de cantidad
   void aumentarCantidad(Map<String, dynamic> producto) async {
     final detalleId = producto['detalleId'];
@@ -535,88 +535,115 @@ void cambiarEstadoProducto(Map<String, dynamic> producto, String nuevoEstado) as
       
     }
   }
-
 void _confirmarEliminarProducto(Map<String, dynamic> producto) {
+  final detalleId = producto['detalleId'] as int;
   final nombreProducto = producto['nombreProducto'] ?? 'Producto';
+  final numeroMesaProducto = numeroMesa;
   
   QuickAlert.show(
     context: Get.context!,
     type: QuickAlertType.confirm,
     title: 'Eliminar Producto',
-    text: '¿Está seguro de que quiere eliminar "$nombreProducto" del pedido?\n\n'
-          'Esta acción no se puede deshacer.',
+    text: '¿Está seguro de eliminar este producto?\n\n'
+          'Mesa: $numeroMesaProducto\n'
+          'Producto: $nombreProducto\n\n'
+          '⚠️ Esta acción no se puede deshacer',
     confirmBtnText: 'Eliminar',
     cancelBtnText: 'Cancelar',
-    confirmBtnColor: Colors.red,
+    confirmBtnColor: Color(0xFFE74C3C),
     onConfirmBtnTap: () async {
-      Get.back();
-      cambiarEstadoProducto(producto, 'cancelado');
-      
-      // ✅ NUEVO: Verificar después de cancelar
-      await Future.delayed(Duration(milliseconds: 500)); // Esperar a que se actualice
-      await _verificarYCerrarModalSiNoHayProductosActivos();
+      Get.back(); // Cerrar diálogo de confirmación
+      await _ejecutarEliminacionProducto(detalleId, nombreProducto);
     },
   );
 }
-/// Verifica si todos los productos están cancelados o pagados y cierra el modal si es necesario
-Future<void> _verificarYCerrarModalSiNoHayProductosActivos() async {
+
+/// ✅ NUEVO MÉTODO: Ejecutar eliminación usando el servicio
+Future<void> _ejecutarEliminacionProducto(int detalleId, String nombreProducto) async {
   try {
-    // Refrescar datos primero
-    final controller = Get.find<OrdersController>();
-    await controller.refrescarDatos();
+    // Activar loading
+    isUpdating.value = true;
     
-    // Esperar un momento para que se actualice la UI
-    await Future.delayed(Duration(milliseconds: 300));
+    // Llamar al servicio de eliminación
+    final resultado = await _ordenService.eliminarDetallePedido(detalleId);
     
-    // Obtener la mesa actualizada
-    final mesaActual = mesaActualizada;
-    final pedidos = mesaActual['pedidos'] as List? ?? [];
-    
-    bool hayProductosActivos = false;
-    
-    // Verificar si hay algún producto activo (no cancelado ni pagado)
-    for (var pedido in pedidos) {
-      try {
-        final pedidoMap = Map<String, dynamic>.from(pedido);
-        final detalles = pedidoMap['detalles'] as List? ?? [];
-        
-        for (var detalle in detalles) {
-          final detalleMap = Map<String, dynamic>.from(detalle);
-          final status = detalleMap['statusDetalle'] as String? ?? 'proceso';
-          
-          // Si encuentra algún producto activo
-          if (status != 'cancelado' && status != 'pagado') {
-            hayProductosActivos = true;
-            break;
-          }
-        }
-        
-        if (hayProductosActivos) break;
-      } catch (e) {
-        print('❌ Error verificando pedido: $e');
-        continue;
-      }
-    }
-    
-    // ✅ Si no hay productos activos, cerrar el modal
-    if (!hayProductosActivos) {
-      print('🚪 No hay productos activos, cerrando modal...');
-      
-      Get.back(); // Cerrar el modal de detalles de mesa
-      
+    if (resultado['success'] == true) {
+      // Mostrar éxito
       Get.snackbar(
-        'Mesa Actualizada',
-        'Todos los productos han sido procesados',
+        'Producto Eliminado',
+        'El producto "$nombreProducto" ha sido eliminado correctamente',
         backgroundColor: Colors.green.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 2),
       );
+      
+      // Recargar datos
+      final controller = Get.find<OrdersController>();
+      await controller.refrescarDatos();
+      
+    } else {
+      // Mostrar error
+      final mensajeError = resultado['error'] ?? 'No se pudo eliminar el producto';
+      _mostrarErrorCantidad(mensajeError);
     }
     
   } catch (e) {
-    print('❌ Error verificando productos activos: $e');
+    print('❌ Error al eliminar producto: $e');
+    _mostrarErrorCantidad('Error de conexión: $e');
+  } finally {
+    isUpdating.value = false;
   }
 }
+  Future<void> _eliminarProducto(int detalleId) async {
+    final controller = Get.find<OrdersController>();
+    
+    try {
+       isUpdating.value = true; // Activar loading
+
+
+      Uri uri = Uri.parse('${controller.defaultApiServer}/pedidos/eliminar-detalle/$detalleId/');
+      
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
+
+      Get.back();
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['success'] == true) {
+          Get.snackbar(
+            'Producto Eliminado',
+            'El producto se eliminó correctamente del pedido',
+            backgroundColor: Colors.green.withOpacity(0.8),
+            colorText: Colors.white,
+            duration: Duration(seconds: 2),
+          );
+          
+          await controller.refrescarDatos();
+        } else {
+          _mostrarErrorCantidad('Error al eliminar: ${data['message'] ?? 'Error desconocido'}');
+        }
+      } else {
+        _mostrarErrorCantidad('Error del servidor (${response.statusCode})');
+      }
+
+    } catch (e) {
+      if (Get.isDialogOpen ?? false) Get.back();
+      
+      print('❌ Error al eliminar producto: $e');
+      _mostrarErrorCantidad('Error de conexión: $e');
+    } finally{
+          isUpdating.value = false; // Desactivar loading
+
+    }
+  }
+
   void _mostrarErrorCantidad(String mensaje) {
     Get.snackbar(
       'Error',
