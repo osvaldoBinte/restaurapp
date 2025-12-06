@@ -16,7 +16,9 @@ class TableDetailsController extends GetxController {
   final isUpdating = false.obs;
   final isBluetoothConnected = false.obs;
   final isLiberandoTodasLasMesas = false.obs;
-
+  final productoEnEdicion = Rxn<int>(); // ID del producto siendo editado (null = ninguno)
+  final modoEdicion = 'aumentar'.obs; // 'aumentar' o 'disminuir'
+  final cantidadEdicion = ''.obs; // Texto del input
   // Services
   final UniversalPrinterService printerService = UniversalPrinterService();
   
@@ -467,27 +469,82 @@ void cambiarEstadoProducto(Map<String, dynamic> producto, String nuevoEstado) as
   // ✅ NUEVO: Verificar si todos los productos están cancelados/pagados
   await _verificarYCerrarModalSiNoHayProductosActivos();
 }
-
+void activarEdicionCantidad(int detalleId) {
+    productoEnEdicion.value = detalleId;
+    cantidadEdicion.value = '';
+    modoEdicion.value = 'aumentar';
+  }
+  
+  void cancelarEdicionCantidad() {
+    productoEnEdicion.value = null;
+    cantidadEdicion.value = '';
+  }
+  
+  void toggleModoEdicion() {
+    modoEdicion.value = modoEdicion.value == 'aumentar' ? 'disminuir' : 'aumentar';
+  }
+  
+  void confirmarCambioManual(Map<String, dynamic> producto) async {
+    final inputText = cantidadEdicion.value.trim();
+    final cantidadActual = (producto['cantidad'] as num?)?.toInt() ?? 1;
+    final detalleId = producto['detalleId'];
+    
+    if (inputText.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'Ingrese una cantidad válida',
+        backgroundColor: Colors.orange.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
+      return;
+    }
+    
+    final cantidad = int.tryParse(inputText);
+    
+    if (cantidad == null || cantidad <= 0) {
+      Get.snackbar(
+        'Error',
+        'La cantidad debe ser un número mayor a 0',
+        backgroundColor: Colors.orange.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
+      return;
+    }
+    
+    // Validar si es disminuir
+    if (modoEdicion.value == 'disminuir') {
+      if (cantidad > cantidadActual) {
+        Get.snackbar(
+          'Error',
+          'No puede disminuir más de la cantidad actual ($cantidadActual)',
+          backgroundColor: Colors.red.withOpacity(0.8),
+          colorText: Colors.white,
+          duration: Duration(seconds: 2),
+        );
+        return;
+      }
+    }
+    
+    // Cancelar edición
+    cancelarEdicionCantidad();
+    
+    // Ejecutar actualización
+    final cantidadFinal = modoEdicion.value == 'aumentar' ? cantidad : -cantidad;
+    await _actualizarCantidadProducto(detalleId, cantidadFinal);
+  }
   // Métodos de cantidad
   void aumentarCantidad(Map<String, dynamic> producto) async {
     final detalleId = producto['detalleId'];
-    final cantidadActual = producto['cantidad'] ?? 1;
-    final nuevaCantidad = cantidadActual + 1;
-    
-    await _actualizarCantidadProducto(detalleId, nuevaCantidad);
+ 
+    await _actualizarCantidadProducto(detalleId, 1);
   }
 
   void disminuirCantidad(Map<String, dynamic> producto) async {
     final detalleId = producto['detalleId'];
-    final cantidadActual = producto['cantidad'] ?? 1;
     
-    if (cantidadActual <= 1) {
-      _confirmarEliminarProducto(producto);
-      return;
-    }
-    
-    final nuevaCantidad = cantidadActual - 1;
-    await _actualizarCantidadProducto(detalleId, nuevaCantidad);
+    await _actualizarCantidadProducto(detalleId, -1);
   }
 
   Future<void> _actualizarCantidadProducto(int detalleId, int nuevaCantidad) async {

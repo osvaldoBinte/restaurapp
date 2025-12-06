@@ -86,38 +86,32 @@ class OrdersController extends GetxController {
     }
   }
 
-Future<void> cargarDatos() async {
-  final esAutoRefresh = _autoRefreshTimer?.isActive == true;
-  
-  if (!esAutoRefresh) {
-    isLoading.value = true;
-  }
-
-  try {
-    await Future.wait([
-      obtenerPedidosPendientes(), // Para el carousel
-      obtenerMesasConPedidosAbiertos(), // Para la lista de mesas
-    ]);
+  /// Cargar ambos endpoints
+  Future<void> cargarDatos() async {
+    // ✅ MODIFICADO: Solo mostrar loading si no es auto-refresh
+    final esAutoRefresh = _autoRefreshTimer?.isActive == true;
     
-    if (esAutoRefresh) {
-      print('✅ Auto-refresh completado');
-    }
-  } catch (e) {
-    print('❌ Error en cargarDatos: $e');
-  } finally {
     if (!esAutoRefresh) {
-      isLoading.value = false;
+      isLoading.value = true;
+    }
+
+    try {
+      await Future.wait([
+        obtenerPedidosPendientes(),
+        obtenerMesasConPedidosAbiertos(),
+      ]);
+      
+      if (esAutoRefresh) {
+        print('✅ Auto-refresh completado');
+      }
+    } catch (e) {
+      print('❌ Error en cargarDatos: $e');
+    } finally {
+      if (!esAutoRefresh) {
+        isLoading.value = false;
+      }
     }
   }
-}
-Future<void> refrescarSoloMesas() async {
-  try {
-    await obtenerMesasConPedidosAbiertos();
-    print('✅ Mesas refrescadas');
-  } catch (e) {
-    print('❌ Error refrescando mesas: $e');
-  }
-}
 
  Future<void> obtenerPedidosPendientes() async {
   try {
@@ -576,11 +570,11 @@ void _showTableDetailsModal(Map<String, dynamic> mesa) {
 }
 
   /// ✅ MODIFICADO: Refrescar datos y reiniciar timer
-/// ✅ MODIFICADO: refrescarDatos ahora solo refresca mesas
-Future<void> refrescarDatos() async {
-  await refrescarSoloMesas();
-  _reiniciarTimer();
-}
+  Future<void> refrescarDatos() async {
+    await cargarDatos();
+    _reiniciarTimer(); // Reiniciar el timer después del refresh manual
+  }
+
   /// Calcular total de una mesa considerando solo productos no cancelados
   double calcularTotalMesa(Map<String, dynamic> mesa) {
     double total = 0.0;
