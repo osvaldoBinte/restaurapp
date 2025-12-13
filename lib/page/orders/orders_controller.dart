@@ -339,52 +339,56 @@ detallesFlat.sort((a, b) {
     );
   }
 
-  Future<void> actualizarEstadoOrden(int detalleId, String nuevoEstado) async {
-    try {
-      // Mostrar loading
-      
+  // En orders_controller.dart
 
-      Uri uri = Uri.parse('$defaultApiServer/ordenes/actualizarStatusorden/$detalleId/');
+Future<void> actualizarEstadoOrden(int detalleId, String nuevoEstado, {bool completarTodos = false}) async {
+  try {
+    Uri uri = Uri.parse('$defaultApiServer/ordenes/actualizarStatusorden/$detalleId/');
 
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({
-          'status': nuevoEstado,
-        }),
-      );
-
-      print('📡 Actualizar estado - Código: ${response.statusCode}');
-
+    // Construir el body dinámicamente
+    Map<String, dynamic> requestBody = {
+      'status': nuevoEstado,
+    };
     
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['success'] == true || response.statusCode == 200) {
-          
-          // Recargar datos y reiniciar timer
-          await refrescarDatos();
-        } else {
-          _mostrarErrorActualizacion('Error en la respuesta del servidor');
-        }
-      } else {
-        _mostrarErrorActualizacion('Error del servidor (${response.statusCode})');
-      }
-
-    } catch (e) {
-      // Cerrar loading si está abierto
-      if (Get.isDialogOpen ?? false) {
-        Get.back();
-      }
-      
-      print('Error al actualizar estado: $e');
-      _mostrarErrorActualizacion('Error de conexión');
+    // Solo agregar completarTodos si es true
+    if (completarTodos) {
+      requestBody['completarTodos'] = true;
     }
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(requestBody),
+    );
+
+    print('📡 Actualizar estado - Código: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      
+      if (data['success'] == true || response.statusCode == 200) {
+        // Recargar datos y reiniciar timer
+        await refrescarDatos();
+      } else {
+        _mostrarErrorActualizacion('Error en la respuesta del servidor');
+      }
+    } else {
+      _mostrarErrorActualizacion('Error del servidor (${response.statusCode})');
+    }
+
+  } catch (e) {
+    // Cerrar loading si está abierto
+    if (Get.isDialogOpen ?? false) {
+      Get.back();
+    }
+    
+    print('Error al actualizar estado: $e');
+    _mostrarErrorActualizacion('Error de conexión');
   }
+}
 
   void _mostrarErrorActualizacion(String mensaje) {
     QuickAlert.show(

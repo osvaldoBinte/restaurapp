@@ -59,7 +59,7 @@ class OrdersDashboardScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '"El Jobo v1.1"',
+                    '"El Jobo v1.2"',
                     style: TextStyle(
                       fontSize: isSmallWidth ? 16 : 18,
                       fontWeight: FontWeight.bold,

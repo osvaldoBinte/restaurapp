@@ -282,23 +282,43 @@ void toggleProductoSeleccionado(int detalleId) {
   }
   return false;
 }
+// En table_details_controller.dart
+
 bool puedeSerPagado(Map<String, dynamic> pedido) {
   try {
     final pedidoMap = Map<String, dynamic>.from(pedido);
     final detalles = pedidoMap['detalles'] as List? ?? [];
     
+    // ✅ CAMBIO: Verificar que hay detalles y que TODOS estén completados
+    if (detalles.isEmpty) return false;
+    
+    bool tieneAlMenosUnProducto = false;
+    
     for (var detalle in detalles) {
       final detalleMap = Map<String, dynamic>.from(detalle);
       final status = detalleMap['statusDetalle'] as String? ?? 'proceso';
-      // Puede ser pagado si tiene productos completados (no cancelados ni ya pagados)
-      if (status == 'completado') return true;
+      
+      // Ignorar productos cancelados o ya pagados
+      if (status == 'cancelado' || status == 'pagado') {
+        continue;
+      }
+      
+      tieneAlMenosUnProducto = true;
+      
+      // Si encuentra algún producto que NO esté completado, retornar false
+      if (status != 'completado') {
+        return false;
+      }
     }
+    
+    // Retornar true solo si hay al menos un producto válido y todos están completados
+    return tieneAlMenosUnProducto;
+    
   } catch (e) {
     print('❌ Error verificando si puede ser pagado: $e');
   }
   return false;
 }
-
   // Métodos de navegación y modales
   void mostrarSelectorPedidoParaAgregar() {
     Get.dialog(
@@ -450,6 +470,8 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
       isUpdating.value = false;
     }
   }
+// En table_details_controller.dart - método cambiarEstadoProducto
+
 void cambiarEstadoProducto(Map<String, dynamic> producto, String nuevoEstado) async {
   final detalleId = producto['detalleId'] as int;
   final nombreProducto = producto['nombreProducto'] ?? 'Producto';
@@ -464,7 +486,9 @@ void cambiarEstadoProducto(Map<String, dynamic> producto, String nuevoEstado) as
   Color colorBoton = nuevoEstado == 'completado' ? Colors.green : Colors.red;
   
   final controller = Get.find<OrdersController>();
-  await controller.actualizarEstadoOrden(detalleId, nuevoEstado);
+  
+  // ✅ CAMBIO AQUÍ: Pasar completarTodos: true cuando viene de TableDetailsModal
+  await controller.actualizarEstadoOrden(detalleId, nuevoEstado, completarTodos: true);
   
   // ✅ NUEVO: Verificar si todos los productos están cancelados/pagados
   await _verificarYCerrarModalSiNoHayProductosActivos();
