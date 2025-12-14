@@ -20,6 +20,7 @@ class TableDetailsController extends GetxController {
   final modoEdicion = 'aumentar'.obs; // 'aumentar' o 'disminuir'
   final cantidadEdicion = ''.obs; // Texto del input
   // Services
+  
   final UniversalPrinterService printerService = UniversalPrinterService();
   
   // Datos actuales
@@ -1040,6 +1041,7 @@ Future<void> _ejecutarLiberacionTodasLasMesas() async {
     for (int detalleId in detalleIds) {
       try {
         // Marcar el producto como pagado
+        
         await controller.actualizarEstadoOrden(detalleId, 'pagado');
         
         // Buscar el detalle para obtener su precio y calcular el total
