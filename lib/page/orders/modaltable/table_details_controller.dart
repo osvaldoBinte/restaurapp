@@ -472,7 +472,6 @@ bool puedeSerPagado(Map<String, dynamic> pedido) {
     }
   }
 // En table_details_controller.dart - método cambiarEstadoProducto
-
 void cambiarEstadoProducto(Map<String, dynamic> producto, String nuevoEstado) async {
   final detalleId = producto['detalleId'] as int;
   final nombreProducto = producto['nombreProducto'] ?? 'Producto';
@@ -488,10 +487,10 @@ void cambiarEstadoProducto(Map<String, dynamic> producto, String nuevoEstado) as
   
   final controller = Get.find<OrdersController>();
   
-  // ✅ CAMBIO AQUÍ: Pasar completarTodos: true cuando viene de TableDetailsModal
-  await controller.actualizarEstadoOrden(detalleId, nuevoEstado, completarTodos: true);
+  // ✅ CAMBIO: Pasar como lista con un solo elemento
+  await controller.actualizarEstadoOrden([detalleId], nuevoEstado, completarTodos: true);
   
-  // ✅ NUEVO: Verificar si todos los productos están cancelados/pagados
+  // Verificar y cerrar modal si no hay productos activos
   await _verificarYCerrarModalSiNoHayProductosActivos();
 }
 void activarEdicionCantidad(int detalleId) {
@@ -1017,7 +1016,7 @@ Future<void> _ejecutarLiberacionTodasLasMesas() async {
     return detalleIds;
   }
 
-  Future<void> pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detalleIds, double totalEstimado) async {
+ Future<void> pagarPedidoEspecifico(Map<String, dynamic> pedido, List<int> detalleIds, double totalEstimado) async {
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];
   
@@ -1033,32 +1032,22 @@ Future<void> _ejecutarLiberacionTodasLasMesas() async {
       );
     }
 
-    double totalReal = 0.0;
-    int exitosos = 0;
-    int fallidos = 0;
+    // ✅ CAMBIO: Marcar todos los productos como pagados en una sola llamada
+    await controller.actualizarEstadoOrden(detalleIds, 'pagado', completarTodos: true);
 
-    // En lugar de usar procesarDetalleId, marcar cada detalle como "pagado"
+    // Calcular el total real
+    double totalReal = 0.0;
     for (int detalleId in detalleIds) {
-      try {
-        // Marcar el producto como pagado
-        
-        await controller.actualizarEstadoOrden(detalleId, 'pagado');
-        
-        // Buscar el detalle para obtener su precio y calcular el total
-        final detalle = _buscarDetallePorId(detalleId);
-        if (detalle != null) {
-          final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
-          final precioUnitario = (detalle['precioUnitario'] as num?)?.toDouble() ?? 0.0;
-          totalReal += precioUnitario * cantidad;
-          exitosos++;
-        }
-      } catch (e) {
-        print('❌ Error marcando detalle $detalleId como pagado: $e');
-        fallidos++;
+      final detalle = _buscarDetallePorId(detalleId);
+      if (detalle != null) {
+        final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
+        final precioUnitario = (detalle['precioUnitario'] as num?)?.toDouble() ?? 0.0;
+        totalReal += precioUnitario * cantidad;
       }
     }
 
-    if (fallidos == 0 && impresoraConectada) {
+    // Imprimir ticket
+    if (impresoraConectada) {
       try {
         await printerService.imprimirTicket(pedido, totalReal);
       } catch (e) {
@@ -1066,43 +1055,23 @@ Future<void> _ejecutarLiberacionTodasLasMesas() async {
       }
     }
 
-    if (fallidos == 0) {
-      String mensaje = 'Pedido #$pedidoId pagado correctamente\nTotal: \$${totalReal.toStringAsFixed(2)}';
-      
-      if (impresoraConectada) {
-        mensaje += '\n✅ Ticket impreso';
-      }
-      
-      Get.snackbar(
-        'Pago Exitoso',
-        mensaje,
-        backgroundColor: Colors.green.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 3),
-      );
-      
-      await controller.refrescarDatos();
-      
-    } else if (exitosos > 0) {
-      Get.snackbar(
-        'Pago Parcial',
-        'Pedido #$pedidoId procesado parcialmente\nExitosos: $exitosos items\nFallidos: $fallidos items',
-        backgroundColor: Colors.orange.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 4),
-      );
-      
-      await controller.refrescarDatos();
-      
-    } else {
-      Get.snackbar(
-        'Error en Pago',
-        'No se pudo procesar ningún item del pedido #$pedidoId',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 3),
-      );
+    // Mostrar mensaje de éxito
+    String mensaje = 'Pedido #$pedidoId pagado correctamente\n'
+                    'Total: \$${totalReal.toStringAsFixed(2)}';
+    
+    if (impresoraConectada) {
+      mensaje += '\n✅ Ticket impreso';
     }
+    
+    Get.snackbar(
+      'Pago Exitoso',
+      mensaje,
+      backgroundColor: Colors.green.withOpacity(0.8),
+      colorText: Colors.white,
+      duration: Duration(seconds: 3),
+    );
+    
+    await controller.refrescarDatos();
 
   } catch (e) {
     Get.snackbar(
@@ -1230,8 +1199,6 @@ void confirmarPagoYLiberacion(Map<String, dynamic> pedido) {
     },
   );
 }
-
-
 Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleIds, double totalEstimado) async {
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];
@@ -1245,65 +1212,52 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       print('⚠️ Impresora no disponible, continuando sin imprimir...');
     }
 
-    // Paso 2: Procesar el pago
+    // Paso 2: Procesar el pago - ✅ CAMBIO: Una sola llamada con toda la lista
+    await controller.actualizarEstadoOrden(detalleIds, 'pagado', completarTodos: true);
+
+    // Calcular total real y productos pagados
     double totalReal = 0.0;
-    int exitosos = 0;
-    int fallidos = 0;
     List<Map<String, dynamic>> productosRecienPagados = [];
 
     for (int detalleId in detalleIds) {
-      try {
-        final detalle = _buscarDetallePorId(detalleId);
-        if (detalle != null) {
-          final statusActual = detalle['statusDetalle'] as String? ?? 'proceso';
-          
-          if (statusActual != 'pagado') {
-            await controller.actualizarEstadoOrden(detalleId, 'pagado');
-            
-            final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
-            final precioUnitario = (detalle['precioUnitario'] as num?)?.toDouble() ?? 0.0;
-            totalReal += precioUnitario * cantidad;
-            exitosos++;
-            
-            productosRecienPagados.add({
-              ...detalle,
-              'statusDetalle': 'pagado',
-            });
-          }
-        }
-      } catch (e) {
-        print('❌ Error marcando detalle $detalleId como pagado: $e');
-        fallidos++;
+      final detalle = _buscarDetallePorId(detalleId);
+      if (detalle != null) {
+        final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
+        final precioUnitario = (detalle['precioUnitario'] as num?)?.toDouble() ?? 0.0;
+        totalReal += precioUnitario * cantidad;
+        
+        productosRecienPagados.add({
+          ...detalle,
+          'statusDetalle': 'pagado',
+        });
       }
     }
 
-    // Paso 3: Liberar mesa (solo si el pago fue exitoso)
+    // Paso 3: Liberar mesa
     bool mesaLiberada = false;
-    if (fallidos == 0) {
-      try {
-        Uri uri = Uri.parse('${controller.defaultApiServer}/mesas/liberarMesa/$idnumeromesa/');
-        final statusData = {'status': true};
-        
-        final response = await http.post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: jsonEncode(statusData),
-        );
+    try {
+      Uri uri = Uri.parse('${controller.defaultApiServer}/mesas/liberarMesa/$idnumeromesa/');
+      final statusData = {'status': true};
+      
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(statusData),
+      );
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          mesaLiberada = data['success'] == true;
-        }
-      } catch (e) {
-        print('❌ Error liberando mesa: $e');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        mesaLiberada = data['success'] == true;
       }
+    } catch (e) {
+      print('❌ Error liberando mesa: $e');
     }
 
     // Paso 4: Imprimir ticket
-    if (fallidos == 0 && impresoraConectada && productosRecienPagados.isNotEmpty) {
+    if (impresoraConectada && productosRecienPagados.isNotEmpty) {
       try {
         final pedidoParaTicket = _crearPedidoParaTicketConFiltro(
           productosRecienPagados, 
@@ -1319,12 +1273,12 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
     }
 
     // Paso 5: Mostrar resultado y cerrar modal SOLO si fue exitoso
-    if (fallidos == 0 && mesaLiberada) {
+    if (mesaLiberada) {
       // ✅ ÉXITO COMPLETO - Cerrar modal aquí
       Get.back(); // Cerrar TableDetailsModal
       
       String mensaje = 'Mesa $numeroMesa liberada exitosamente\n'
-                      'Productos finales pagados: $exitosos\n'
+                      'Productos finales pagados: ${detalleIds.length}\n'
                       'Total: \$${totalReal.toStringAsFixed(2)}';
       
       if (impresoraConectada && productosRecienPagados.isNotEmpty) {
@@ -1341,7 +1295,7 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       
       await controller.refrescarDatos();
       
-    } else if (fallidos == 0 && !mesaLiberada) {
+    } else {
       // Pago exitoso pero error liberando mesa - NO cerrar modal
       Get.snackbar(
         'Pago Exitoso - Error al Liberar',
@@ -1352,16 +1306,6 @@ Future<void> _pagarYLiberarMesa(Map<String, dynamic> pedido, List<int> detalleId
       );
       
       await controller.refrescarDatos();
-      
-    } else {
-      // Error en el pago - NO cerrar modal
-      Get.snackbar(
-        'Error en la Operación',
-        'No se pudo completar el pago',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 4),
-      );
     }
 
   } catch (e) {
@@ -1684,9 +1628,7 @@ void confirmarPagoProductosSeleccionados() {
       Navigator.of(Get.context!).pop();
     },
   );
-}
-// Mueve la función fuera del método confirmarPagoProductosSeleccionados
-Future<void> _pagarProductosSeleccionados(
+}Future<void> _pagarProductosSeleccionados(
   List<Map<String, dynamic>> productos, 
   Map<String, dynamic> pedido, 
   double totalEstimado
@@ -1702,26 +1644,20 @@ Future<void> _pagarProductosSeleccionados(
       print('⚠️ Impresora no disponible para productos seleccionados');
     }
 
-    double totalReal = 0.0;
-    int exitosos = 0;
-    int fallidos = 0;
+    // ✅ CAMBIO: Extraer todos los IDs y hacer una sola llamada
+    List<int> detalleIds = productos.map((p) => p['detalleId'] as int).toList();
+    await controller.actualizarEstadoOrden(detalleIds, 'pagado', completarTodos: true);
 
+    // Calcular total real
+    double totalReal = 0.0;
     for (var producto in productos) {
-      try {
-        final detalleId = producto['detalleId'] as int;
-        await controller.actualizarEstadoOrden(detalleId, 'pagado');
-        
-        final cantidad = (producto['cantidad'] as num?)?.toInt() ?? 1;
-        final precioUnitario = (producto['precioUnitario'] as num?)?.toDouble() ?? 0.0;
-        totalReal += precioUnitario * cantidad;
-        exitosos++;
-      } catch (e) {
-        print('❌ Error pagando producto: $e');
-        fallidos++;
-      }
+      final cantidad = (producto['cantidad'] as num?)?.toInt() ?? 1;
+      final precioUnitario = (producto['precioUnitario'] as num?)?.toDouble() ?? 0.0;
+      totalReal += precioUnitario * cantidad;
     }
 
-    if (fallidos == 0 && impresoraConectada) {
+    // Imprimir ticket
+    if (impresoraConectada) {
       try {
         final pedidoParaTicket = _crearPedidoParaTicket(productos, pedido, totalReal);
         await printerService.imprimirTicket(pedidoParaTicket, totalReal);
@@ -1731,33 +1667,26 @@ Future<void> _pagarProductosSeleccionados(
       }
     }
 
-    if (fallidos == 0) {
-      String mensaje = 'Productos pagados correctamente\nPedido #$pedidoId\n$exitosos productos pagados\nTotal: \$${totalReal.toStringAsFixed(2)}';
-      
-      if (impresoraConectada) {
-        mensaje += '\n✅ Ticket impreso';
-      }
-      
-      Get.snackbar(
-        'Pago Exitoso',
-        mensaje,
-        backgroundColor: Colors.green.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 3),
-      );
-      
-      productosSeleccionados.clear();
-      await controller.refrescarDatos();
-      
-    } else {
-      Get.snackbar(
-        'Pago Parcial',
-        'Algunos productos no se pudieron procesar\nExitosos: $exitosos\nFallidos: $fallidos',
-        backgroundColor: Colors.orange.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 4),
-      );
+    // Mostrar mensaje de éxito
+    String mensaje = 'Productos pagados correctamente\n'
+                    'Pedido #$pedidoId\n'
+                    '${detalleIds.length} productos pagados\n'
+                    'Total: \$${totalReal.toStringAsFixed(2)}';
+    
+    if (impresoraConectada) {
+      mensaje += '\n✅ Ticket impreso';
     }
+    
+    Get.snackbar(
+      'Pago Exitoso',
+      mensaje,
+      backgroundColor: Colors.green.withOpacity(0.8),
+      colorText: Colors.white,
+      duration: Duration(seconds: 3),
+    );
+    
+    productosSeleccionados.clear();
+    await controller.refrescarDatos();
 
   } catch (e) {
     Get.snackbar(
@@ -1821,7 +1750,6 @@ Map<String, dynamic> _crearPedidoParaTicket(List<Map<String, dynamic>> productos
   return pedidoParaTicket;
 }
 
-
 Future<void> _pagarSeleccionadosYLiberarMesa(
   List<Map<String, dynamic>> productos, 
   Map<String, dynamic> pedido, 
@@ -1830,69 +1758,55 @@ Future<void> _pagarSeleccionadosYLiberarMesa(
   final controller = Get.find<OrdersController>();
   final pedidoId = pedido['pedidoId'];
   
-  bool debeRefrescarDatos = false;
-  
   try {
-    isUpdating.value = true; // Activar loading (en lugar de Get.dialog)
+    isUpdating.value = true; // Activar loading
 
     final impresoraConectada = await printerService.conectarImpresoraAutomaticamente();
 
+    // ✅ CAMBIO: Extraer todos los IDs y hacer una sola llamada
+    List<int> detalleIds = productos.map((p) => p['detalleId'] as int).toList();
+    await controller.actualizarEstadoOrden(detalleIds, 'pagado', completarTodos: true);
+
+    // Calcular total real y productos pagados
     double totalReal = 0.0;
-    int exitosos = 0;
-    int fallidos = 0;
     List<Map<String, dynamic>> productosRecienPagados = [];
 
-    // Pagar productos seleccionados
     for (var producto in productos) {
-      try {
-        final detalleId = producto['detalleId'] as int;
-        final statusActual = producto['statusDetalle'] as String? ?? 'proceso';
-        
-        if (statusActual != 'pagado') {
-          await controller.actualizarEstadoOrden(detalleId, 'pagado');
-          
-          final cantidad = (producto['cantidad'] as num?)?.toInt() ?? 1;
-          final precioUnitario = (producto['precioUnitario'] as num?)?.toDouble() ?? 0.0;
-          totalReal += precioUnitario * cantidad;
-          exitosos++;
-          
-          productosRecienPagados.add({
-            ...producto,
-            'statusDetalle': 'pagado',
-          });
-        }
-      } catch (e) {
-        fallidos++;
-      }
+      final cantidad = (producto['cantidad'] as num?)?.toInt() ?? 1;
+      final precioUnitario = (producto['precioUnitario'] as num?)?.toDouble() ?? 0.0;
+      totalReal += precioUnitario * cantidad;
+      
+      productosRecienPagados.add({
+        ...producto,
+        'statusDetalle': 'pagado',
+      });
     }
 
-    // Liberar mesa si el pago fue exitoso
+    // Liberar mesa
     bool mesaLiberada = false;
-    if (fallidos == 0) {
-      try {
-        Uri uri = Uri.parse('${controller.defaultApiServer}/mesas/liberarMesa/$idnumeromesa/');
-        final statusData = {'status': true};
-        
-        final response = await http.post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: jsonEncode(statusData),
-        );
+    try {
+      Uri uri = Uri.parse('${controller.defaultApiServer}/mesas/liberarMesa/$idnumeromesa/');
+      final statusData = {'status': true};
+      
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(statusData),
+      );
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          mesaLiberada = data['success'] == true;
-        }
-      } catch (e) {
-        print('❌ Error liberando mesa: $e');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        mesaLiberada = data['success'] == true;
       }
+    } catch (e) {
+      print('❌ Error liberando mesa: $e');
     }
 
     // Imprimir ticket
-    if (fallidos == 0 && impresoraConectada && productosRecienPagados.isNotEmpty) {
+    if (impresoraConectada && productosRecienPagados.isNotEmpty) {
       try {
         final pedidoParaTicket = _crearPedidoParaTicketConFiltro(
           productosRecienPagados, 
@@ -1907,21 +1821,22 @@ Future<void> _pagarSeleccionadosYLiberarMesa(
     }
     
     productosSeleccionados.clear();
-    debeRefrescarDatos = true;
     
     // Mostrar resultado
-    if (fallidos == 0 && mesaLiberada) {
+    if (mesaLiberada) {
       Get.back(); // Cerrar TableDetailsModal
       
       Get.snackbar(
         'Operación Exitosa',
-        '🎉 Mesa $numeroMesa liberada exitosamente!\nProductos: $exitosos\nTotal: \$${totalReal.toStringAsFixed(2)}',
+        '🎉 Mesa $numeroMesa liberada exitosamente!\n'
+        'Productos: ${detalleIds.length}\n'
+        'Total: \$${totalReal.toStringAsFixed(2)}',
         backgroundColor: Colors.green.withOpacity(0.8),
         colorText: Colors.white,
         duration: Duration(seconds: 4),
       );
       
-    } else if (fallidos == 0 && !mesaLiberada) {
+    } else {
       Get.snackbar(
         'Pago Exitoso - Error al Liberar',
         'Productos pagados pero no se pudo liberar la mesa',
@@ -1929,20 +1844,12 @@ Future<void> _pagarSeleccionadosYLiberarMesa(
         colorText: Colors.white,
         duration: Duration(seconds: 4),
       );
-      
-    } else {
-      Get.snackbar(
-        'Error Parcial',
-        'Error en el proceso',
-        backgroundColor: Colors.orange.withOpacity(0.8),
-        colorText: Colors.white,
-        duration: Duration(seconds: 4),
-      );
     }
+
+    await controller.refrescarDatos();
 
   } catch (e) {
     productosSeleccionados.clear();
-    debeRefrescarDatos = true;
     
     Get.snackbar(
       'Error',
@@ -1951,13 +1858,12 @@ Future<void> _pagarSeleccionadosYLiberarMesa(
       colorText: Colors.white,
       duration: Duration(seconds: 3),
     );
+    
+    await controller.refrescarDatos();
+    
   } finally {
     isUpdating.value = false; // Desactivar loading
     await printerService.desconectar();
-    
-    if (debeRefrescarDatos) {
-      await controller.refrescarDatos();
-    }
   }
 }
 }

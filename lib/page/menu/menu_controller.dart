@@ -11,7 +11,35 @@ import 'package:restaurapp/common/constants/constants.dart';
 import 'package:restaurapp/page/menu/listarmenu/listar_controller.dart';
 import 'package:restaurapp/page/orders/crear/crear_orden_controller.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
+// Modelo para las categorías métricas
+class CategoriaMetrica {
+  final int id;
+  final String nombreCategoria;
 
+  CategoriaMetrica({
+    required this.id,
+    required this.nombreCategoria,
+  });
+
+  factory CategoriaMetrica.fromJson(Map<String, dynamic> json) {
+    return CategoriaMetrica(
+      id: json['id'] ?? 0,
+      nombreCategoria: json['nombreCategoria'] ?? '',
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is CategoriaMetrica && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() => 'CategoriaMetrica(id: $id, nombre: $nombreCategoria)';
+}
 // Modelo para las categorías - CORREGIDO
 class Categoria {
   final int id;
@@ -59,6 +87,10 @@ class MenuController extends GetxController {
   var categories = <Categoria>[].obs;
   var message = ''.obs;
   
+  // ✅ NUEVO: Variables para categorías métricas
+  var categoriasMetricas = <CategoriaMetrica>[].obs;
+  var selectedCategoriaMetricaId = Rxn<int>();
+  var isLoadingMetricas = false.obs;
   // Variables observables para el formulario
   var selectedCategoryId = Rxn<int>();
   var selectedImage = Rxn<File>();
@@ -74,10 +106,13 @@ class MenuController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    
     obtenerCategorias();
+    obtenerCategoriasMetricas();
   }
 
   /// Método para inicializar en modo creación - CORREGIDO
+  /// ✅ MODIFICADO: Actualizar initializeForCreate
   void initializeForCreate() {
     print('🔄 Inicializando modo CREACIÓN');
     isEditMode.value = false;
@@ -85,33 +120,160 @@ class MenuController extends GetxController {
     currentImageUrl.value = null;
     clearForm();
     
-    // ✅ IMPORTANTE: Recargar categorías para asegurar datos frescos
     obtenerCategorias();
+    obtenerCategoriasMetricas(); // ✅ NUEVO
   }
 
-  /// Método para inicializar en modo edición - CORREGIDO
-  void initializeForEdit(Map<String, dynamic> menuData) {
-    print('🔄 Inicializando modo EDICIÓN');
-    print('   - Datos recibidos: $menuData');
+  /// ✅ NUEVO: Método para obtener categorías métricas
+  Future<void> obtenerCategoriasMetricas({BuildContext? context}) async {
+    try {
+      isLoadingMetricas.value = true;
+      
+      Uri uri = Uri.parse('$defaultApiServer/menu/listarCategoriaMetricas/');
+      print('🌐 Obteniendo categorías métricas desde: $uri');
+      
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
+      
+      print('📡 Código de respuesta categorías métricas: ${response.statusCode}');
+      print('📄 Respuesta del servidor: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        
+        categoriasMetricas.clear();
+        
+        final categoriasUnicas = <CategoriaMetrica>[];
+        final idsVistos = <int>{};
+        
+        for (var json in data) {
+          final categoria = CategoriaMetrica.fromJson(json);
+          if (!idsVistos.contains(categoria.id)) {
+            categoriasUnicas.add(categoria);
+            idsVistos.add(categoria.id);
+          }
+        }
+        
+        categoriasMetricas.value = categoriasUnicas;
+        
+        print('✅ ${categoriasMetricas.length} categorías métricas únicas cargadas:');
+        for (var cat in categoriasMetricas) {
+          print('   - ID: ${cat.id}, Nombre: ${cat.nombreCategoria}');
+        }
+        
+        _validarCategoriaMetricaSeleccionada();
+        
+      } else {
+        print('⚠️ Error al cargar categorías métricas: ${response.statusCode}');
+        if (context?.mounted == true) {
+          mostrarErrorCategorias(context!, 'No se pudieron obtener las categorías métricas');
+        }
+      }
+      
+    } catch (e) {
+      print('🚨 Error al obtener categorías métricas: $e');
+      if (context?.mounted == true) {
+        mostrarErrorCategorias(context!, 'No se pudo conectar para obtener las categorías métricas');
+      }
+    } finally {
+      isLoadingMetricas.value = false;
+    }
+  }
+
+  /// ✅ NUEVO: Validar categoría métrica seleccionada
+  void _validarCategoriaMetricaSeleccionada() {
+    if (selectedCategoriaMetricaId.value != null) {
+      final existe = categoriasMetricas.any((cat) => cat.id == selectedCategoriaMetricaId.value);
+      if (!existe) {
+        print('⚠️ Categoría métrica seleccionada (${selectedCategoriaMetricaId.value}) no existe, limpiando...');
+        selectedCategoriaMetricaId.value = null;
+      } else {
+        print('✅ Categoría métrica seleccionada (${selectedCategoriaMetricaId.value}) es válida');
+      }
+    }
+  }
+
+  /// ✅ NUEVO: Establecer categoría métrica seleccionada
+  void setSelectedCategoriaMetrica(int? categoriaId) {
+    print('📋 Estableciendo categoría métrica: $categoriaId');
     
-    isEditMode.value = true;
-    editingMenuId.value = menuData['id'];
-    currentImageUrl.value = menuData['imagen'];
-    selectedImage.value = null;
-    
-    // ✅ CORREGIDO: Esperar a que las categorías se carguen antes de asignar
-    if (categories.isEmpty) {
-      print('   - Categorías vacías, cargando primero...');
-      obtenerCategorias().then((_) {
-        _asignarCategoriaEdicion(menuData);
-      });
+    if (categoriaId != null) {
+      final existe = categoriasMetricas.any((cat) => cat.id == categoriaId);
+      if (existe) {
+        selectedCategoriaMetricaId.value = categoriaId;
+        print('   ✅ Categoría métrica $categoriaId establecida correctamente');
+      } else {
+        print('   ⚠️ Categoría métrica $categoriaId no existe en la lista');
+        selectedCategoriaMetricaId.value = null;
+      }
     } else {
-      _asignarCategoriaEdicion(menuData);
+      selectedCategoriaMetricaId.value = null;
+      print('   ✅ Categoría métrica limpiada (null)');
     }
     
     updatePreview();
   }
 
+  /// ✅ NUEVO: Obtener nombre de categoría métrica
+  String obtenerNombreCategoriaMetrica(int categoriaId) {
+    final categoria = categoriasMetricas.firstWhereOrNull((cat) => cat.id == categoriaId);
+    final nombre = categoria?.nombreCategoria ?? 'Sin categoría métrica';
+    print('🏷️ Nombre para categoría métrica $categoriaId: $nombre');
+    return nombre;
+  }
+/// ✅ MODIFICADO: Actualizar initializeForEdit
+void initializeForEdit(Map<String, dynamic> menuData) {
+  print('🔄 Inicializando modo EDICIÓN');
+  print('   - Datos recibidos: $menuData');
+  
+  isEditMode.value = true;
+  editingMenuId.value = menuData['id'];
+  currentImageUrl.value = menuData['imagen'];
+  selectedImage.value = null;
+  
+  if (categories.isEmpty || categoriasMetricas.isEmpty) {
+    print('   - Categorías vacías, cargando primero...');
+    Future.wait([
+      obtenerCategorias(),
+      obtenerCategoriasMetricas(),
+    ]).then((_) {
+      _asignarCategoriaEdicion(menuData);
+      _asignarCategoriaMetricaEdicion(menuData);
+    });
+  } else {
+    _asignarCategoriaEdicion(menuData);
+    _asignarCategoriaMetricaEdicion(menuData);
+  }
+  
+  updatePreview();
+}
+
+/// ✅ MODIFICADO: Asignar categoría métrica en edición
+void _asignarCategoriaMetricaEdicion(Map<String, dynamic> menuData) {
+  // ✅ CAMBIADO: Leer 'categoriaMetricaId' en lugar de 'idCategoriasMetricas'
+  final categoriaMetricaId = menuData['categoriaMetricaId'];
+  print('   - Intentando asignar categoría métrica ID: $categoriaMetricaId');
+  print('   - Categorías métricas disponibles: ${categoriasMetricas.map((c) => 'ID:${c.id}').join(', ')}');
+  
+  if (categoriaMetricaId != null) {
+    final existe = categoriasMetricas.any((cat) => cat.id == categoriaMetricaId);
+    if (existe) {
+      selectedCategoriaMetricaId.value = categoriaMetricaId;
+      print('   ✅ Categoría métrica $categoriaMetricaId asignada correctamente');
+    } else {
+      print('   ⚠️ Categoría métrica $categoriaMetricaId no encontrada en la lista');
+      selectedCategoriaMetricaId.value = null;
+    }
+  } else {
+    selectedCategoriaMetricaId.value = null;
+    print('   ⚠️ No se proporcionó categoriaMetricaId');
+  }
+}
   // ✅ NUEVO: Método auxiliar para asignar categoría en edición
   void _asignarCategoriaEdicion(Map<String, dynamic> menuData) {
     final categoriaId = menuData['categoriaId'];
@@ -260,21 +422,22 @@ class MenuController extends GetxController {
   void clearForm() {
     print('🧹 Limpiando formulario completo');
     selectedCategoryId.value = null;
+    selectedCategoriaMetricaId.value = null; // ✅ NUEVO
     selectedImage.value = null;
     currentImageUrl.value = null;
     updatePreview();
   }
 
-  /// Método para crear un nuevo menú
-  Future<bool> crearMenu({
+
+   Future<bool> crearMenu({
     required String nombre,
     required String descripcion,
     required double precio,
     int? tiempoPreparacion,
     File? imagenFile,
     required int categoriaId,
-        required BuildContext context, // ✅ Agregar context como parámetro
-
+    required int idCategoriasMetricas, // ✅ NUEVO parámetro
+    required BuildContext context,
   }) async {
     try {
       isCreating.value = true;
@@ -291,6 +454,7 @@ class MenuController extends GetxController {
       request.fields['precio'] = precio.toString();
       request.fields['tiempoPreparacion'] = (tiempoPreparacion ?? 0).toString();
       request.fields['categoriaId'] = categoriaId.toString();
+      request.fields['idCategoriasMetricas'] = idCategoriasMetricas.toString(); // ✅ NUEVO
       
       if (imagenFile != null) {
         var multipartFile = await http.MultipartFile.fromPath(
@@ -309,6 +473,7 @@ class MenuController extends GetxController {
       print('   - precio: "${request.fields['precio']}"');
       print('   - tiempoPreparacion: "${request.fields['tiempoPreparacion']}"');
       print('   - categoriaId: "${request.fields['categoriaId']}"');
+      print('   - idCategoriasMetricas: "${request.fields['idCategoriasMetricas']}"'); // ✅ NUEVO
       print('   - imagen: ${imagenFile != null ? "Archivo adjunto" : "Sin imagen"}');
       
       var streamedResponse = await request.send();
@@ -317,21 +482,20 @@ class MenuController extends GetxController {
       print('📡 Código de respuesta: ${response.statusCode}');
       print('📄 Respuesta del servidor: ${response.body}');
       
-       if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         message.value = 'Menú creado exitosamente';
         final controller2 = Get.find<CreateOrderController>();
         controller2.cargarDatosIniciales();
         
-
-         final controller = Get.find<ListarMenuController>();
+        final controller = Get.find<ListarMenuController>();
         controller2.cargarDatosIniciales();
         controller.refrescarLista();
-final controller3 = Get.find<OrdersController>();
-          controller3.cargarDatos();
-        // ✅ VERIFICAR: Context antes de mostrar alert
+        final controller3 = Get.find<OrdersController>();
+        controller3.cargarDatos();
+        
         if (context.mounted) {
           QuickAlert.show(
-            context: context, // ✅ Usar context del widget
+            context: context,
             type: QuickAlertType.success,
             title: '¡Éxito!',
             text: 'Menú "$nombre" creado correctamente',
@@ -348,13 +512,14 @@ final controller3 = Get.find<OrdersController>();
       }
       
     } catch (e) {
-      return _handleException(e, 'crearMenu',context);
+      return _handleException(e, 'crearMenu', context);
     } finally {
       isCreating.value = false;
     }
   }
 
-  /// Método para actualizar un menú existente
+ 
+  /// ✅ MODIFICADO: Actualizar menú con categoría métrica
   Future<bool> actualizarMenu({
     required int menuId,
     required String nombre,
@@ -363,8 +528,8 @@ final controller3 = Get.find<OrdersController>();
     int? tiempoPreparacion,
     File? imagenFile,
     required int categoriaId,
-        required BuildContext context, // ✅ Agregar context como parámetro
-
+    required int idCategoriasMetricas, // ✅ NUEVO parámetro
+    required BuildContext context,
   }) async {
     try {
       isUpdating.value = true;
@@ -381,8 +546,8 @@ final controller3 = Get.find<OrdersController>();
       request.fields['precio'] = precio.toString();
       request.fields['tiempoPreparacion'] = (tiempoPreparacion ?? 0).toString();
       request.fields['categoriaId'] = categoriaId.toString();
+      request.fields['idCategoriasMetricas'] = idCategoriasMetricas.toString(); // ✅ NUEVO
       
-      // Solo agregar imagen si se seleccionó una nueva
       if (imagenFile != null) {
         var multipartFile = await http.MultipartFile.fromPath(
           'imagen',
@@ -391,7 +556,6 @@ final controller3 = Get.find<OrdersController>();
         request.files.add(multipartFile);
         print('📸 Nueva imagen agregada: ${imagenFile.path}');
       } else {
-        // Si no hay nueva imagen, mantener la actual (o vacío si no había)
         request.fields['imagen'] = "";
         print('📸 Manteniendo imagen actual o sin imagen');
       }
@@ -403,6 +567,7 @@ final controller3 = Get.find<OrdersController>();
       print('   - precio: "${request.fields['precio']}"');
       print('   - tiempoPreparacion: "${request.fields['tiempoPreparacion']}"');
       print('   - categoriaId: "${request.fields['categoriaId']}"');
+      print('   - idCategoriasMetricas: "${request.fields['idCategoriasMetricas']}"'); // ✅ NUEVO
       print('   - imagen: ${imagenFile != null ? "Nueva imagen adjunta" : "Sin cambio de imagen"}');
       
       var streamedResponse = await request.send();
@@ -413,16 +578,17 @@ final controller3 = Get.find<OrdersController>();
       
       if (response.statusCode == 200 || response.statusCode == 201) {
         message.value = 'Menú actualizado exitosamente';
-       final controller2 = Get.find<CreateOrderController>();
-         controller2.cargarDatosIniciales();
-          final controller = Get.find<ListarMenuController>();
+        final controller2 = Get.find<CreateOrderController>();
+        controller2.cargarDatosIniciales();
+        final controller = Get.find<ListarMenuController>();
         controller2.cargarDatosIniciales();
         controller.refrescarLista();
-final controller3 = Get.find<OrdersController>();
-          controller3.cargarDatos();
+        final controller3 = Get.find<OrdersController>();
+        controller3.cargarDatos();
+        
         if (context.mounted) {
           QuickAlert.show(
-            context: context, // ✅ Usar context del widget
+            context: context,
             type: QuickAlertType.success,
             title: '¡Éxito!',
             text: 'Menú "$nombre" actualizado correctamente',
@@ -526,19 +692,21 @@ final controller3 = Get.find<OrdersController>();
     return false;
   }
 
-  /// Método para validar datos antes de enviar
+ 
+  /// ✅ MODIFICADO: Validar datos incluyendo categoría métrica
   bool validarDatos({
     required String nombre,
     required String descripcion,
     required String precio,
     required int? categoriaId,
-    required BuildContext context, // ✅ Agregar context
+    required int? idCategoriasMetricas, // ✅ NUEVO parámetro
+    required BuildContext context,
   }) {
-    if (!context.mounted) return false; // ✅ Verificar context
+    if (!context.mounted) return false;
     
     if (nombre.isEmpty) {
       QuickAlert.show(
-        context: context, // ✅ Usar context del widget
+        context: context,
         type: QuickAlertType.warning,
         title: 'Campo Requerido',
         text: 'El nombre del menú es requerido',
@@ -597,25 +765,41 @@ final controller3 = Get.find<OrdersController>();
       return false;
     }
     
+    // ✅ NUEVA validación
+    if (idCategoriasMetricas == null) {
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.warning,
+        title: 'Categoría Métrica Requerida',
+        text: 'Selecciona una categoría métrica para el menú',
+        confirmBtnText: 'OK',
+        confirmBtnColor: Color(0xFFF39C12),
+      );
+      return false;
+    }
+    
     return true;
   }
 
-  /// Método conveniente que combina validación y creación/actualización
-   Future<bool> guardarMenuConValidacion({
+ 
+  /// ✅ MODIFICADO: guardarMenuConValidacion
+  Future<bool> guardarMenuConValidacion({
     required String nombre,
     required String descripcion,
     required String precio,
     String? tiempoPreparacion,
     File? imagenFile,
     required int? categoriaId,
-    required BuildContext context, // ✅ Agregar context
+    required int? idCategoriasMetricas, // ✅ NUEVO parámetro
+    required BuildContext context,
   }) async {
     if (!validarDatos(
       nombre: nombre,
       descripcion: descripcion,
       precio: precio,
       categoriaId: categoriaId,
-      context: context, // ✅ Pasar context
+      idCategoriasMetricas: idCategoriasMetricas, // ✅ NUEVO
+      context: context,
     )) {
       return false;
     }
@@ -626,7 +810,6 @@ final controller3 = Get.find<OrdersController>();
         : null;
     
     if (isEditMode.value && editingMenuId.value != null) {
-      // Modo actualización
       return await actualizarMenu(
         menuId: editingMenuId.value!,
         nombre: nombre,
@@ -635,10 +818,10 @@ final controller3 = Get.find<OrdersController>();
         tiempoPreparacion: tiempoValue,
         imagenFile: imagenFile,
         categoriaId: categoriaId!,
-        context: context, // ✅ Pasar context
+        idCategoriasMetricas: idCategoriasMetricas!, // ✅ NUEVO
+        context: context,
       );
     } else {
-      // Modo creación
       return await crearMenu(
         nombre: nombre,
         descripcion: descripcion,
@@ -646,20 +829,22 @@ final controller3 = Get.find<OrdersController>();
         tiempoPreparacion: tiempoValue,
         imagenFile: imagenFile,
         categoriaId: categoriaId!,
-        context: context, // ✅ Pasar context
+        idCategoriasMetricas: idCategoriasMetricas!, // ✅ NUEVO
+        context: context,
       );
     }
   }
 
-  /// Método legacy para mantener compatibilidad
-  Future<bool> crearMenuConValidacion({
+
+ Future<bool> crearMenuConValidacion({
     required String nombre,
     required String descripcion,
     required String precio,
     String? tiempoPreparacion,
     File? imagenFile,
     required int? categoriaId,
-    required BuildContext context, // ✅ Agregar context
+    required int? idCategoriasMetricas, // ✅ NUEVO parámetro
+    required BuildContext context,
   }) async {
     return await guardarMenuConValidacion(
       nombre: nombre,
@@ -668,38 +853,9 @@ final controller3 = Get.find<OrdersController>();
       tiempoPreparacion: tiempoPreparacion,
       imagenFile: imagenFile,
       categoriaId: categoriaId,
-      context: context, // ✅ Usar context de GetX
+      idCategoriasMetricas: idCategoriasMetricas, // ✅ NUEVO
+      context: context,
     );
-  }
-
-  Future<File?> seleccionarImagenGaleria(BuildContext context) async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-      );
-      
-      if (image != null) {
-        return File(image.path);
-      }
-      return null;
-    } catch (e) {
-      print('Error al seleccionar imagen: $e');
-      if (context.mounted) {
-        QuickAlert.show(
-          context: context,
-          type: QuickAlertType.error,
-          title: 'Error',
-          text: 'No se pudo seleccionar la imagen',
-          confirmBtnText: 'OK',
-          confirmBtnColor: Color(0xFFE74C3C),
-        );
-      }
-      return null;
-    }
   }
 
    Future<File?> tomarFotoCamara(BuildContext context) async {
@@ -732,6 +888,35 @@ final controller3 = Get.find<OrdersController>();
     }
   }
 
+  Future<File?> seleccionarImagenGaleria(BuildContext context) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        return File(image.path);
+      }
+      return null;
+    } catch (e) {
+      print('Error al seleccionar imagen: $e');
+      if (context.mounted) {
+        QuickAlert.show(
+          context: context,
+          type: QuickAlertType.error,
+          title: 'Error',
+          text: 'No se pudo seleccionar la imagen',
+          confirmBtnText: 'OK',
+          confirmBtnColor: Color(0xFFE74C3C),
+        );
+      }
+      return null;
+    }
+  }
   /// Método actualizado para mostrar opciones de imagen
    void mostrarOpcionesImagen(BuildContext context) {
     if (!context.mounted) return; // ✅ Verificar context

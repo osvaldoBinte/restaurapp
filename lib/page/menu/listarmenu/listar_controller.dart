@@ -19,6 +19,7 @@ class Menu {
   final int categoriaId;
   final String? categoriaNombre;
   final bool mostrarEnListado; // ✅ NUEVO CAMPO
+  final int categoriaMetricaId;
 
   Menu({
     required this.id,
@@ -30,6 +31,7 @@ class Menu {
     required this.categoriaId,
     this.categoriaNombre,
     required this.mostrarEnListado, // ✅ NUEVO CAMPO
+    required this.categoriaMetricaId
   });
 
   factory Menu.fromJson(Map<String, dynamic> json) {
@@ -40,9 +42,12 @@ class Menu {
       precio: json['precio'] ?? '0.00',
       tiempoPreparacion: json['tiempoPreparacion'] ?? 0,
       imagen: json['imagen'] ?? '',
-      categoriaId: json['categoriaId'] ?? json['categoria_id'] ?? 0,
+      categoriaId: json['categoriaId'] ?? json['categoria_id'] ?? json['idCategoria']??0,
+      
       categoriaNombre: json['categoriaNombre'] ?? json['categoria_nombre'] ?? json['categoria'] ?? '',
-      mostrarEnListado: json['mostrarEnListado'] ?? true, // ✅ NUEVO CAMPO CON DEFAULT TRUE
+      mostrarEnListado: json['mostrarEnListado'] ?? true, 
+      
+      categoriaMetricaId :json['categoriaMetricaId']??0
     );
   }
 
@@ -218,6 +223,7 @@ class ListarMenuController extends GetxController {
             categoriaId: menus[menuIndex].categoriaId,
             categoriaNombre: menus[menuIndex].categoriaNombre,
             mostrarEnListado: nuevoEstado,
+            categoriaMetricaId:menus[menuIndex].categoriaMetricaId,
           );
           
           menus[menuIndex] = menuActualizado;
@@ -1470,7 +1476,9 @@ Widget _buildCompactHeader(ListarMenuController controller) {
       'precio': menu.precioNumerico,
       'tiempoPreparacion': menu.tiempoPreparacion,
       'categoriaId': menu.categoriaId,
+      'categoria': menu.categoriaNombre,
       'imagen': menu.imagen,
+      'categoriaMetricaId':menu.categoriaMetricaId
     };
 
     showDialog(

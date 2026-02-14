@@ -340,20 +340,28 @@ detallesFlat.sort((a, b) {
   }
 
   // En orders_controller.dart
-
-Future<void> actualizarEstadoOrden(int detalleId, String nuevoEstado, {bool completarTodos = false}) async {
+// ✅ MEJOR: Siempre recibe List<int>
+Future<void> actualizarEstadoOrden(
+  List<int> detalleIds, // Siempre es una lista
+  String nuevoEstado, 
+  {bool completarTodos = false}
+) async {
   try {
-    Uri uri = Uri.parse('$defaultApiServer/ordenes/actualizarStatusorden/$detalleId/');
+    Uri uri = Uri.parse('$defaultApiServer/ordenes/actualizarStatusorden/');
 
-    // Construir el body dinámicamente
     Map<String, dynamic> requestBody = {
+      'idDetalle': detalleIds,
       'status': nuevoEstado,
     };
     
-    // Solo agregar completarTodos si es true
     if (completarTodos) {
       requestBody['completarTodos'] = true;
     }
+
+    print('📡 Actualizando estado:');
+    print('   IDs: $detalleIds');
+    print('   Estado: $nuevoEstado');
+    print('   Body: ${jsonEncode(requestBody)}');
 
     final response = await http.post(
       uri,
@@ -364,13 +372,12 @@ Future<void> actualizarEstadoOrden(int detalleId, String nuevoEstado, {bool comp
       body: jsonEncode(requestBody),
     );
 
-    print('📡 Actualizar estado - Código: ${response.statusCode}');
+    print('📡 Código: ${response.statusCode}');
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       
       if (data['success'] == true || response.statusCode == 200) {
-        // Recargar datos y reiniciar timer
         await refrescarDatos();
       } else {
         _mostrarErrorActualizacion('Error en la respuesta del servidor');
@@ -380,16 +387,14 @@ Future<void> actualizarEstadoOrden(int detalleId, String nuevoEstado, {bool comp
     }
 
   } catch (e) {
-    // Cerrar loading si está abierto
     if (Get.isDialogOpen ?? false) {
       Get.back();
     }
     
-    print('Error al actualizar estado: $e');
+    print('❌ Error al actualizar estado: $e');
     _mostrarErrorActualizacion('Error de conexión');
   }
 }
-
   void _mostrarErrorActualizacion(String mensaje) {
     QuickAlert.show(
       context: Get.context!,

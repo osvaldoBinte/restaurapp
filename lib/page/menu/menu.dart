@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:restaurapp/common/constants/constants.dart';
 import 'package:restaurapp/common/widgets/base64.dart';
 import 'package:restaurapp/page/menu/menu_controller.dart';
+
 // ✅ MODIFICACIÓN 1: Cambiar CreateEditMenuScreen a StatefulWidget
 class CreateEditMenuScreen extends StatefulWidget {
   final Map<String, dynamic>? menuData;
@@ -62,15 +63,19 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     
     _isInitialized = true;
   }
-
-  void _populateForm() {
-    if (widget.menuData != null) {
-      _nameController.text = widget.menuData!['nombre'] ?? '';
-      _descriptionController.text = widget.menuData!['descripcion'] ?? '';
-      _priceController.text = widget.menuData!['precio']?.toString() ?? '';
-      _timeController.text = widget.menuData!['tiempoPreparacion']?.toString() ?? '';
-    }
+void _populateForm() {
+  if (widget.menuData != null) {
+    print('📋 Poblando formulario con datos:');
+    print('   - nombre: ${widget.menuData!['nombre']}');
+    print('   - categoriaId: ${widget.menuData!['categoria']}');
+    print('   - categoriaMetricaId: ${widget.menuData!['categoriaMetricaId']}');  // ✅ Debug
+    
+    _nameController.text = widget.menuData!['nombre'] ?? '';
+    _descriptionController.text = widget.menuData!['descripcion'] ?? '';
+    _priceController.text = widget.menuData!['precio']?.toString() ?? '';
+    _timeController.text = widget.menuData!['tiempoPreparacion']?.toString() ?? '';
   }
+}
 
   @override
   void dispose() {
@@ -79,6 +84,7 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     _descriptionController.dispose();
     _priceController.dispose();
     _timeController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -153,16 +159,11 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
                 title: 'Nombre del Platillo',
                 child: TextFormField(
                   controller: _nameController,
-                  // ✅ MODIFICADO: Optimizar el callback onChanged
-                  onChanged: (value) {
-                    // Usar debounce para evitar múltiples llamadas
-                    _debounceUpdatePreview();
-                  },
+                  onChanged: (value) => _debounceUpdatePreview(),
                   decoration: _buildInputDecoration(
                     'Ej: Quesadilla de Pollo',
                     Icons.restaurant,
                   ),
-                  // ✅ NUEVO: Configuraciones importantes para móvil
                   textInputAction: TextInputAction.next,
                   autocorrect: false,
                   enableSuggestions: false,
@@ -188,7 +189,6 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
                     'Describe los ingredientes y preparación...',
                     null,
                   ),
-                  // ✅ NUEVO: Configuraciones para móvil
                   textInputAction: TextInputAction.newline,
                   autocorrect: true,
                   validator: (value) {
@@ -221,7 +221,6 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
                           '0.00',
                           Icons.attach_money,
                         ),
-                        // ✅ NUEVO: Configuraciones para móvil
                         textInputAction: TextInputAction.next,
                         autocorrect: false,
                         enableSuggestions: false,
@@ -253,7 +252,6 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
                           '0',
                           Icons.timer,
                         ),
-                        // ✅ NUEVO: Configuraciones para móvil
                         textInputAction: TextInputAction.done,
                         autocorrect: false,
                         enableSuggestions: false,
@@ -265,12 +263,20 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
               
               SizedBox(height: 24),
               
-              // ✅ MODIFICADO: Categoría con mejor manejo del estado
+              // ✅ Categoría
               _buildSectionTitle('Categoría'),
               SizedBox(height: 12),
               _buildInputCard(
                 title: 'Seleccionar Categoría',
                 child: _buildCategoryDropdown(),
+              ),
+              
+              SizedBox(height: 16),
+              
+              // ✅ NUEVO: Categoría Métrica
+              _buildInputCard(
+                title: 'Seleccionar Categoría Métrica',
+                child: _buildCategoriaMetricaDropdown(),
               ),
               
               SizedBox(height: 24),
@@ -313,7 +319,7 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     });
   }
 
-  // ✅ NUEVO: Widget separado para el dropdown de categoría
+  // ✅ Widget separado para el dropdown de categoría
   Widget _buildCategoryDropdown() {
     return Obx(() {
       if (menuController.isLoading.value) {
@@ -363,7 +369,57 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     });
   }
 
-  // ✅ NUEVO: Widget separado para la sección de imagen
+  // ✅ NUEVO: Widget para dropdown de categoría métrica
+  Widget _buildCategoriaMetricaDropdown() {
+    return Obx(() {
+      if (menuController.isLoadingMetricas.value) {
+        return Container(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('Cargando categorías métricas...'),
+            ],
+          ),
+        );
+      }
+      
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.white,
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<int>(
+            value: menuController.selectedCategoriaMetricaId.value,
+            hint: Text('Seleccionar categoría métrica'),
+            isExpanded: true,
+            items: menuController.categoriasMetricas.map((categoria) {
+              return DropdownMenuItem<int>(
+                value: categoria.id,
+                child: Text(categoria.nombreCategoria),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (mounted) {
+                menuController.setSelectedCategoriaMetrica(value);
+              }
+            },
+          ),
+        ),
+      );
+    });
+  }
+
+  // ✅ Widget separado para la sección de imagen
   Widget _buildImageSection() {
     return _buildInputCard(
       title: 'Seleccionar Imagen',
@@ -388,7 +444,7 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     );
   }
 
-  // ✅ MODIFICADO: Widget para vista previa de imagen
+  // ✅ Widget para vista previa de imagen
   Widget _buildImagePreview() {
     return Obx(() {
       if (menuController.selectedImage.value != null) {
@@ -400,32 +456,32 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
           ),
         );
       } else if (menuController.currentImageUrl.value != null && 
-         menuController.currentImageUrl.value!.isNotEmpty) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(12),
-    child: Base64ImageperfilWidget(
-      base64String: menuController.currentImageUrl.value,
-      width: double.infinity, // O el ancho que necesites
-      height: 200, // O la altura que necesites
-      fit: BoxFit.cover,
-      errorWidget: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.broken_image,
-            size: 48,
-            color: Colors.grey[400],
+                 menuController.currentImageUrl.value!.isNotEmpty) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Base64ImageperfilWidget(
+            base64String: menuController.currentImageUrl.value,
+            width: double.infinity,
+            height: widget.isModal ? 150 : 200,
+            fit: BoxFit.cover,
+            errorWidget: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.broken_image,
+                  size: 48,
+                  color: Colors.grey[400],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Error al cargar imagen',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
+            ),
           ),
-          SizedBox(height: 8),
-          Text(
-            'Error al cargar imagen',
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-        ],
-      ),
-    ),
-  );
-}else {
+        );
+      } else {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -456,7 +512,7 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     });
   }
 
-  // ✅ NUEVO: Widget separado para botones de imagen
+  // ✅ Widget separado para botones de imagen
   Widget _buildImageButtons() {
     return Row(
       children: [
@@ -516,7 +572,7 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     );
   }
 
-  // ✅ NUEVO: Widget separado para botones de acción
+  // ✅ Widget separado para botones de acción
   Widget _buildActionButtons() {
     return Row(
       children: [
@@ -587,10 +643,6 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     );
   }
 
-  // ... [Mantener todos los demás métodos sin cambios: _buildSectionTitle, _buildInputCard, 
-  // _buildInputDecoration, _buildPreviewCard, _buildPreviewImage, _showDeleteImageConfirmation, 
-  // _clearForm, _saveMenu]
-
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
@@ -648,7 +700,7 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
 
   Widget _buildPreviewCard() {
     return Obx(() {
-     final name = _nameController.text.isNotEmpty ? _nameController.text : 'Nombre del platillo';
+      final name = _nameController.text.isNotEmpty ? _nameController.text : 'Nombre del platillo';
       final description = _descriptionController.text.isNotEmpty ? _descriptionController.text : 'Descripción del platillo';
       final price = _priceController.text.isNotEmpty ? _priceController.text : '0.00';
       final time = _timeController.text.isNotEmpty ? _timeController.text : '0';
@@ -656,6 +708,11 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
       final categoryName = menuController.selectedCategoryId.value != null 
           ? menuController.obtenerNombreCategoria(menuController.selectedCategoryId.value!)
           : 'Sin categoría';
+      
+      // ✅ NUEVO: Obtener nombre de categoría métrica
+      final categoriaMetricaName = menuController.selectedCategoriaMetricaId.value != null 
+          ? menuController.obtenerNombreCategoriaMetrica(menuController.selectedCategoriaMetricaId.value!)
+          : 'Sin categoría métrica';
 
       return Card(
         elevation: 4,
@@ -697,8 +754,9 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
                             color: Color(0xFF3E1F08),
                           ),
                         ),
+                        // ✅ MODIFICADO: Mostrar ambas categorías
                         Text(
-                          categoryName,
+                          '$categoryName • $categoriaMetricaName',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -749,7 +807,6 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
   Widget _buildPreviewImage() {
     return Obx(() {
       if (menuController.selectedImage.value != null) {
-        // Nueva imagen seleccionada
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.file(
@@ -759,7 +816,6 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
         );
       } else if (menuController.currentImageUrl.value != null && 
                  menuController.currentImageUrl.value!.isNotEmpty) {
-        // Imagen actual del servidor
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.network(
@@ -775,7 +831,6 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
           ),
         );
       } else {
-        // Placeholder
         return Icon(
           Icons.restaurant_menu,
           color: Color(0xFF8B4513),
@@ -787,7 +842,7 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
 
   void _showDeleteImageConfirmation() {
     QuickAlert.show(
-      context: Get.context!,
+      context: context,
       type: QuickAlertType.confirm,
       title: 'Eliminar Imagen',
       text: '¿Estás seguro de que quieres eliminar la imagen actual?',
@@ -810,8 +865,12 @@ class _CreateEditMenuScreenState extends State<CreateEditMenuScreen> {
     menuController.clearForm();
   }
 
-void _saveMenu() async {
-    if (_formKey.currentState!.validate() && menuController.selectedCategoryId.value != null) {
+  // ✅ MODIFICADO: Guardar menú con categoría métrica
+  void _saveMenu() async {
+    if (_formKey.currentState!.validate() && 
+        menuController.selectedCategoryId.value != null &&
+        menuController.selectedCategoriaMetricaId.value != null) {
+      
       final success = await menuController.guardarMenuConValidacion(
         nombre: _nameController.text.trim(),
         descripcion: _descriptionController.text.trim(),
@@ -819,7 +878,8 @@ void _saveMenu() async {
         tiempoPreparacion: _timeController.text.trim(),
         imagenFile: menuController.selectedImage.value,
         categoriaId: menuController.selectedCategoryId.value,
-        context: context, // ✅ Pasar context del widget
+        idCategoriasMetricas: menuController.selectedCategoriaMetricaId.value, // ✅ NUEVO
+        context: context,
       );
       
       if (success && !menuController.isEditMode.value) {
@@ -828,19 +888,24 @@ void _saveMenu() async {
         }
       }
       
-      if (success && menuController.isEditMode.value) {
-       
-      }
     } else if (menuController.selectedCategoryId.value == null) {
       QuickAlert.show(
-        context: context, // ✅ Usar context del widget
+        context: context,
         type: QuickAlertType.warning,
         title: 'Categoría Requerida',
         text: 'Por favor selecciona una categoría',
         confirmBtnText: 'OK',
         confirmBtnColor: Color(0xFFF39C12),
       );
+    } else if (menuController.selectedCategoriaMetricaId.value == null) { // ✅ NUEVO
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.warning,
+        title: 'Categoría Métrica Requerida',
+        text: 'Por favor selecciona una categoría métrica',
+        confirmBtnText: 'OK',
+        confirmBtnColor: Color(0xFFF39C12),
+      );
     }
   }
-
 }

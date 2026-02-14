@@ -767,39 +767,36 @@ class _TableDetailsModalState extends State<TableDetailsModal> {
         ],
       ),
     );
-  }
-
-  // Función para cambiar estado de producto
-  void _cambiarEstadoProducto(Map<String, dynamic> producto, String nuevoEstado) {
-    final detalleId = producto['detalleId'] as int;
-    final nombreProducto = producto['nombreProducto'] ?? 'Producto';
-    final pedidoId = producto['pedidoId'];
-    
-    String titulo = nuevoEstado == 'completado' ? 'Completar Producto' : 'Cancelar Producto';
-    String mensaje = nuevoEstado == 'completado' 
-        ? '¿Marcar "$nombreProducto" como completado?'
-        : '¿Está seguro de que quiere cancelar "$nombreProducto"?\n\nEsta acción no se puede deshacer.';
-    
-    String textoBoton = nuevoEstado == 'completado' ? 'Completar' : 'Cancelar';
-    Color colorBoton = nuevoEstado == 'completado' ? Colors.green : Colors.red;
-    
-    QuickAlert.show(
-      context: Get.context!,
-      type: QuickAlertType.confirm,
-      title: titulo,
-      text: '$mensaje\n\nPedido #$pedidoId',
-      confirmBtnText: textoBoton,
-      cancelBtnText: 'Volver',
-      confirmBtnColor: colorBoton,
-      onConfirmBtnTap: () async {
-        Get.back(); // Cerrar diálogo de confirmación
-        
-        // Usar el método del controller que ya tienes
-        final controller = Get.find<OrdersController>();
-        await controller.actualizarEstadoOrden(detalleId, nuevoEstado);
-      },
-    );
-  }
+  }void _cambiarEstadoProducto(Map<String, dynamic> producto, String nuevoEstado) {
+  final detalleId = producto['detalleId'] as int;
+  final nombreProducto = producto['nombreProducto'] ?? 'Producto';
+  final pedidoId = producto['pedidoId'];
+  
+  String titulo = nuevoEstado == 'completado' ? 'Completar Producto' : 'Cancelar Producto';
+  String mensaje = nuevoEstado == 'completado' 
+      ? '¿Marcar "$nombreProducto" como completado?'
+      : '¿Está seguro de que quiere cancelar "$nombreProducto"?\n\nEsta acción no se puede deshacer.';
+  
+  String textoBoton = nuevoEstado == 'completado' ? 'Completar' : 'Cancelar';
+  Color colorBoton = nuevoEstado == 'completado' ? Colors.green : Colors.red;
+  
+  QuickAlert.show(
+    context: Get.context!,
+    type: QuickAlertType.confirm,
+    title: titulo,
+    text: '$mensaje\n\nPedido #$pedidoId',
+    confirmBtnText: textoBoton,
+    cancelBtnText: 'Volver',
+    confirmBtnColor: colorBoton,
+    onConfirmBtnTap: () async {
+      Get.back(); // Cerrar diálogo de confirmación
+      
+      // ✅ CAMBIO: Pasar detalleId como lista
+      final controller = Get.find<OrdersController>();
+      await controller.actualizarEstadoOrden([detalleId], nuevoEstado);
+    },
+  );
+}
   void _aumentarCantidad(Map<String, dynamic> producto) async {
     final detalleId = producto['detalleId'];
     final cantidadActual = producto['cantidad'] ?? 1;

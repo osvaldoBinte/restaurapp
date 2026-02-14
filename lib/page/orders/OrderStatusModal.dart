@@ -114,14 +114,14 @@ class OrderStatusModal extends StatelessWidget {
     );
   }
   
-  // Método para actualizar estado y cerrar modal
+  // ✅ CAMBIO: Convertir pedidoId a lista antes de llamar al controller
   Future<void> _actualizarYCerrar(OrdersController controller, int pedidoId, String nuevoEstado) async {
     try {
       // Cerrar modal inmediatamente para mejor UX
       Get.back();
       
-      // Ejecutar actualización
-      await controller.actualizarEstadoOrden(pedidoId, nuevoEstado);
+      // ✅ CAMBIO: Pasar el pedidoId como lista
+      await controller.actualizarEstadoOrden([pedidoId], nuevoEstado);
       
     } catch (e) {
       print('Error al actualizar estado: $e');
