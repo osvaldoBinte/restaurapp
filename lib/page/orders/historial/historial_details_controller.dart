@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import 'package:quickalert/quickalert.dart';
+import 'package:restaurapp/common/constants/constants.dart';
 
 import 'package:restaurapp/common/services/BluetoothPrinterService.dart';
 import 'package:restaurapp/page/orders/historial/historal_controller.dart';
@@ -67,8 +69,69 @@ void toggleProductoSeleccionado(int detalleId) {
   print('   Products count: ${productosSeleccionados.length}');
   
   update(); // ← ¡AGREGAR ESTA LÍNEA!
-}
+}Future<void> modificarCantidad(int detalleId, int nuevaCantidad) async {
+  if (nuevaCantidad < 1) return;
 
+  isUpdating.value = true;
+
+  try {
+    final url = Uri.parse('${AppConstants.serverBase}/ordenes/detalle/$detalleId/modificarCantidad/');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({'cantidad': nuevaCantidad}),
+    ).timeout(Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      // ✅ Actualizar _ventaActual localmente sin salir del modal
+      final detalles = (_ventaActual['detalles'] ?? _ventaActual['items']) as List?;
+      if (detalles != null) {
+        for (int i = 0; i < detalles.length; i++) {
+          final item = detalles[i] as Map<String, dynamic>;
+          final itemId = (item['detalleId'] as int?) ??
+                         (item['id'] as int?) ??
+                         (item['itemId'] as int?);
+          if (itemId == detalleId) {
+            detalles[i] = Map<String, dynamic>.from(item)
+              ..['cantidad'] = nuevaCantidad;
+            break;
+          }
+        }
+        // Forzar la copia actualizada
+        _ventaActual = Map<String, dynamic>.from(_ventaActual);
+      }
+
+      update(); // ✅ Redibujar el modal inmediatamente
+
+      // Refrescar la lista de fondo (sin bloquear UI)
+      Get.find<HistorialController>().refrescarDatos();
+
+      Get.snackbar(
+        'Cantidad Actualizada',
+        'Cantidad cambiada a $nuevaCantidad',
+        backgroundColor: Colors.green.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
+    } else {
+      throw Exception('Error ${response.statusCode}');
+    }
+  } catch (e) {
+    print('❌ Error modificarCantidad: $e');
+    Get.snackbar(
+      'Error',
+      'No se pudo modificar la cantidad: $e',
+      backgroundColor: Colors.red.withOpacity(0.8),
+      colorText: Colors.white,
+    );
+  } finally {
+    isUpdating.value = false;
+  }
+}
 void toggleSeleccionarTodos() {
   if (productosSeleccionados.length == productos.length) {
     // Si todos están seleccionados, deseleccionar todos

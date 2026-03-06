@@ -587,19 +587,16 @@ Widget _buildMetricasYHistorial() {
         ),
       ],
     );
-  }
-// 🆕 Modal para mostrar métricas por categorías CON SELECTOR DE FECHA
-void _showMetricasModal() {
-  // Cargar datos al abrir el modal
+  }void _showMetricasModal() {
+  // Cargar ambos datos al abrir el modal
   metricasController.cargarMetricasPorCategorias();
+  metricasController.cargarListaCategorias();
   
   Get.dialog(
     Dialog(
-      // Modal que cubre toda la pantalla
       insetPadding: EdgeInsets.zero,
       backgroundColor: Colors.transparent,
       child: Container(
-        // Ocupa todo el ancho y alto de la pantalla
         width: Get.width,
         height: Get.height,
         decoration: BoxDecoration(
@@ -607,7 +604,7 @@ void _showMetricasModal() {
         ),
         child: Column(
           children: [
-            // Header del modal - Responsivo
+            // Header del modal
             Container(
               padding: EdgeInsets.only(
                 top: MediaQuery.of(Get.context!).padding.top + 8,
@@ -617,7 +614,7 @@ void _showMetricasModal() {
               ),
               decoration: BoxDecoration(
                 color: Color(0xFF2196F3),
-                borderRadius: BorderRadius.zero, // Sin bordes redondeados
+                borderRadius: BorderRadius.zero,
               ),
               child: SafeArea(
                 top: false,
@@ -633,17 +630,25 @@ void _showMetricasModal() {
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(Icons.analytics, color: Colors.white, size: 20),
+                          child: Obx(() => Icon(
+                            metricasController.mostrarListaCategorias.value 
+                              ? Icons.list_alt 
+                              : Icons.analytics,
+                            color: Colors.white,
+                            size: 20,
+                          )),
                         ),
                         SizedBox(width: 12),
                         
-                        // Títulos con Expanded para evitar overflow
+                        // Títulos
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Métricas por Categorías',
+                              Obx(() => Text(
+                                metricasController.mostrarListaCategorias.value
+                                  ? 'Lista de Categorías'
+                                  : 'Métricas por Categorías',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -651,77 +656,155 @@ void _showMetricasModal() {
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
-                              ),
-                              // Selector de fecha clickeable
-                              GestureDetector(
-                                onTap: () => _mostrarSelectorFecha(),
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.calendar_today,
-                                        size: 12,
-                                        color: Colors.white,
+                              )),
+                              
+                              // Solo mostrar selector de fecha en modo métricas
+                              Obx(() {
+                                if (!metricasController.mostrarListaCategorias.value) {
+                                  return GestureDetector(
+                                    onTap: () => _mostrarSelectorFecha(),
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
                                       ),
-                                      SizedBox(width: 4),
-                                      Obx(() => Text(
-                                        metricasController.fechaFormateada,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      )),
-                                      SizedBox(width: 4),
-                                      Icon(
-                                        Icons.arrow_drop_down,
-                                        size: 14,
-                                        color: Colors.white,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.calendar_today, size: 12, color: Colors.white),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            metricasController.fechaFormateada,
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Icon(Icons.arrow_drop_down, size: 14, color: Colors.white),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                                    ),
+                                  );
+                                }
+                                return SizedBox(height: 4);
+                              }),
                             ],
                           ),
                         ),
                         
-                        // Botones en fila horizontal responsiva
+                        // Botones
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Botón de fecha rápida (hoy)
+                            // 🆕 Switch entre vistas
                             Container(
-                              width: 36,
                               height: 36,
-                              child: IconButton(
-                                padding: EdgeInsets.zero,
-                                onPressed: () => _cambiarAFechaHoy(),
-                                icon: Icon(Icons.today, color: Colors.white, size: 18),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.white.withOpacity(0.2),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Obx(() => _buildViewSwitchButton(
+                                    icon: Icons.analytics,
+                                    tooltip: 'Métricas',
+                                    isActive: !metricasController.mostrarListaCategorias.value,
+                                    onPressed: () => metricasController.mostrarListaCategorias.value = false,
+                                  )),
+                                  Container(
+                                    width: 1,
+                                    height: 24,
+                                    color: Colors.white.withOpacity(0.3),
                                   ),
-                                ),
-                                tooltip: 'Ir a hoy',
+                                  Obx(() => _buildViewSwitchButton(
+                                    icon: Icons.list_alt,
+                                    tooltip: 'Lista',
+                                    isActive: metricasController.mostrarListaCategorias.value,
+                                    onPressed: () => metricasController.mostrarListaCategorias.value = true,
+                                  )),
+                                ],
                               ),
                             ),
                             SizedBox(width: 8),
-                            // Botón de refrescar
+                            
+                            // Botón crear categoría (solo en modo lista)
+                            Obx(() {
+                              if (metricasController.mostrarListaCategorias.value) {
+                                return Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      child: IconButton(
+                                        padding: EdgeInsets.zero,
+                                        onPressed: () => metricasController.mostrarDialogoCrearCategoria(),
+                                        icon: Icon(Icons.add_circle_outline, color: Colors.white, size: 18),
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: Colors.white.withOpacity(0.2),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        tooltip: 'Nueva categoría',
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                  ],
+                                );
+                              }
+                              return SizedBox.shrink();
+                            }),
+                            
+                            // Botón hoy (solo en modo métricas)
+                            Obx(() {
+                              if (!metricasController.mostrarListaCategorias.value) {
+                                return Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      child: IconButton(
+                                        padding: EdgeInsets.zero,
+                                        onPressed: () => _cambiarAFechaHoy(),
+                                        icon: Icon(Icons.today, color: Colors.white, size: 18),
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: Colors.white.withOpacity(0.2),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        tooltip: 'Ir a hoy',
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                  ],
+                                );
+                              }
+                              return SizedBox.shrink();
+                            }),
+                            
+                            // Botón refrescar
                             Container(
                               width: 36,
                               height: 36,
                               child: IconButton(
                                 padding: EdgeInsets.zero,
-                                onPressed: () => metricasController.refrescarMetricas(),
-                                icon: Obx(() => metricasController.isLoading.value
+                                onPressed: () {
+                                  if (metricasController.mostrarListaCategorias.value) {
+                                    metricasController.cargarListaCategorias();
+                                  } else {
+                                    metricasController.refrescarMetricas();
+                                  }
+                                },
+                                icon: Obx(() {
+                                  final isLoading = metricasController.mostrarListaCategorias.value
+                                    ? metricasController.isLoadingListaCategorias.value
+                                    : metricasController.isLoading.value;
+                                  
+                                  return isLoading
                                     ? SizedBox(
                                         width: 16,
                                         height: 16,
@@ -730,8 +813,8 @@ void _showMetricasModal() {
                                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                         ),
                                       )
-                                    : Icon(Icons.refresh, color: Colors.white, size: 18)
-                                ),
+                                    : Icon(Icons.refresh, color: Colors.white, size: 18);
+                                }),
                                 style: IconButton.styleFrom(
                                   backgroundColor: Colors.white.withOpacity(0.2),
                                   shape: RoundedRectangleBorder(
@@ -741,7 +824,8 @@ void _showMetricasModal() {
                               ),
                             ),
                             SizedBox(width: 8),
-                            // Botón de cerrar
+                            
+                            // Botón cerrar
                             Container(
                               width: 36,
                               height: 36,
@@ -762,391 +846,61 @@ void _showMetricasModal() {
                       ],
                     ),
                     
-                    // Navegación rápida de fechas
-                    SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // Botón día anterior
-                        _buildFechaNavButton(
-                          icon: Icons.chevron_left,
-                          label: 'Anterior',
-                          onPressed: () => _cambiarFecha(-1),
-                        ),
-                        // Indicador de fecha actual
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Obx(() => Text(
-                            _obtenerEtiquetaFecha(),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                    // Navegación de fechas (solo en modo métricas)
+                    Obx(() {
+                      if (!metricasController.mostrarListaCategorias.value) {
+                        return Column(
+                          children: [
+                            SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _buildFechaNavButton(
+                                  icon: Icons.chevron_left,
+                                  label: 'Anterior',
+                                  onPressed: () => _cambiarFecha(-1),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Text(
+                                    _obtenerEtiquetaFecha(),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                _buildFechaNavButton(
+                                  icon: Icons.chevron_right,
+                                  label: 'Siguiente',
+                                  onPressed: () => _cambiarFecha(1),
+                                ),
+                              ],
                             ),
-                          )),
-                        ),
-                        // Botón día siguiente
-                        _buildFechaNavButton(
-                          icon: Icons.chevron_right,
-                          label: 'Siguiente',
-                          onPressed: () => _cambiarFecha(1),
-                        ),
-                      ],
-                    ),
+                          ],
+                        );
+                      }
+                      return SizedBox.shrink();
+                    }),
                   ],
                 ),
               ),
             ),
             
-            // Contenido del modal - Completamente expandido
+            // Contenido del modal
             Expanded(
               child: Obx(() {
-                if (metricasController.isLoading.value) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
-                        ),
-                        SizedBox(height: 16),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          child: Text(
-                            'Cargando métricas...',
-                            style: TextStyle(
-                              color: Color(0xFF2196F3),
-                              fontSize: 16,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                // Mostrar lista de categorías o métricas según el switch
+                if (metricasController.mostrarListaCategorias.value) {
+                  return _buildListaCategorias();
+                } else {
+                  return _buildMetricasContent();
                 }
-
-                if (metricasController.error.value.isNotEmpty) {
-                  return Center(
-                    child: Container(
-                      margin: EdgeInsets.all(20),
-                      padding: EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.error_outline, color: Colors.red, size: 48),
-                          SizedBox(height: 12),
-                          Text(
-                            'Error al cargar métricas',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red[700],
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: 8),
-                          Flexible(
-                            child: Text(
-                              metricasController.error.value,
-                              style: TextStyle(
-                                color: Colors.red[600],
-                                fontSize: 14,
-                              ),
-                              textAlign: TextAlign.center,
-                              overflow: TextOverflow.visible,
-                            ),
-                          ),
-                          SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () => metricasController.refrescarMetricas(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: Text('Reintentar'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                return Container(
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Resumen total responsivo con más información
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: Get.width > 400 ? 20 : 16,
-                        ),
-                        margin: EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0xFF2196F3).withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Total General',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: Get.width > 400 ? 16 : 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: 8),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                metricasController.totalGeneralFormateado,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: Get.width > 400 ? 28 : 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                              ),
-                            ),
-                            // Mostrar cantidad total de items si está disponible
-                            Obx(() {
-                              if (metricasController.cantidadGeneralItems.value > 0) {
-                                return Column(
-                                  children: [
-                                    SizedBox(height: 4),
-                                    Text(
-                                      '${metricasController.cantidadGeneralItems.value} items en total',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                );
-                              }
-                              return SizedBox.shrink();
-                            }),
-                          ],
-                        ),
-                      ),
-
-                      // Lista de categorías
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          'Desglose por Categorías',
-                          style: TextStyle(
-                            fontSize: Get.width > 400 ? 18 : 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF3E1F08),
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 12),
-
-                      // Lista completamente expandida
-                      Expanded(
-                        child: metricasController.categorias.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.inbox_outlined,
-                                      size: Get.width > 400 ? 64 : 48,
-                                      color: Colors.grey[400],
-                                    ),
-                                    SizedBox(height: 16),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 20),
-                                      child: Text(
-                                        'No hay datos disponibles',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey[600],
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                    SizedBox(height: 8),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 20),
-                                      child: Text(
-                                        'Para la fecha seleccionada',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[500],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                padding: EdgeInsets.only(bottom: 16),
-                                itemCount: metricasController.categorias.length,
-                                itemBuilder: (context, index) {
-                                  final categoria = metricasController.categorias[index];
-                                  final nombre = categoria['categoria'] ?? 'Sin categoría';
-                                  final total = categoria['total'] ?? 0.0;
-                                  final cantidad = categoria['cantidad'] ?? 0;
-                                  final porcentaje = metricasController.totalGeneral.value > 0 
-                                      ? (total / metricasController.totalGeneral.value * 100) 
-                                      : 0.0;
-
-                                  return Container(
-                                    margin: EdgeInsets.only(bottom: 12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.05),
-                                          blurRadius: 4,
-                                          offset: Offset(0, 1),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Padding(
-                                      padding: EdgeInsets.all(16),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          // Icono con color diferente según categoría
-                                          Container(
-                                            width: 45,
-                                            height: 45,
-                                            decoration: BoxDecoration(
-                                              color: _obtenerColorCategoria(categoria['clave'] ?? '').withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(10),
-                                            ),
-                                            child: Icon(
-                                              _obtenerIconoCategoria(categoria['clave'] ?? ''),
-                                              color: _obtenerColorCategoria(categoria['clave'] ?? ''),
-                                              size: 22,
-                                            ),
-                                          ),
-                                          SizedBox(width: 12),
-                                          
-                                          // Contenido principal expandido
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                // Nombre de categoría
-                                                Text(
-                                                  nombre,
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: Get.width > 400 ? 16 : 14,
-                                                    color: Color(0xFF3E1F08),
-                                                  ),
-                                                  overflow: TextOverflow.ellipsis,
-                                                  maxLines: 2,
-                                                ),
-                                                SizedBox(height: 4),
-                                                
-                                                // Información de cantidad si está disponible
-                                                if (cantidad > 0)
-                                                  Text(
-                                                    'cantidad total: $cantidad',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                    ),
-                                                  ),
-                                                SizedBox(height: 8),
-                                                
-                                                // Barra de progreso
-                                                Container(
-                                                  height: 4,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.grey[200],
-                                                    borderRadius: BorderRadius.circular(2),
-                                                  ),
-                                                  child: FractionallySizedBox(
-                                                    alignment: Alignment.centerLeft,
-                                                    widthFactor: (porcentaje / 100).clamp(0.0, 1.0),
-                                                    child: Container(
-                                                      decoration: BoxDecoration(
-                                                        color: _obtenerColorCategoria(categoria['clave'] ?? ''),
-                                                        borderRadius: BorderRadius.circular(2),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          
-                                          SizedBox(width: 8),
-                                          
-                                          // Información de precio y porcentaje
-                                          Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
-                                              // Monto - Con tamaño adaptativo
-                                              FittedBox(
-                                                fit: BoxFit.scaleDown,
-                                                child: Text(
-                                                  metricasController.formatearMonto(total),
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: Get.width > 400 ? 16 : 14,
-                                                    color: _obtenerColorCategoria(categoria['clave'] ?? ''),
-                                                  ),
-                                                  maxLines: 1,
-                                                ),
-                                              ),
-                                              SizedBox(height: 2),
-                                              
-                                             
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                );
               }),
             ),
           ],
@@ -1157,6 +911,595 @@ void _showMetricasModal() {
   );
 }
 
+// 🆕 Widget para botones del switch de vista
+Widget _buildViewSwitchButton({
+  required IconData icon,
+  required String tooltip,
+  required bool isActive,
+  required VoidCallback onPressed,
+}) {
+  return Container(
+    width: 36,
+    height: 36,
+    child: IconButton(
+      padding: EdgeInsets.zero,
+      onPressed: onPressed,
+      icon: Icon(
+        icon,
+        color: isActive ? Colors.white : Colors.white.withOpacity(0.5),
+        size: 18,
+      ),
+      style: IconButton.styleFrom(
+        backgroundColor: isActive ? Colors.white.withOpacity(0.2) : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
+      tooltip: tooltip,
+    ),
+  );
+}
+
+// 🆕 Contenido de métricas (código existente)
+Widget _buildMetricasContent() {
+  return Obx(() {
+    if (metricasController.isLoading.value) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Cargando métricas...',
+              style: TextStyle(color: Color(0xFF2196F3), fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (metricasController.error.value.isNotEmpty) {
+      return Center(
+        child: Container(
+          margin: EdgeInsets.all(20),
+          padding: EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.red.withOpacity(0.3)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, color: Colors.red, size: 48),
+              SizedBox(height: 12),
+              Text(
+                'Error al cargar métricas',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red[700],
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                metricasController.error.value,
+                style: TextStyle(color: Colors.red[600], fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => metricasController.refrescarMetricas(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Resumen total
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            margin: EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0xFF2196F3).withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'Total General',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  metricasController.totalGeneralFormateado,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Obx(() {
+                  if (metricasController.cantidadGeneralItems.value > 0) {
+                    return Column(
+                      children: [
+                        SizedBox(height: 4),
+                        Text(
+                          '${metricasController.cantidadGeneralItems.value} items en total',
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    );
+                  }
+                  return SizedBox.shrink();
+                }),
+              ],
+            ),
+          ),
+
+          // Título
+          Text(
+            'Desglose por Categorías',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF3E1F08),
+            ),
+          ),
+          SizedBox(height: 12),
+
+          // Lista de categorías con métricas
+          Expanded(
+            child: metricasController.categorias.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
+                        SizedBox(height: 16),
+                        Text(
+                          'No hay datos disponibles',
+                          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.only(bottom: 16),
+                    itemCount: metricasController.categorias.length,
+                    itemBuilder: (context, index) {
+                      final categoria = metricasController.categorias[index];
+                      final nombre = categoria['categoria'] ?? 'Sin categoría';
+                      final total = categoria['total'] ?? 0.0;
+                      final cantidad = categoria['cantidad'] ?? 0;
+                      final clave = categoria['clave'] ?? '';
+                      final categoriaId = categoria['categoria_id'] ?? 0;
+                      final porcentaje = metricasController.totalGeneral.value > 0 
+                          ? (total / metricasController.totalGeneral.value * 100) 
+                          : 0.0;
+
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 45,
+                                height: 45,
+                                decoration: BoxDecoration(
+                                  color: _obtenerColorCategoria(clave).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  _obtenerIconoCategoria(clave),
+                                  color: _obtenerColorCategoria(clave),
+                                  size: 22,
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      nombre,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Color(0xFF3E1F08),
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    if (cantidad > 0)
+                                      Text(
+                                        'cantidad total: $cantidad',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                      ),
+                                    SizedBox(height: 8),
+                                    Container(
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                      child: FractionallySizedBox(
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor: (porcentaje / 100).clamp(0.0, 1.0),
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: _obtenerColorCategoria(clave),
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              
+                              SizedBox(width: 8),
+                              
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    metricasController.formatearMonto(total),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: _obtenerColorCategoria(clave),
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        child: IconButton(
+                                          padding: EdgeInsets.zero,
+                                          onPressed: () {
+                                            metricasController.mostrarDialogoModificarCategoria(
+                                              id: categoriaId,
+                                              nombreActual: nombre,
+                                            );
+                                          },
+                                          icon: Icon(Icons.edit_outlined, size: 16),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.blue.withOpacity(0.1),
+                                            foregroundColor: Colors.blue,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        child: IconButton(
+                                          padding: EdgeInsets.zero,
+                                          onPressed: () {
+                                            metricasController.eliminarCategoria(
+                                              id: categoriaId,
+                                              nombreCategoria: nombre,
+                                            );
+                                          },
+                                          icon: Icon(Icons.delete_outline, size: 16),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.red.withOpacity(0.1),
+                                            foregroundColor: Colors.red,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  });
+}
+
+// 🆕 Contenido de lista de categorías
+Widget _buildListaCategorias() {
+  return Obx(() {
+    if (metricasController.isLoadingListaCategorias.value) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Cargando categorías...',
+              style: TextStyle(color: Color(0xFF2196F3), fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (metricasController.listaCategorias.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.category_outlined, size: 64, color: Colors.grey[400]),
+            SizedBox(height: 16),
+            Text(
+              'No hay categorías registradas',
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            ),
+            SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () => metricasController.mostrarDialogoCrearCategoria(),
+              icon: Icon(Icons.add),
+              label: Text('Crear primera categoría'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF2196F3),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Contador
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Color(0xFF2196F3).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.category, color: Color(0xFF2196F3)),
+                SizedBox(width: 8),
+                Text(
+                  '${metricasController.listaCategorias.length} categorías registradas',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2196F3),
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '${metricasController.categoriasActivas.length} activas',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+          
+          // Lista
+          Expanded(
+            child: ListView.builder(
+              itemCount: metricasController.listaCategorias.length,
+              itemBuilder: (context, index) {
+                final categoria = metricasController.listaCategorias[index];
+                final id = categoria['id'] ?? 0;
+                final nombre = categoria['nombreCategoria'] ?? 'Sin nombre';
+                final descripcion = categoria['descripcion'] ?? '';
+                final status = categoria['status'] ?? false;
+
+                return Container(
+                  margin: EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: status ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        // Indicador de estado
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: status ? Colors.green : Colors.grey,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        
+                        // Contenido
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      nombre,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Color(0xFF3E1F08),
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: status ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      status ? 'Activa' : 'Inactiva',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: status ? Colors.green[700] : Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (descripcion.isNotEmpty) ...[
+                                SizedBox(height: 4),
+                                Text(
+                                  descripcion,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                              SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.tag, size: 12, color: Colors.grey[400]),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'ID: $id',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[500],
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        SizedBox(width: 8),
+                        
+                        // Botones de acción
+                        Column(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () {
+                                  metricasController.mostrarDialogoModificarCategoria(
+                                    id: id,
+                                    nombreActual: nombre,
+                                  );
+                                },
+                                icon: Icon(Icons.edit_outlined, size: 16),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.blue.withOpacity(0.1),
+                                  foregroundColor: Colors.blue,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Container(
+                              width: 32,
+                              height: 32,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () {
+                                  metricasController.eliminarCategoria(
+                                    id: id,
+                                    nombreCategoria: nombre,
+                                  );
+                                },
+                                icon: Icon(Icons.delete_outline, size: 16),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.red.withOpacity(0.1),
+                                  foregroundColor: Colors.red,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  });
+}
 // Métodos auxiliares para el modal
 
 Widget _buildFechaNavButton({

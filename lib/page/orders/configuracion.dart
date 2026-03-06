@@ -27,23 +27,41 @@ class ConfiguracionController extends GetxController {
   // Observable para saber si está usando color personalizado
   final RxBool usarColorPersonalizado = false.obs;
   
+  // 🆕 Observables para peso de fuente (FontWeight)
+  final RxInt pesoFuenteProducto = 600.obs; // w600 por defecto
+  final RxBool usarPesoPersonalizadoProducto = false.obs;
+  
+  final RxInt pesoFuenteObservaciones = 400.obs; // w400 (normal) por defecto
+  final RxBool usarPesoPersonalizadoObservaciones = false.obs;
+  
   // Colores predefinidos
   final List<Color> coloresPredefinidos = [
     Colors.white,
     Colors.black,
-   Colors.grey[700]!,          // Gris oscuro
-  Color(0xFF5D4E75),          // Púrpura suave
-  Color(0xFF2E7D95),          // Azul océano
-  Color(0xFF4A7C59),          // Verde bosque
-  Color(0xFF8B6F47),          // Marrón cálido
-  Color(0xFF7A4F4F),          // Rojo ladrillo
-  Color(0xFF6B5B95),          // Lavanda
-  Color(0xFF2C5F2D),          // Verde oscuro
-  Color(0xFF4B6EAF),          // Azul slate
-  Color(0xFF8B7355),     
+    Colors.grey[700]!,
+    Color(0xFF5D4E75),
+    Color(0xFF2E7D95),
+    Color(0xFF4A7C59),
+    Color(0xFF8B6F47),
+    Color(0xFF7A4F4F),
+    Color(0xFF6B5B95),
+    Color(0xFF2C5F2D),
+    Color(0xFF4B6EAF),
+    Color(0xFF8B7355),
   ];
   
-  // Clave para SharedPreferences
+  // 🆕 Opciones de peso de fuente disponibles
+  final List<Map<String, dynamic>> pesosFuenteDisponibles = [
+    {'label': 'Delgada (300)', 'value': 300, 'weight': FontWeight.w300},
+    {'label': 'Normal (400)', 'value': 400, 'weight': FontWeight.w400},
+    {'label': 'Media (500)', 'value': 500, 'weight': FontWeight.w500},
+    {'label': 'Semi-negrita (600)', 'value': 600, 'weight': FontWeight.w600},
+    {'label': 'Negrita (700)', 'value': 700, 'weight': FontWeight.w700},
+    {'label': 'Extra negrita (800)', 'value': 800, 'weight': FontWeight.w800},
+    {'label': 'Ultra negrita (900)', 'value': 900, 'weight': FontWeight.w900},
+  ];
+  
+  // Claves para SharedPreferences
   static const String _keyTamanoFuente = 'tamano_fuente_personalizado';
   static const String _keyUsarPersonalizado = 'usar_tamano_personalizado';
   static const String _keyTamanoSecundario = 'tamano_fuente_secundario';
@@ -52,6 +70,12 @@ class ConfiguracionController extends GetxController {
   static const String _keyUsarAnchoPersonalizado = 'usar_ancho_personalizado';
   static const String _keyColorTexto = 'color_texto_personalizado';
   static const String _keyUsarColorPersonalizado = 'usar_color_personalizado';
+  
+  // 🆕 Claves para peso de fuente
+  static const String _keyPesoFuenteProducto = 'peso_fuente_producto';
+  static const String _keyUsarPesoPersonalizadoProducto = 'usar_peso_personalizado_producto';
+  static const String _keyPesoFuenteObservaciones = 'peso_fuente_observaciones';
+  static const String _keyUsarPesoPersonalizadoObservaciones = 'usar_peso_personalizado_observaciones';
   
   @override
   void onInit() {
@@ -78,6 +102,12 @@ class ConfiguracionController extends GetxController {
       final colorValue = prefs.getInt(_keyColorTexto) ?? Colors.white.value;
       colorTextoPersonalizado.value = Color(colorValue);
       usarColorPersonalizado.value = prefs.getBool(_keyUsarColorPersonalizado) ?? false;
+      
+      // 🆕 Cargar peso de fuente
+      pesoFuenteProducto.value = prefs.getInt(_keyPesoFuenteProducto) ?? 600;
+      usarPesoPersonalizadoProducto.value = prefs.getBool(_keyUsarPesoPersonalizadoProducto) ?? false;
+      pesoFuenteObservaciones.value = prefs.getInt(_keyPesoFuenteObservaciones) ?? 400;
+      usarPesoPersonalizadoObservaciones.value = prefs.getBool(_keyUsarPesoPersonalizadoObservaciones) ?? false;
     } catch (e) {
       print('Error cargando configuración: $e');
     }
@@ -95,6 +125,12 @@ class ConfiguracionController extends GetxController {
       await prefs.setBool(_keyUsarAnchoPersonalizado, usarAnchoPersonalizado.value);
       await prefs.setInt(_keyColorTexto, colorTextoPersonalizado.value.value);
       await prefs.setBool(_keyUsarColorPersonalizado, usarColorPersonalizado.value);
+      
+      // 🆕 Guardar peso de fuente
+      await prefs.setInt(_keyPesoFuenteProducto, pesoFuenteProducto.value);
+      await prefs.setBool(_keyUsarPesoPersonalizadoProducto, usarPesoPersonalizadoProducto.value);
+      await prefs.setInt(_keyPesoFuenteObservaciones, pesoFuenteObservaciones.value);
+      await prefs.setBool(_keyUsarPesoPersonalizadoObservaciones, usarPesoPersonalizadoObservaciones.value);
     } catch (e) {
       print('Error guardando configuración: $e');
     }
@@ -106,17 +142,15 @@ class ConfiguracionController extends GetxController {
       return tamanoFuentePersonalizado.value;
     }
     
-    // Tamaño automático basado en el tamaño de pantalla
     return isSmallWidth ? 12 : (isSmallScreen ? 13 : 14);
   }
   
-  // Obtener el tamaño de fuente para texto secundario (Cant, observaciones, etc.)
+  // Obtener el tamaño de fuente para texto secundario
   double obtenerTamanoFuenteSecundario(bool isSmallWidth, bool isSmallScreen) {
     if (usarTamanoSecundarioPersonalizado.value) {
       return tamanoFuenteSecundario.value;
     }
     
-    // Tamaño automático basado en el tamaño de pantalla para texto secundario
     return isSmallWidth ? 10 : (isSmallScreen ? 11 : 12);
   }
   
@@ -126,7 +160,6 @@ class ConfiguracionController extends GetxController {
       return anchoCardPersonalizado.value;
     }
     
-    // Ancho automático basado en el tamaño de pantalla
     if (isSmallWidth) {
       return 150;
     } else if (isSmallScreen) {
@@ -147,21 +180,16 @@ class ConfiguracionController extends GetxController {
     }
   }
   
-  // Obtener la altura mínima del carousel basada en la configuración
+  // Obtener la altura mínima del carousel
   double obtenerAlturaMinCarousel(bool isVerySmallScreen, bool isSmallScreen) {
-    // Factor de escalado basado en el ancho de las cards
     double factorEscala = 1.0;
     
     if (usarAnchoPersonalizado.value) {
-      // Calcular factor de escala basado en el ancho personalizado
       double anchoBase = isVerySmallScreen ? 150 : (isSmallScreen ? 170 : 190);
       factorEscala = anchoCardPersonalizado.value / anchoBase;
-      
-      // Limitar el factor de escala para evitar valores extremos
       factorEscala = factorEscala.clamp(1.0, 2.0);
     }
     
-    // Altura base según el tamaño de pantalla
     double alturaBase;
     if (isVerySmallScreen) {
       alturaBase = 140;
@@ -174,21 +202,16 @@ class ConfiguracionController extends GetxController {
     return alturaBase * factorEscala;
   }
   
-  // Obtener la altura máxima del carousel basada en la configuración
+  // Obtener la altura máxima del carousel
   double obtenerAlturaMaxCarousel(bool isVerySmallScreen, bool isSmallScreen) {
-    // Factor de escalado basado en el ancho de las cards
     double factorEscala = 1.0;
     
     if (usarAnchoPersonalizado.value) {
-      // Calcular factor de escala basado en el ancho personalizado
       double anchoBase = isVerySmallScreen ? 150 : (isSmallScreen ? 170 : 190);
       factorEscala = anchoCardPersonalizado.value / anchoBase;
-      
-      // Limitar el factor de escala para evitar valores extremos
       factorEscala = factorEscala.clamp(1.0, 2.0);
     }
     
-    // Altura base según el tamaño de pantalla
     double alturaBase;
     if (isVerySmallScreen) {
       alturaBase = 180;
@@ -201,14 +224,69 @@ class ConfiguracionController extends GetxController {
     return alturaBase * factorEscala;
   }
   
-  // Obtener el color del texto basado en la configuración
+  // Obtener el color del texto
   Color obtenerColorTexto() {
     if (usarColorPersonalizado.value) {
       return colorTextoPersonalizado.value;
     }
     
-    // Color por defecto
     return Colors.white;
+  }
+  
+  // 🆕 Obtener peso de fuente para producto
+  FontWeight obtenerPesoFuenteProducto() {
+    if (!usarPesoPersonalizadoProducto.value) {
+      return FontWeight.w600; // Peso por defecto
+    }
+    
+    return _convertirPesoAFontWeight(pesoFuenteProducto.value);
+  }
+  
+  // 🆕 Obtener peso de fuente para observaciones
+  FontWeight obtenerPesoFuenteObservaciones() {
+    if (!usarPesoPersonalizadoObservaciones.value) {
+      return FontWeight.w400; // Peso por defecto (normal)
+    }
+    
+    return _convertirPesoAFontWeight(pesoFuenteObservaciones.value);
+  }
+  
+  // 🆕 Convertir valor numérico a FontWeight
+  FontWeight _convertirPesoAFontWeight(int peso) {
+    switch (peso) {
+      case 300: return FontWeight.w300;
+      case 400: return FontWeight.w400;
+      case 500: return FontWeight.w500;
+      case 600: return FontWeight.w600;
+      case 700: return FontWeight.w700;
+      case 800: return FontWeight.w800;
+      case 900: return FontWeight.w900;
+      default: return FontWeight.w400;
+    }
+  }
+  
+  // 🆕 Cambiar peso de fuente para producto
+  void cambiarPesoFuenteProducto(int nuevoPeso) {
+    pesoFuenteProducto.value = nuevoPeso;
+    _guardarConfiguracion();
+  }
+  
+  // 🆕 Cambiar peso de fuente para observaciones
+  void cambiarPesoFuenteObservaciones(int nuevoPeso) {
+    pesoFuenteObservaciones.value = nuevoPeso;
+    _guardarConfiguracion();
+  }
+  
+  // 🆕 Alternar modo personalizado para peso de producto
+  void alternarModoPesoPersonalizadoProducto() {
+    usarPesoPersonalizadoProducto.value = !usarPesoPersonalizadoProducto.value;
+    _guardarConfiguracion();
+  }
+  
+  // 🆕 Alternar modo personalizado para peso de observaciones
+  void alternarModoPesoPersonalizadoObservaciones() {
+    usarPesoPersonalizadoObservaciones.value = !usarPesoPersonalizadoObservaciones.value;
+    _guardarConfiguracion();
   }
   
   // Cambiar color personalizado
@@ -269,397 +347,569 @@ class ConfiguracionController extends GetxController {
     anchoCardPersonalizado.value = 190.0;
     usarColorPersonalizado.value = false;
     colorTextoPersonalizado.value = Colors.white;
+    
+    // 🆕 Resetear peso de fuente
+    usarPesoPersonalizadoProducto.value = false;
+    pesoFuenteProducto.value = 600;
+    usarPesoPersonalizadoObservaciones.value = false;
+    pesoFuenteObservaciones.value = 400;
+    
     _guardarConfiguracion();
   }
   
-  // Mostrar modal de configuración
+
   void mostrarModalConfiguracion() {
-     Get.dialog(
+  Get.dialog(
     Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-      insetPadding: EdgeInsets.all(10), // Margen mínimo desde los bordes
+      insetPadding: EdgeInsets.all(10),
       child: Container(
-        width: double.infinity, // Ocupa todo el ancho disponible
+        width: double.infinity,
         padding: EdgeInsets.all(20),
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(Get.context!).size.height * 0.9, // 90% de altura
+          maxHeight: MediaQuery.of(Get.context!).size.height * 0.9,
         ),
         child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Título
-                Row(
-                  children: [
-                    Icon(
-                      Icons.palette,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Título
+              Row(
+                children: [
+                  Icon(
+                    Icons.palette,
+                    color: Color(0xFF8B4513),
+                    size: 24,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Personalizar Texto',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                       color: Color(0xFF8B4513),
-                      size: 24,
                     ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Personalizar Texto',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF8B4513),
-                      ),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+              
+              SizedBox(height: 20),
+              
+              // SECCIÓN TAMAÑO DE FUENTE PRINCIPAL
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
                 ),
-                
-                SizedBox(height: 20),
-                
-                // SECCIÓN TAMAÑO DE FUENTE PRINCIPAL
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    children: [
-                      // Toggle para tamaño personalizado
-                      Obx(() => SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          'Tamaño personalizado (Título)',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          usarTamanoPersonalizado.value 
-                            ? 'Usando tamaño personalizado para títulos'
-                            : 'Usando tamaño automático para títulos',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        value: usarTamanoPersonalizado.value,
-                        onChanged: (value) => alternarModoPersonalizado(),
-                        activeColor: Color(0xFF8B4513),
-                      )),
-                      
-                      // Slider para tamaño (solo si está en modo personalizado)
-                      Obx(() {
-                        if (!usarTamanoPersonalizado.value) {
-                          return SizedBox.shrink();
-                        }
-                        
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Tamaño título: ${tamanoFuentePersonalizado.value.toInt()}px',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            
-                            Slider(
-                              value: tamanoFuentePersonalizado.value,
-                              min: 10.0,
-                              max: 32.0,
-                              divisions: 14,
-                              activeColor: Color(0xFF8B4513),
-                              onChanged: (value) {
-                                cambiarTamanoFuente(value);
-                              },
-                            ),
-                          ],
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-                
-                SizedBox(height: 12),
-                
-                // SECCIÓN TAMAÑO DE FUENTE SECUNDARIO (Cantidad, observaciones)
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    children: [
-                      // Toggle para tamaño secundario personalizado
-                      Obx(() => SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          'Tamaño personalizado (Detalles)',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          usarTamanoSecundarioPersonalizado.value 
-                            ? 'Usando tamaño personalizado para detalles'
-                            : 'Usando tamaño automático para detalles',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        value: usarTamanoSecundarioPersonalizado.value,
-                        onChanged: (value) => alternarModoSecundarioPersonalizado(),
-                        activeColor: Color(0xFF8B4513),
-                      )),
-                      
-                      // Slider para tamaño secundario (solo si está en modo personalizado)
-                      Obx(() {
-                        if (!usarTamanoSecundarioPersonalizado.value) {
-                          return SizedBox.shrink();
-                        }
-                        
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Tamaño detalles: ${tamanoFuenteSecundario.value.toInt()}px',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            
-                            Slider(
-                              value: tamanoFuenteSecundario.value,
-                              min: 8.0,
-                              max: 32.0,
-                              divisions: 12,
-                              activeColor: Color(0xFF8B4513),
-                              onChanged: (value) {
-                                cambiarTamanoFuenteSecundario(value);
-                              },
-                            ),
-                          ],
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-                
-                SizedBox(height: 12),
-                
-                // SECCIÓN ANCHO DE TARJETAS
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    children: [
-                      // Toggle para ancho personalizado
-                      Obx(() => SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          'Ancho personalizado (Tarjetas)',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          usarAnchoPersonalizado.value 
-                            ? 'Usando ancho personalizado para tarjetas'
-                            : 'Usando ancho automático para tarjetas',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        value: usarAnchoPersonalizado.value,
-                        onChanged: (value) => alternarModoAnchoPersonalizado(),
-                        activeColor: Color(0xFF8B4513),
-                      )),
-                      
-                      // Slider para ancho (solo si está en modo personalizado)
-                      Obx(() {
-                        if (!usarAnchoPersonalizado.value) {
-                          return SizedBox.shrink();
-                        }
-                        
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Ancho tarjetas: ${anchoCardPersonalizado.value.toInt()}px',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            
-                            Text(
-                              'Mínimo: ${obtenerAnchoMinimo(false, false).toInt()}px',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            
-                            Slider(
-                              value: anchoCardPersonalizado.value,
-                              min: obtenerAnchoMinimo(false, false), // Ancho mínimo basado en pantalla
-                              max: 350.0, // Ancho máximo
-                              divisions: ((300 - obtenerAnchoMinimo(false, false)) / 10).round(),
-                              activeColor: Color(0xFF8B4513),
-                              onChanged: (value) {
-                                cambiarAnchoCard(value);
-                              },
-                            ),
-                          ],
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-                
-                SizedBox(height: 16),
-                
-                // SECCIÓN COLOR
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    children: [
-                      // Toggle para color personalizado
-                      Obx(() => SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          'Color personalizado',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          usarColorPersonalizado.value 
-                            ? 'Usando color personalizado'
-                            : 'Usando color automático (blanco)',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        value: usarColorPersonalizado.value,
-                        onChanged: (value) => alternarModoColorPersonalizado(),
-                        activeColor: Color(0xFF8B4513),
-                      )),
-                      
-                      // Selector de colores (solo si está en modo personalizado)
-                      Obx(() {
-                        if (!usarColorPersonalizado.value) {
-                          return SizedBox.shrink();
-                        }
-                        
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Seleccionar color:',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            
-                            SizedBox(height: 8),
-                            
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: coloresPredefinidos.map((color) {
-                                return Obx(() => GestureDetector(
-                                  onTap: () => cambiarColorTexto(color),
-                                  child: Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: color,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: colorTextoPersonalizado.value == color
-                                          ? Color(0xFF8B4513)
-                                          : Colors.grey[400]!,
-                                        width: colorTextoPersonalizado.value == color ? 3 : 1,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black26,
-                                          blurRadius: 2,
-                                          offset: Offset(0, 1),
-                                        ),
-                                      ],
-                                    ),
-                                    child: colorTextoPersonalizado.value == color
-                                      ? Icon(
-                                          Icons.check,
-                                          color: color == Colors.white || color == Colors.yellow
-                                            ? Colors.black
-                                            : Colors.white,
-                                          size: 20,
-                                        )
-                                      : null,
-                                  ),
-                                ));
-                              }).toList(),
-                            ),
-                          ],
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-                
-                SizedBox(height: 16),
-                
-                
-                // Botones de acción
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                child: Column(
                   children: [
-                    // Botón Resetear
-                    TextButton(
-                      onPressed: () {
-                        resetearConfiguracion();
-                      },
-                      child: Text(
-                        'Resetear',
+                    Obx(() => SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Tamaño personalizado (Título)',
                         style: TextStyle(
-                          color: Colors.grey[600],
                           fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ),
+                      subtitle: Text(
+                        usarTamanoPersonalizado.value 
+                          ? 'Usando tamaño personalizado para títulos'
+                          : 'Usando tamaño automático para títulos',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: usarTamanoPersonalizado.value,
+                      onChanged: (value) => alternarModoPersonalizado(),
+                      activeColor: Color(0xFF8B4513),
+                    )),
                     
-                    // Botón Cerrar
-                    ElevatedButton(
-                      onPressed: () => Get.back(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF8B4513),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        'Aplicar',
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    ),
+                    Obx(() {
+                      if (!usarTamanoPersonalizado.value) {
+                        return SizedBox.shrink();
+                      }
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tamaño título: ${tamanoFuentePersonalizado.value.toInt()}px',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          
+                          Slider(
+                            value: tamanoFuentePersonalizado.value,
+                            min: 10.0,
+                            max: 32.0,
+                            divisions: 14,
+                            activeColor: Color(0xFF8B4513),
+                            onChanged: (value) {
+                              cambiarTamanoFuente(value);
+                            },
+                          ),
+                        ],
+                      );
+                    }),
                   ],
                 ),
-              ],
-            ),
+              ),
+              
+              SizedBox(height: 12),
+              
+              // SECCIÓN TAMAÑO DE FUENTE SECUNDARIO
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  children: [
+                    Obx(() => SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Tamaño personalizado (Detalles)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        usarTamanoSecundarioPersonalizado.value 
+                          ? 'Usando tamaño personalizado para detalles'
+                          : 'Usando tamaño automático para detalles',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: usarTamanoSecundarioPersonalizado.value,
+                      onChanged: (value) => alternarModoSecundarioPersonalizado(),
+                      activeColor: Color(0xFF8B4513),
+                    )),
+                    
+                    Obx(() {
+                      if (!usarTamanoSecundarioPersonalizado.value) {
+                        return SizedBox.shrink();
+                      }
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tamaño detalles: ${tamanoFuenteSecundario.value.toInt()}px',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          
+                          Slider(
+                            value: tamanoFuenteSecundario.value,
+                            min: 8.0,
+                            max: 32.0,
+                            divisions: 12,
+                            activeColor: Color(0xFF8B4513),
+                            onChanged: (value) {
+                              cambiarTamanoFuenteSecundario(value);
+                            },
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 12),
+              
+              // 🆕 SECCIÓN PESO DE FUENTE PARA PRODUCTO
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  children: [
+                    Obx(() => SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Grosor personalizado (Producto)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        usarPesoPersonalizadoProducto.value 
+                          ? 'Usando grosor personalizado para nombres de productos'
+                          : 'Usando grosor automático (Semi-negrita)',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: usarPesoPersonalizadoProducto.value,
+                      onChanged: (value) => alternarModoPesoPersonalizadoProducto(),
+                      activeColor: Color(0xFF8B4513),
+                    )),
+                    
+                    Obx(() {
+                      if (!usarPesoPersonalizadoProducto.value) {
+                        return SizedBox.shrink();
+                      }
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 8),
+                          Text(
+                            'Seleccionar grosor:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: pesosFuenteDisponibles.map((pesoInfo) {
+                              final int valor = pesoInfo['value'];
+                              final String label = pesoInfo['label'];
+                              final FontWeight weight = pesoInfo['weight'];
+                              
+                              return Obx(() => ChoiceChip(
+                                label: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: weight,
+                                  ),
+                                ),
+                                selected: pesoFuenteProducto.value == valor,
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    cambiarPesoFuenteProducto(valor);
+                                  }
+                                },
+                                selectedColor: Color(0xFF8B4513).withOpacity(0.3),
+                                labelStyle: TextStyle(
+                                  color: pesoFuenteProducto.value == valor
+                                    ? Color(0xFF8B4513)
+                                    : Colors.black87,
+                                ),
+                              ));
+                            }).toList(),
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 12),
+              
+              // 🆕 SECCIÓN PESO DE FUENTE PARA OBSERVACIONES
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  children: [
+                    Obx(() => SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Grosor personalizado (Observaciones)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        usarPesoPersonalizadoObservaciones.value 
+                          ? 'Usando grosor personalizado para observaciones'
+                          : 'Usando grosor automático (Normal)',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: usarPesoPersonalizadoObservaciones.value,
+                      onChanged: (value) => alternarModoPesoPersonalizadoObservaciones(),
+                      activeColor: Color(0xFF8B4513),
+                    )),
+                    
+                    Obx(() {
+                      if (!usarPesoPersonalizadoObservaciones.value) {
+                        return SizedBox.shrink();
+                      }
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 8),
+                          Text(
+                            'Seleccionar grosor:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: pesosFuenteDisponibles.map((pesoInfo) {
+                              final int valor = pesoInfo['value'];
+                              final String label = pesoInfo['label'];
+                              final FontWeight weight = pesoInfo['weight'];
+                              
+                              return Obx(() => ChoiceChip(
+                                label: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: weight,
+                                  ),
+                                ),
+                                selected: pesoFuenteObservaciones.value == valor,
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    cambiarPesoFuenteObservaciones(valor);
+                                  }
+                                },
+                                selectedColor: Color(0xFF8B4513).withOpacity(0.3),
+                                labelStyle: TextStyle(
+                                  color: pesoFuenteObservaciones.value == valor
+                                    ? Color(0xFF8B4513)
+                                    : Colors.black87,
+                                ),
+                              ));
+                            }).toList(),
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 12),
+              
+              // SECCIÓN ANCHO DE TARJETAS
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  children: [
+                    Obx(() => SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Ancho personalizado (Tarjetas)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        usarAnchoPersonalizado.value 
+                          ? 'Usando ancho personalizado para tarjetas'
+                          : 'Usando ancho automático para tarjetas',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: usarAnchoPersonalizado.value,
+                      onChanged: (value) => alternarModoAnchoPersonalizado(),
+                      activeColor: Color(0xFF8B4513),
+                    )),
+                    
+                    Obx(() {
+                      if (!usarAnchoPersonalizado.value) {
+                        return SizedBox.shrink();
+                      }
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ancho tarjetas: ${anchoCardPersonalizado.value.toInt()}px',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          
+                          Text(
+                            'Mínimo: ${obtenerAnchoMinimo(false, false).toInt()}px',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          
+                          Slider(
+                            value: anchoCardPersonalizado.value,
+                            min: obtenerAnchoMinimo(false, false),
+                            max: 350.0,
+                            divisions: ((300 - obtenerAnchoMinimo(false, false)) / 10).round(),
+                            activeColor: Color(0xFF8B4513),
+                            onChanged: (value) {
+                              cambiarAnchoCard(value);
+                            },
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 12),
+              
+              // SECCIÓN COLOR
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  children: [
+                    Obx(() => SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Color personalizado',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        usarColorPersonalizado.value 
+                          ? 'Usando color personalizado'
+                          : 'Usando color automático (blanco)',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: usarColorPersonalizado.value,
+                      onChanged: (value) => alternarModoColorPersonalizado(),
+                      activeColor: Color(0xFF8B4513),
+                    )),
+                    
+                    Obx(() {
+                      if (!usarColorPersonalizado.value) {
+                        return SizedBox.shrink();
+                      }
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Seleccionar color:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          
+                          SizedBox(height: 8),
+                          
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: coloresPredefinidos.map((color) {
+                              return Obx(() => GestureDetector(
+                                onTap: () => cambiarColorTexto(color),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: colorTextoPersonalizado.value == color
+                                        ? Color(0xFF8B4513)
+                                        : Colors.grey[400]!,
+                                      width: colorTextoPersonalizado.value == color ? 3 : 1,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 2,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: colorTextoPersonalizado.value == color
+                                    ? Icon(
+                                        Icons.check,
+                                        color: color == Colors.white || color == Colors.yellow
+                                          ? Colors.black
+                                          : Colors.white,
+                                        size: 20,
+                                      )
+                                    : null,
+                                ),
+                              ));
+                            }).toList(),
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 16),
+              
+              // Botones de acción
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      resetearConfiguracion();
+                    },
+                    child: Text(
+                      'Resetear',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  
+                  ElevatedButton(
+                    onPressed: () => Get.back(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF8B4513),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Aplicar',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

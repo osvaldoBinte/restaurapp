@@ -404,32 +404,43 @@ class HistorialDetailsModal extends StatelessWidget {
                 ),
                 
                 // Status y cantidad (lado derecho)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // Status chip
-                    _buildStatusChip(statusDetalle, controller),
-                    
-                    SizedBox(height: 12),
-                    
-                    // Cantidad
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Color(0xFF8B4513).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'x$cantidad',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Color(0xFF8B4513),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                // Reemplaza el Container de 'x$cantidad' con esto:
+Row(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    IconButton(
+      icon: Icon(Icons.remove, size: 16),
+      padding: EdgeInsets.zero,
+      constraints: BoxConstraints(minWidth: 28, minHeight: 28),
+      onPressed: cantidad > 1
+          ? () => controller.modificarCantidad(detalleId, cantidad - 1)
+          : null,
+      color: Color(0xFF8B4513),
+    ),
+    Container(
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Color(0xFF8B4513).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '$cantidad',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          color: Color(0xFF8B4513),
+        ),
+      ),
+    ),
+    IconButton(
+      icon: Icon(Icons.add, size: 16),
+      padding: EdgeInsets.zero,
+      constraints: BoxConstraints(minWidth: 28, minHeight: 28),
+      onPressed: () => controller.modificarCantidad(detalleId, cantidad + 1),
+      color: Color(0xFF8B4513),
+    ),
+  ],
+),
               ],
             ),
             

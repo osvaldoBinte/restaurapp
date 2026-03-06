@@ -59,7 +59,7 @@ class OrdersDashboardScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '"El Jobo v1.2"',
+                    '"El Jobo v1.3"',
                     style: TextStyle(
                       fontSize: isSmallWidth ? 16 : 18,
                       fontWeight: FontWeight.bold,
@@ -409,15 +409,15 @@ class OrdersDashboardScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // ✅ NOMBRE DEL PRODUCTO - TAMAÑO Y COLOR PERSONALIZABLES
-                    Obx(() => Text(
-                      nombreProducto,
-                      style: TextStyle(
-                        color: configuracionController.obtenerColorTexto(),
-                        fontSize: configuracionController.obtenerTamanoFuente(isSmallWidth, isSmallScreen),
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                      ),
-                    )),
+                   Obx(() => Text(
+  nombreProducto,
+  style: TextStyle(
+    color: configuracionController.obtenerColorTexto(),
+    fontSize: configuracionController.obtenerTamanoFuente(isSmallWidth, isSmallScreen),
+    fontWeight: configuracionController.obtenerPesoFuenteProducto(), // 🆕 PESO PERSONALIZABLE
+    height: 1.3,
+  ),
+)),
 
                     SizedBox(height: 6),
 
@@ -457,17 +457,17 @@ class OrdersDashboardScreen extends StatelessWidget {
 
                     // ✅ OBSERVACIONES - TAMAÑO SECUNDARIO Y COLOR PERSONALIZABLES
                     if (observaciones.isNotEmpty) ...[
-                      SizedBox(height: 6),
-                      Obx(() => Text(
-                        '$observaciones',
-                        style: TextStyle(
-                          color: configuracionController.obtenerColorTexto().withOpacity(0.7),
-                          fontSize: configuracionController.obtenerTamanoFuenteSecundario(isSmallWidth, isSmallScreen),
-                          height: 1.2,
-                        ),
-                        // ✅ TEXTO SIN RESTRICCIONES - EL SCROLL MANEJA EL OVERFLOW
-                      )),
-                    ],
+  SizedBox(height: 6),
+  Obx(() => Text(
+    '$observaciones',
+    style: TextStyle(
+      color: configuracionController.obtenerColorTexto().withOpacity(0.7),
+      fontSize: configuracionController.obtenerTamanoFuenteSecundario(isSmallWidth, isSmallScreen),
+      fontWeight: configuracionController.obtenerPesoFuenteObservaciones(), // 🆕 PESO PERSONALIZABLE
+      height: 1.2,
+    ),
+  )),
+],
                     
                     // ✅ ESPACIADO ADICIONAL PARA MEJOR SCROLL
                     SizedBox(height: 8),
