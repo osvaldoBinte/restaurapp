@@ -118,7 +118,80 @@ Future<void> paginaAnterior() async {
     print('⚠️ Ya estás en la primera página');
   }
 }
+Future<void> eliminarPedido(int pedidoId) async {
+  try {
+    // ✅ Guardar context antes del async
+    final ctx = Get.context!;
+    
+    QuickAlert.show(
+      context: ctx,
+      type: QuickAlertType.confirm,
+      title: '¿Eliminar pedido?',
+      text: 'Esta acción no se puede deshacer.',
+      confirmBtnText: 'Eliminar',
+      cancelBtnText: 'Cancelar',
+      confirmBtnColor: Colors.red,
+      barrierDismissible: true, // ✅ Permite cerrar tocando fuera
+      onConfirmBtnTap: () {
+        // ✅ Cerrar con Navigator en lugar de Get.back()
+        Navigator.of(ctx, rootNavigator: true).pop();
+        
+        // ✅ Delay mínimo para que el dialog cierre antes de continuar
+        Future.delayed(Duration(milliseconds: 150), () {
+          _ejecutarEliminarPedido(pedidoId);
+        });
+      },
+    );
+  } catch (e) {
+    print('❌ Error: $e');
+  }
+}
 
+Future<void> _ejecutarEliminarPedido(int pedidoId) async {
+  isLoading.value = true;
+  
+  try {
+    final uri = Uri.parse('$defaultApiServer/ordenes/$pedidoId/eliminarPedido/');
+    
+    final response = await http.delete(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    ).timeout(Duration(seconds: 15));
+
+    print('📡 Eliminar pedido $pedidoId - Status: ${response.statusCode}');
+
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      historialVentas.removeWhere(
+        (v) => v['pedidoId'] == pedidoId || v['id'] == pedidoId,
+      );
+
+      Get.snackbar(
+        '✅ Pedido eliminado',
+        'El pedido #$pedidoId fue eliminado correctamente',
+        backgroundColor: Colors.green.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: Duration(seconds: 3),
+      );
+    } else {
+      final data = jsonDecode(response.body);
+      throw Exception(data['message'] ?? 'Error del servidor');
+    }
+
+  } catch (e) {
+    print('❌ Error eliminando pedido: $e');
+    Get.snackbar(
+      'Error',
+      'No se pudo eliminar el pedido: $e',
+      backgroundColor: Colors.red.withOpacity(0.8),
+      colorText: Colors.white,
+    );
+  } finally {
+    isLoading.value = false;
+  }
+}
 /// Página siguiente - ✅ Usa información real de la API
 Future<void> paginaSiguiente() async {
   // ✅ No necesitamos verificar hasMoreData aquí, 

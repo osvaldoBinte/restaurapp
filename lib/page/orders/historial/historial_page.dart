@@ -1071,14 +1071,35 @@ Widget _buildNavButton({
                   ),
 
                   // Icono de navegación
-                  if (!isCompact) ...[
-                    SizedBox(width: 8),
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      size: isSmallScreen ? 12 : 14,
-                      color: Color(0xFF8B4513),
-                    ),
-                  ]
+                  // Icono de navegación + botón eliminar
+if (!isCompact) ...[
+  SizedBox(width: 8),
+  // Botón eliminar
+  GestureDetector(
+    onTap: () {
+      final id = int.tryParse(pedidoId);
+      if (id != null) controller.eliminarPedido(id);
+    },
+    child: Container(
+      padding: EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Icon(
+        Icons.delete_outline,
+        size: isSmallScreen ? 14 : 16,
+        color: Colors.red,
+      ),
+    ),
+  ),
+  SizedBox(width: 4),
+  Icon(
+    Icons.arrow_forward_ios,
+    size: isSmallScreen ? 12 : 14,
+    color: Color(0xFF8B4513),
+  ),
+]
                 ],
               ),
             ),

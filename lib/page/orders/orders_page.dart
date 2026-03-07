@@ -59,7 +59,7 @@ class OrdersDashboardScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '"El Jobo v1.3"',
+                    '"El Jobo v1.4"',
                     style: TextStyle(
                       fontSize: isSmallWidth ? 16 : 18,
                       fontWeight: FontWeight.bold,
@@ -703,6 +703,8 @@ double _calcularAlturaCard(bool isVerySmallScreen, bool isSmallScreen) {
     bool isSmallWidth,
   ) {
     final numeroMesa = mesa['numeroMesa'];
+
+    final nombreOrden = mesa['nombreOrden'];
     final pedidos = mesa['pedidos'] as List;
     final totalMesa = controller.calcularTotalMesa(mesa);
     final totalItems = controller.contarItemsMesa(mesa);
@@ -731,7 +733,7 @@ double _calcularAlturaCard(bool isVerySmallScreen, bool isSmallScreen) {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'mesa $numeroMesa',
+                        '$nombreOrden',
                         style: TextStyle(
                           fontSize: isSmallScreen ? 16 : 18, // Font adaptativo
                           fontWeight: FontWeight.bold,

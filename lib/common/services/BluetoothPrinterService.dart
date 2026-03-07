@@ -738,4 +738,70 @@ class UniversalPrinterService {
     
     return ticket.toString();
   }
+
+  /// Genera los bytes del ticket SIN conectar la impresora
+Future<Uint8List> generarBytesTicket(Map<String, dynamic> pedido, double total) async {
+  final profile = await CapabilityProfile.load();
+  final generator = Generator(PaperSize.mm58, profile);
+  List<int> bytes = _generarComandosESCPOS(generator, pedido, total);
+  return Uint8List.fromList(bytes);
+}
+
+/// Conecta y envía bytes ya preparados - operación mínima
+Future<bool> conectarYEnviarBytes(Uint8List bytes) async {
+  try {
+    if (isMobile) {
+      List<BluetoothDevice> bondedDevices =
+          await FlutterBluetoothSerial.instance.getBondedDevices();
+
+      BluetoothDevice? impresora;
+      for (var device in bondedDevices) {
+        final deviceName = device.name?.toLowerCase() ?? '';
+        if (deviceName.contains('printer') ||
+            deviceName.contains('bluetooth') ||
+            deviceName.contains('pos') ||
+            deviceName.contains('receipt')) {
+          impresora = device;
+          break;
+        }
+      }
+
+      if (impresora == null) return false;
+
+      // Conectar y enviar SIN NADA EN MEDIO
+      bluetoothConnection = await BluetoothConnection.toAddress(impresora.address);
+      bluetoothConnection!.output.add(bytes);
+      await bluetoothConnection!.output.allSent;
+      await bluetoothConnection!.close();
+      bluetoothConnection = null;
+      isBluetoothConnected = false;
+
+      print('✅ Bytes enviados correctamente');
+      return true;
+
+    } else if (isDesktop) {
+      await _conectarImpresoraDesktop();
+      if (!isDesktopPrinterConnected) return false;
+
+      final tempDir = Directory.systemTemp;
+      final tempFile = File(
+          '${tempDir.path}/ticket_${DateTime.now().millisecondsSinceEpoch}.bin');
+      await tempFile.writeAsBytes(bytes);
+
+      ProcessResult result = await Process.run(
+        'copy',
+        ['/B', tempFile.path, selectedPrinterName!],
+        runInShell: true,
+      );
+
+      if (await tempFile.exists()) await tempFile.delete();
+      return result.exitCode == 0;
+    }
+
+    return false;
+  } catch (e) {
+    print('❌ Error en conectarYEnviarBytes: $e');
+    return false;
+  }
+}
 }

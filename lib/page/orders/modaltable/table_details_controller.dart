@@ -1866,4 +1866,156 @@ Future<void> _pagarSeleccionadosYLiberarMesa(
     await printerService.desconectar();
   }
 }
+Future<void> imprimirTicketManual(Map<String, dynamic> pedido) async {
+  try {
+    isUpdating.value = true;
+
+    // Calcular total de productos no cancelados
+    double totalReal = 0.0;
+    List<Map<String, dynamic>> productosActivos = [];
+
+    final detalles = pedido['detalles'] as List? ?? [];
+    for (var detalle in detalles) {
+      final status = detalle['statusDetalle'] ?? 'proceso';
+      if (status == 'cancelado') continue;
+
+      final cantidad = (detalle['cantidad'] as num?)?.toInt() ?? 1;
+      final precioUnitario = (detalle['precioUnitario'] as num?)?.toDouble() ?? 0.0;
+      totalReal += precioUnitario * cantidad;
+      productosActivos.add(detalle);
+    }
+
+    if (productosActivos.isEmpty) {
+      Get.snackbar('Sin productos', 'No hay productos para imprimir',
+          backgroundColor: Colors.orange.withOpacity(0.8),
+          colorText: Colors.white);
+      return;
+    }
+
+    // Generar bytes
+    final pedidoParaTicket = {
+      ...pedido,
+      'detalles': productosActivos,
+    };
+
+    final ticketBytes = await printerService.generarBytesTicket(pedidoParaTicket, totalReal);
+    final impreso = await printerService.conectarYEnviarBytes(ticketBytes);
+
+    Get.snackbar(
+      impreso ? '✅ Ticket impreso' : '❌ Error al imprimir',
+      impreso
+          ? 'Total: \$${totalReal.toStringAsFixed(2)}'
+          : 'No se pudo conectar con la impresora',
+      backgroundColor: (impreso ? Colors.green : Colors.red).withOpacity(0.8),
+      colorText: Colors.white,
+      duration: Duration(seconds: 3),
+    );
+
+  } catch (e) {
+    print('❌ Error imprimiendo manual: $e');
+    Get.snackbar('Error', 'Error al imprimir: $e',
+        backgroundColor: Colors.red.withOpacity(0.8), colorText: Colors.white);
+  } finally {
+    isUpdating.value = false;
+  }
+}
+Future<void> renombrarOrden(int pedidoId, String nuevoNombre) async {
+  if (nuevoNombre.trim().isEmpty) return;
+
+  isUpdating.value = true;
+
+  try {
+    final controller = Get.find<OrdersController>();
+    final uri = Uri.parse('${controller.defaultApiServer}/ordenes/obtenerPedidosPorFecha/');
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'nuevoNombre': nuevoNombre.trim(),
+        'pedidoId': pedidoId,
+      }),
+    ).timeout(Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      await controller.refrescarDatos();
+      update();
+
+      Get.snackbar(
+        'Nombre Actualizado',
+        'El pedido ahora se llama "${nuevoNombre.trim()}"',
+        backgroundColor: Colors.green.withOpacity(0.8),
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
+    } else {
+      throw Exception('Error ${response.statusCode}');
+    }
+  } catch (e) {
+    print('❌ Error renombrando orden: $e');
+    Get.snackbar(
+      'Error',
+      'No se pudo cambiar el nombre: $e',
+      backgroundColor: Colors.red.withOpacity(0.8),
+      colorText: Colors.white,
+    );
+  } finally {
+    isUpdating.value = false;
+  }
+}
+
+void mostrarDialogoRenombrar(Map<String, dynamic> pedido) {
+  final pedidoId = pedido['pedidoId'] as int;
+  final nombreActual = pedido['nombreOrden'] ?? '';
+  final textController = TextEditingController(text: nombreActual);
+
+  Get.dialog(
+    AlertDialog(
+      title: Text(
+        'Cambiar Nombre',
+        style: TextStyle(
+          color: Color(0xFF8B4513),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: TextField(
+        controller: textController,
+        autofocus: true,
+        decoration: InputDecoration(
+          labelText: 'Nombre del pedido',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Color(0xFF8B4513)),
+          ),
+        ),
+        onSubmitted: (value) {
+          Get.back();
+          renombrarOrden(pedidoId, value);
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Get.back(),
+          child: Text('Cancelar', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Get.back();
+            renombrarOrden(pedidoId, textController.text);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF8B4513),
+          ),
+          child: Text('Guardar', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
 }

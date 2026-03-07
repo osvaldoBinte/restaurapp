@@ -546,16 +546,20 @@ class OrdersController extends GetxController {
               (p) => p['status'] != 'cancelado',
             );
 
-            if (tieneProductosActivos) {
-              mesasConPedidos.add({
-                'numeroMesa': numeroMesa,
-                'id': idMesa,
-                'idnumeroMesa': idMesa,
-                'mesaId': idMesa,
-                'statusMesa': statusMesa,
-                'pedidos': pedidosFormateados,
-              });
-            }
+        // Después de construir pedidosFormateados, agrega esto:
+final nombreOrdenMesa = pedidosFormateados.isNotEmpty 
+    ? (pedidosFormateados.first['nombreOrden'] ?? 'Mesa $numeroMesa')
+    : 'Mesa $numeroMesa';
+
+mesasConPedidos.add({
+  'numeroMesa': numeroMesa,
+  'id': idMesa,
+  'idnumeroMesa': idMesa,
+  'mesaId': idMesa,
+  'statusMesa': statusMesa,
+  'pedidos': pedidosFormateados,
+  'nombreOrden': nombreOrdenMesa, // ✅ Agregar esto
+});
           }
 
           print('\n📊 RESUMEN LISTA DE MESAS:');
