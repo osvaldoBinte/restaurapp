@@ -721,25 +721,31 @@ Future<void> buscarProductos(String query) async {
         nombreFinal = 'Orden ${DateTime.now().millisecondsSinceEpoch}';
       }
 
-      // ✅ Construcción segura del orderData
-      final orderData = <String, dynamic>{
-        'nombreOrden': nombreFinal,
-        'mesaId': selectedMesa.value!.id,
-        'productos': cartItems.map((item) {
-          try {
-            return item.toJson();
-          } catch (e) {
-            print('⚠️ Error serializando item: $e');
-            // Versión manual como fallback
-            return {
-              'productoId': item.producto.id,
-              'cantidad': item.cantidad,
-              'observaciones': item.observaciones ?? '',
-            };
-          }
-        }).toList(),
-        'status': 'proceso',
+// ✅ Construcción del orderData según si es grupo o mesa simple
+final mesa = selectedMesa.value!;
+final Map<String, dynamic> orderData = {
+  'nombreOrden': nombreFinal,
+  if (mesa.esGrupo)
+    'grupoId': mesa.grupoId  // grupo → grupoId
+  else
+    'mesaId': mesa.id,       // mesa simple → mesaId
+  'productos': cartItems.map((item) {
+    try {
+      return item.toJson();
+    } catch (e) {
+      return {
+        'productoId': item.producto.id,
+        'cantidad': item.cantidad,
+        'observaciones': item.observaciones ?? '',
       };
+    }
+  }).toList(),
+  'status': 'proceso',
+};
+
+print('📤 Creando orden: ${jsonEncode(orderData)}');
+// mesa simple  → {"nombreOrden":"...","mesaId":24,"productos":[...],"status":"proceso"}
+// grupo        → {"nombreOrden":"...","grupoId":3,"productos":[...],"status":"proceso"}
 
       print('📤 Creando orden: ${jsonEncode(orderData)}');
 
