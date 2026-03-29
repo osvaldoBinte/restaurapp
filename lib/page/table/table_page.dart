@@ -269,7 +269,102 @@ class TablesScreen extends StatelessWidget {
     });
   }
 
+Widget _buildGrupoCard(Mesa grupo) {
+  return Container(
+    margin: EdgeInsets.only(bottom: 8),
+    padding: EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Color(0xFF8B4513).withOpacity(0.4)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 3,
+          offset: Offset(0, 1),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Color(0xFF8B4513).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.table_bar, size: 24, color: Color(0xFF8B4513)),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    grupo.etiquetaGrupo ?? 'Grupo',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Color(0xFF3E1F08),
+                    ),
+                  ),
+                  Text(
+                    '${grupo.mesas?.length ?? 0} mesas agrupadas',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            // Badge grupo
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Color(0xFF8B4513).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Grupo',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF8B4513),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        // Mesas dentro del grupo
+        if (grupo.mesas != null && grupo.mesas!.isNotEmpty) ...[
+          SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: grupo.mesas!.map((m) => Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Text(
+                'Mesa ${m.numeroMesa}',
+                style: TextStyle(fontSize: 12, color: Color(0xFF3E1F08)),
+              ),
+            )).toList(),
+          ),
+        ],
+      ],
+    ),
+  );
+}
   Widget buildMesaCard(Mesa mesa) {
+      if (mesa.esGrupo) {
+    return _buildGrupoCard(mesa);
+  }
     return Container(
       margin: EdgeInsets.only(bottom: 8),
       padding: EdgeInsets.all(12),

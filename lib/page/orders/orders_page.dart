@@ -708,6 +708,7 @@ double _calcularAlturaCard(bool isVerySmallScreen, bool isSmallScreen) {
     final pedidos = mesa['pedidos'] as List;
     final totalMesa = controller.calcularTotalMesa(mesa);
     final totalItems = controller.contarItemsMesa(mesa);
+final displayLabel = mesa['displayLabel'] ?? mesa['nombreOrden'] ?? 'Mesa $numeroMesa';
 
     return Container(
       margin: EdgeInsets.only(bottom: isSmallScreen ? 8 : 12),
@@ -733,7 +734,7 @@ double _calcularAlturaCard(bool isVerySmallScreen, bool isSmallScreen) {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '$nombreOrden',
+                        '$displayLabel',
                         style: TextStyle(
                           fontSize: isSmallScreen ? 16 : 18, // Font adaptativo
                           fontWeight: FontWeight.bold,

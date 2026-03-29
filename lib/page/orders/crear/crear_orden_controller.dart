@@ -30,24 +30,75 @@ class Category {
     );
   }
 }
+// Modelo para mesa simple dentro de un grupo
+class MesaSimple {
+  final int id;
+  final int numeroMesa;
+
+  MesaSimple({required this.id, required this.numeroMesa});
+
+  factory MesaSimple.fromJson(Map<String, dynamic> json) {
+    return MesaSimple(
+      id: json['id'],
+      numeroMesa: json['numeroMesa'],
+    );
+  }
+}
 
 class Mesa {
   final int id;
   final int numeroMesa;
   final bool status;
+  final bool esGrupo;
+  final int? grupoId;
+  final String? etiquetaGrupo;
+  final List<MesaSimple>? mesasDelGrupo;
 
   Mesa({
     required this.id,
     required this.numeroMesa,
     required this.status,
+    this.esGrupo = false,
+    this.grupoId,
+    this.etiquetaGrupo,
+    this.mesasDelGrupo,
   });
 
   factory Mesa.fromJson(Map<String, dynamic> json) {
+    final esGrupo = json['esGrupo'] ?? false;
+
+    if (esGrupo) {
+      // Es un grupo: usa grupoId como id y construye un numeroMesa virtual (0)
+      return Mesa(
+        id: json['grupoId'] ?? 0,
+        numeroMesa: 0, // no aplica para grupos
+        status: json['status'] ?? false,
+        esGrupo: true,
+        grupoId: json['grupoId'],
+        etiquetaGrupo: json['etiquetaGrupo'],
+        mesasDelGrupo: json['mesas'] != null
+            ? (json['mesas'] as List)
+                .map((m) => MesaSimple.fromJson(m))
+                .toList()
+            : null,
+      );
+    }
+
     return Mesa(
       id: json['id'] ?? 0,
       numeroMesa: json['numeroMesa'] ?? 0,
       status: json['status'] ?? false,
+      esGrupo: false,
     );
+  }
+
+  // Label para mostrar en dropdown
+  String get displayName {
+    if (esGrupo) {
+      final nombres = mesasDelGrupo?.map((m) => 'M${m.numeroMesa}').join(', ') ?? '';
+      return '${etiquetaGrupo ?? 'Grupo'} ($nombres)';
+    }
+    return 'Mesa $numeroMesa';
   }
 }
 

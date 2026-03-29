@@ -441,8 +441,7 @@ Container(
                   items: mesasOrdenadas
                       .map((mesa) => DropdownMenuItem<Mesa?>(
                             value: mesa,
-                            child: Text(
-                              'Mesa ${mesa.numeroMesa}',
+                            child: Text(mesa.displayName,
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                             ),
@@ -1128,16 +1127,11 @@ void _showCart() {
           }
 
           List<Mesa> mesasOrdenadas = List<Mesa>.from(controller.mesas);
-          mesasOrdenadas.sort((a, b) {
-            try {
-              int numeroA = int.parse(a.numeroMesa.toString());
-              int numeroB = int.parse(b.numeroMesa.toString());
-              return numeroA.compareTo(numeroB);
-            } catch (e) {
-              return a.numeroMesa.toString().compareTo(b.numeroMesa.toString());
-            }
-          });
-
+        mesasOrdenadas.sort((a, b) {
+  if (a.esGrupo && !b.esGrupo) return 1;
+  if (!a.esGrupo && b.esGrupo) return -1;
+  return a.numeroMesa.compareTo(b.numeroMesa);
+});
           return DropdownButtonHideUnderline(
             child: DropdownButton<Mesa?>(
               value: controller.selectedMesa.value,

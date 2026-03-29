@@ -258,75 +258,55 @@ class OrdersController extends GetxController {
     print('\n🔄 Extrayendo pedidos individuales para carousel...');
     print('Pedidos pendientes a procesar: ${pedidosPendientes.length}');
 
-    for (var mesaPedidos in pedidosPendientes) {
-      final numeroMesa = mesaPedidos['numeroMesa'];
+for (var mesaPedidos in pedidosPendientes) {
+  final esGrupo = mesaPedidos['esGrupo'] ?? false;
+  
+  // ✅ Para grupos el numeroMesa viene en cada pedido individual
+  final int numeroMesaRaiz = esGrupo
+      ? (mesaPedidos['grupoId'] as int)   // identificador del grupo
+      : (mesaPedidos['numeroMesa'] as int);
 
-      print('  Procesando Mesa $numeroMesa...');
+  if (mesaPedidos['pedidos'] != null) {
+    final pedidos = mesaPedidos['pedidos'] as List;
 
-      // ✅ CORRECCIÓN: La estructura tiene "pedidos" no "items"
-      if (mesaPedidos['pedidos'] != null) {
-        final pedidos = mesaPedidos['pedidos'] as List;
+    for (var pedido in pedidos) {
+      final pedidoId = pedido['pedidoId'];
+      final nombreOrden = pedido['nombreOrden'] ?? 'Orden $pedidoId';
+      final fechaPedido = pedido['fecha'] ?? DateTime.now().toIso8601String();
+      
+      // ✅ Para grupos, usar mesaNumero del pedido; para simples, el de la raíz
+      final int numeroMesaDetalle = esGrupo
+          ? (pedido['mesaNumero'] as int? ?? numeroMesaRaiz)
+          : numeroMesaRaiz;
 
-        print('    Total pedidos en esta mesa: ${pedidos.length}');
+      if (pedido['detalles'] != null) {
+        final detalles = pedido['detalles'] as List;
 
-        for (var pedido in pedidos) {
-          final pedidoId = pedido['pedidoId'];
-          final nombreOrden = pedido['nombreOrden'] ?? 'Orden $pedidoId';
-          final fechaPedido =
-              pedido['fecha'] ?? DateTime.now().toIso8601String();
+        for (var detalle in detalles) {
+          final mostrarEnListado = detalle['mostrarEnListado'] ?? true;
+          if (!mostrarEnListado) continue;
 
-          // ✅ CORRECCIÓN: Los items están en "detalles"
-          if (pedido['detalles'] != null) {
-            final detalles = pedido['detalles'] as List;
-
-            print('      Pedido $pedidoId tiene ${detalles.length} detalles');
-
-            for (var detalle in detalles) {
-              // ✅ VERIFICAR si debe mostrarse en el listado
-              final mostrarEnListado = detalle['mostrarEnListado'] ?? true;
-
-              if (!mostrarEnListado) {
-                print(
-                  '        ⊗ Detalle ${detalle['detalleId']} oculto (mostrarEnListado: false)',
-                );
-                continue; // Saltar este detalle
-              }
-
-              Map<String, dynamic> itemFormateado = {
-                'detalleId': detalle['detalleId'],
-                'menuId': detalle['productoId'] ?? 0,
-                'numeroMesa': numeroMesa,
-                'pedidoId': pedidoId,
-                'nombreOrden': nombreOrden,
-                'nombreProducto': detalle['nombreProducto'],
-                'cantidad': detalle['cantidad'],
-                'precio':
-                    double.tryParse(detalle['precio']?.toString() ?? '0') ??
-                    0.0,
-                'subtotal':
-                    double.tryParse(detalle['subtotal']?.toString() ?? '0') ??
-                    0.0,
-                'estado': detalle['status'] ?? 'proceso',
-                'observaciones': detalle['observaciones'] ?? '',
-                'fecha':
-                    detalle['fecha'] ??
-                    fechaPedido, // ✅ CAMBIADO: usa fecha del detalle
-                'mostrarEnListado': mostrarEnListado,
-              };
-              detallesFlat.add(itemFormateado);
-              print(
-                '        ✓ Detalle ${detalle['detalleId']}: ${detalle['nombreProducto']}',
-              );
-            }
-          } else {
-            print('      ⚠️ Pedido $pedidoId sin campo "detalles"');
-          }
+          detallesFlat.add({
+            'detalleId': detalle['detalleId'],
+            'menuId': detalle['productoId'] ?? 0,
+            'numeroMesa': numeroMesaDetalle, // ✅ número correcto
+            'pedidoId': pedidoId,
+            'nombreOrden': nombreOrden,
+            'nombreProducto': detalle['nombreProducto'],
+            'cantidad': detalle['cantidad'],
+            'precio': double.tryParse(detalle['precio']?.toString() ?? '0') ?? 0.0,
+            'subtotal': double.tryParse(detalle['subtotal']?.toString() ?? '0') ?? 0.0,
+            'estado': detalle['status'] ?? 'proceso',
+            'observaciones': detalle['observaciones'] ?? '',
+            'fecha': detalle['fecha'] ?? fechaPedido,
+            'mostrarEnListado': mostrarEnListado,
+            'esGrupo': esGrupo, // ✅ útil para la UI del carousel
+          });
         }
-      } else {
-        print('    ⚠️ Mesa $numeroMesa sin campo "pedidos"');
       }
     }
-
+  }
+}
     // Ordenar por fecha (más reciente primero)
     detallesFlat.sort((a, b) {
       try {
@@ -477,90 +457,103 @@ class OrdersController extends GetxController {
           }
 
           print('\n🔍 Procesando ${mesas.length} mesas...');
+for (var mesa in mesas) {
+  final esGrupo = mesa['esGrupo'] ?? false;
 
-          for (var mesa in mesas) {
-            final numeroMesa = mesa['numeroMesa'];
-            final statusMesa = mesa['status'] ?? true;
-            final idMesa =
-                mesa['id'] ?? mesa['idMesa'] ?? mesa['mesaId'] ?? numeroMesa;
+  // ✅ Manejo diferente para grupos y mesas simples
+  final int numeroMesa;
+  final dynamic idMesa;
+  final bool statusMesa;
 
-            print('  Mesa $numeroMesa (ID: $idMesa)');
+  if (esGrupo) {
+    // Grupo: usa grupoId como identificador, numeroMesa virtual
+    final grupoId = mesa['grupoId'] as int;
+    numeroMesa = grupoId; // identificador único para el grupo
+    idMesa = grupoId;
+    statusMesa = mesa['status'] ?? false;
+  } else {
+    numeroMesa = mesa['numeroMesa'] as int;
+    idMesa = mesa['id'] ?? mesa['idMesa'] ?? mesa['mesaId'] ?? numeroMesa;
+    statusMesa = mesa['status'] ?? false;
+  }
 
-            final pedidosMesa = mesa['pedidos'] as List;
-            List<Map<String, dynamic>> pedidosFormateados = [];
+  print('  ${esGrupo ? "Grupo" : "Mesa"} $numeroMesa (ID: $idMesa)');
 
-            for (var pedido in pedidosMesa) {
-              final pedidoId = pedido['pedidoId'];
-              final nombreOrden = pedido['nombreOrden'];
-              final fechaPedido = pedido['fechaPedido'];
-              final detalles = pedido['detalles'] as List;
+  final pedidosMesa = mesa['pedidos'] as List;
+  List<Map<String, dynamic>> pedidosFormateados = [];
 
-              List<Map<String, dynamic>> detallesFormateados = [];
+  for (var pedido in pedidosMesa) {
+    final pedidoId = pedido['pedidoId'];
+    final nombreOrden = pedido['nombreOrden'];
+    final fechaPedido = pedido['fechaPedido'];
+    final detalles = pedido['detalles'] as List;
+    // ✅ Para grupos, cada pedido puede tener mesaNumero propio
+    final mesaNumeroPedido = pedido['mesaNumero'] ?? numeroMesa;
 
-              for (var detalle in detalles) {
-                String statusDetalle = detalle['statusDetalle'] ?? 'proceso';
+    List<Map<String, dynamic>> detallesFormateados = [];
+    for (var detalle in detalles) {
+      String statusDetalle = detalle['statusDetalle'] ?? 'proceso';
+      if (statusDetalle == 'True') statusDetalle = 'proceso';
+      else if (statusDetalle == 'False') statusDetalle = 'proceso';
 
-                if (statusDetalle == 'True')
-                  statusDetalle = 'proceso';
-                else if (statusDetalle == 'False')
-                  statusDetalle = 'proceso';
+      detallesFormateados.add({
+        'detalleId': detalle['detalleId'],
+        'nombreProducto': detalle['nombreProducto'],
+        'cantidad': detalle['cantidad'],
+        'precioUnitario': detalle['precioUnitario'],
+        'observaciones': detalle['observaciones'] ?? '',
+        'statusDetalle': statusDetalle,
+      });
+    }
 
-                detallesFormateados.add({
-                  'detalleId': detalle['detalleId'],
-                  'nombreProducto': detalle['nombreProducto'],
-                  'cantidad': detalle['cantidad'],
-                  'precioUnitario': detalle['precioUnitario'],
-                  'observaciones': detalle['observaciones'] ?? '',
-                  'statusDetalle': statusDetalle,
-                });
-              }
+    double totalPedido = detallesFormateados.fold(0.0,
+        (sum, d) => sum + ((d['precioUnitario'] as num) * (d['cantidad'] as int)));
 
-              double totalPedido = 0.0;
-              for (var detalle in detallesFormateados) {
-                totalPedido +=
-                    (detalle['precioUnitario'] * detalle['cantidad']);
-              }
+    final statusPedido = detallesFormateados.every((d) => d['statusDetalle'] == 'cancelado')
+        ? 'cancelado'
+        : detallesFormateados.any((d) => d['statusDetalle'] == 'proceso')
+            ? 'proceso'
+            : 'completado';
 
-              final statusPedido =
-                  detallesFormateados.every(
-                    (d) => d['statusDetalle'] == 'cancelado',
-                  )
-                  ? 'cancelado'
-                  : detallesFormateados.any(
-                      (d) => d['statusDetalle'] == 'proceso',
-                    )
-                  ? 'proceso'
-                  : 'completado';
+    pedidosFormateados.add({
+      'pedidoId': pedidoId,
+      'nombreOrden': nombreOrden,
+      'fecha': fechaPedido,
+      'detalles': detallesFormateados,
+      'total': totalPedido,
+      'status': statusPedido,
+      'mesaNumero': mesaNumeroPedido, // ✅ útil para grupos
+    });
+  }
 
-              pedidosFormateados.add({
-                'pedidoId': pedidoId,
-                'nombreOrden': nombreOrden,
-                'fecha': fechaPedido,
-                'detalles': detallesFormateados,
-                'total': totalPedido,
-                'status': statusPedido,
-              });
-            }
+  final nombreOrdenMesa = pedidosFormateados.isNotEmpty
+      ? (pedidosFormateados.first['nombreOrden'] ?? 'Mesa $numeroMesa')
+      : 'Mesa $numeroMesa';
 
-            final tieneProductosActivos = pedidosFormateados.any(
-              (p) => p['status'] != 'cancelado',
-            );
+  // ✅ Label para mostrar en UI
+  final String displayLabel;
+  if (esGrupo) {
+    final mesasAgrupadas = mesa['mesasAgrupadas'] as List? ?? [];
+    final numeros = mesasAgrupadas.map((m) => 'M${m['numeroMesa']}').join(', ');
+    displayLabel = 'Grupo ($numeros)';
+  } else {
+    displayLabel = 'Mesa $numeroMesa';
+  }
 
-        // Después de construir pedidosFormateados, agrega esto:
-final nombreOrdenMesa = pedidosFormateados.isNotEmpty 
-    ? (pedidosFormateados.first['nombreOrden'] ?? 'Mesa $numeroMesa')
-    : 'Mesa $numeroMesa';
-
-mesasConPedidos.add({
-  'numeroMesa': numeroMesa,
-  'id': idMesa,
-  'idnumeroMesa': idMesa,
-  'mesaId': idMesa,
-  'statusMesa': statusMesa,
-  'pedidos': pedidosFormateados,
-  'nombreOrden': nombreOrdenMesa, // ✅ Agregar esto
-});
-          }
+  mesasConPedidos.add({
+    'numeroMesa': numeroMesa,
+    'id': idMesa,
+    'idnumeroMesa': idMesa,
+    'mesaId': idMesa,
+    'statusMesa': statusMesa,
+    'pedidos': pedidosFormateados,
+    'nombreOrden': nombreOrdenMesa,
+    'esGrupo': esGrupo,
+    'grupoId': mesa['grupoId'],
+    'mesasAgrupadas': mesa['mesasAgrupadas'], // ✅ guardar para UI
+    'displayLabel': displayLabel,            // ✅ para mostrar en cards
+  });
+}
 
           print('\n📊 RESUMEN LISTA DE MESAS:');
           print('  Mesas con pedidos activos: ${mesasConPedidos.length}\n');

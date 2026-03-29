@@ -8,35 +8,55 @@ import 'package:restaurapp/common/constants/constants.dart';
 import 'package:restaurapp/page/orders/crear/crear_orden_controller.dart';
 import 'package:restaurapp/page/orders/orders_controller.dart';
 
-// Modelo para Mesa
-class Mesa {
+// Modelo para mesa dentro de un grupo
+class MesaSimple {
   final int id;
   final int numeroMesa;
+
+  MesaSimple({required this.id, required this.numeroMesa});
+
+  factory MesaSimple.fromJson(Map<String, dynamic> json) {
+    return MesaSimple(
+      id: json['id'],
+      numeroMesa: json['numeroMesa'],
+    );
+  }
+}
+
+// Modelo principal Mesa (ahora soporta esGrupo)
+class Mesa {
+  final int? id;           // null cuando esGrupo = true
+  final int? numeroMesa;   // null cuando esGrupo = true
   final bool status;
+  final bool esGrupo;
+  final int? grupoId;
+  final String? etiquetaGrupo;
+  final List<MesaSimple>? mesas; // solo cuando esGrupo = true
 
   Mesa({
-    required this.id,
-    required this.numeroMesa,
+    this.id,
+    this.numeroMesa,
     required this.status,
+    required this.esGrupo,
+    this.grupoId,
+    this.etiquetaGrupo,
+    this.mesas,
   });
 
   factory Mesa.fromJson(Map<String, dynamic> json) {
     return Mesa(
       id: json['id'],
       numeroMesa: json['numeroMesa'],
-      status: json['status'],
+      status: json['status'] ?? false,
+      esGrupo: json['esGrupo'] ?? false,
+      grupoId: json['grupoId'],
+      etiquetaGrupo: json['etiquetaGrupo'],
+      mesas: json['mesas'] != null
+          ? (json['mesas'] as List).map((m) => MesaSimple.fromJson(m)).toList()
+          : null,
     );
   }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'numeroMesa': numeroMesa,
-      'status': status,
-    };
-  }
 }
-
 // Controller GetX para gestión de mesas
 class TablesController extends GetxController {
   var isLoading = false.obs;
@@ -462,65 +482,79 @@ Future<bool> modificarStatusMesa(int mesaId) async {
       barrierDismissible: !isCreating.value,
     );
   }
+/// Confirmar eliminación de mesa
+void confirmarEliminarMesa(Mesa mesa) {
+  QuickAlert.show(
+    context: Get.context!,
+    type: QuickAlertType.confirm,
+    title: '¿Eliminar Mesa?',
+    text: '¿Estás seguro de que quieres eliminar la ${mesa.esGrupo ? 'Grupo "${mesa.etiquetaGrupo}"' : 'Mesa ${mesa.numeroMesa}'}? Esta acción no se puede deshacer.',
+    confirmBtnText: 'Eliminar',
+    cancelBtnText: 'Cancelar',
+    confirmBtnColor: Color(0xFFE74C3C),
+    onConfirmBtnTap: () async {
+      Get.back();
+      if (mesa.esGrupo) {
+        // si tienes endpoint para eliminar grupo, úsalo aquí
+        // await eliminarGrupo(mesa.grupoId!);
+      } else {
+        await eliminarMesa(mesa.id!); // ← ! porque id es int?
+      }
+    },
+  );
+}
 
-  /// Confirmar eliminación de mesa
-  void confirmarEliminarMesa(Mesa mesa) {
-    QuickAlert.show(
-      context: Get.context!,
-      type: QuickAlertType.confirm,
-      title: '¿Eliminar Mesa?',
-      text: '¿Estás seguro de que quieres eliminar la Mesa ${mesa.numeroMesa}? Esta acción no se puede deshacer.',
-      confirmBtnText: 'Eliminar',
-      cancelBtnText: 'Cancelar',
-      confirmBtnColor: Color(0xFFE74C3C),
-      onConfirmBtnTap: () async {
-        Get.back(); // Cerrar el dialog de confirmación
-        await eliminarMesa(mesa.id);
-      },
-    );
-  }
+/// Confirmar cambio de status
+void confirmarCambioStatus(Mesa mesa) {
+  final nuevoStatus = !mesa.status;
+  final accion = nuevoStatus ? 'activar' : 'desactivar';
+  final nombre = mesa.esGrupo
+      ? 'el Grupo "${mesa.etiquetaGrupo}"'
+      : 'la Mesa ${mesa.numeroMesa}';
 
-  /// Confirmar cambio de status
-  void confirmarCambioStatus(Mesa mesa) {
-    final nuevoStatus = !mesa.status;
-    final accion = nuevoStatus ? 'activar' : 'desactivar';
-    
-    QuickAlert.show(
-      context: Get.context!,
-      type: QuickAlertType.confirm,
-      title: '¿Cambiar Status?',
-      text: '¿Estás seguro de que quieres $accion la Mesa ${mesa.numeroMesa}?',
-      confirmBtnText: accion.capitalize!,
-      cancelBtnText: 'Cancelar',
-      confirmBtnColor: nuevoStatus ? Color(0xFF4CAF50) : Color(0xFFFF9800),
-      onConfirmBtnTap: () async {
-        Get.back(); // Cerrar el dialog de confirmación
-        await modificarStatusMesa(mesa.id, );
-      },
-    );
-  }
+  QuickAlert.show(
+    context: Get.context!,
+    type: QuickAlertType.confirm,
+    title: '¿Cambiar Status?',
+    text: '¿Estás seguro de que quieres $accion $nombre?',
+    confirmBtnText: accion.capitalize!,
+    cancelBtnText: 'Cancelar',
+    confirmBtnColor: nuevoStatus ? Color(0xFF4CAF50) : Color(0xFFFF9800),
+    onConfirmBtnTap: () async {
+      Get.back();
+      if (mesa.esGrupo) {
+        // await modificarStatusGrupo(mesa.grupoId!);
+      } else {
+        await modificarStatusMesa(mesa.id!); // ← ! porque id es int?
+      }
+    },
+  );
+}
 
   /// Filtrar mesas según búsqueda y filtro
-  void _filtrarMesas() {
-    var mesasFiltradas = mesas.where((mesa) {
-      // Filtro por texto
-      final cumpleBusqueda = searchText.value.isEmpty ||
-          mesa.numeroMesa.toString().contains(searchText.value.toLowerCase()) ||
-          mesa.id.toString().contains(searchText.value.toLowerCase());
+ void _filtrarMesas() {
+  var mesasFiltradas = mesas.where((mesa) {
+    final cumpleBusqueda = searchText.value.isEmpty ||
+        (mesa.numeroMesa?.toString().contains(searchText.value) ?? false) ||
+        (mesa.id?.toString().contains(searchText.value) ?? false) ||
+        (mesa.etiquetaGrupo?.toLowerCase().contains(searchText.value.toLowerCase()) ?? false);
 
-      // Filtro por status
-      final cumpleStatus = selectedFilter.value == 'Todas' ||
-          (selectedFilter.value == 'Activas' && mesa.status) ||
-          (selectedFilter.value == 'Inactivas' && !mesa.status);
+    final cumpleStatus = selectedFilter.value == 'Todas' ||
+        (selectedFilter.value == 'Activas' && mesa.status) ||
+        (selectedFilter.value == 'Inactivas' && !mesa.status);
 
-      return cumpleBusqueda && cumpleStatus;
-    }).toList();
+    return cumpleBusqueda && cumpleStatus;
+  }).toList();
 
-    // Ordenar por número de mesa
-    mesasFiltradas.sort((a, b) => a.numeroMesa.compareTo(b.numeroMesa));
-    
-    filteredMesas.value = mesasFiltradas;
-  }
+  // Los grupos van al final, las mesas simples ordenadas por número
+  mesasFiltradas.sort((a, b) {
+    if (a.esGrupo && !b.esGrupo) return 1;
+    if (!a.esGrupo && b.esGrupo) return -1;
+    return (a.numeroMesa ?? 0).compareTo(b.numeroMesa ?? 0);
+  });
+
+  filteredMesas.value = mesasFiltradas;
+}
 
   /// Actualizar texto de búsqueda
   void buscarMesas(String texto) {
