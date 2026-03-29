@@ -36,7 +36,20 @@ class OrdersDashboardScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Color(0xFF8B4513),
         title: Row(
-          children: [
+          children: [// En actions del AppBar, agrega después del IconButton de refresh:
+Obx(() => IconButton(
+  icon: Icon(
+    controller.isAutoRefreshEnabled.value 
+        ? Icons.pause_circle 
+        : Icons.play_circle,
+    color: Colors.white,
+    size: isSmallWidth ? 20 : 24,
+  ),
+  tooltip: controller.isAutoRefreshEnabled.value 
+      ? 'Pausar auto-refresh' 
+      : 'Reanudar auto-refresh',
+  onPressed: () => controller.toggleAutoRefresh(),
+)),
             Container(
               padding: EdgeInsets.all(isSmallWidth ? 6 : 8),
               decoration: BoxDecoration(

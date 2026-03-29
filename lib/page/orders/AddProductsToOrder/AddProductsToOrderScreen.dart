@@ -22,27 +22,36 @@ Widget build(BuildContext context) {
         icon: Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Get.back(),
       ),
-      title: Obx(() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Agregar Productos',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              fontSize: 18,
-            ),
-          ),
-          if (controller.pedidoId.value > 0)
-            Text(
-              'Mesa ${controller.numeromesa.value} • Pedido #${controller.pedidoId.value}',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-              ),
-            ),
-        ],
-      )),
+      title: // En el AppBar title, cambia el subtítulo para mostrar info correcta:
+Obx(() {
+  String subtitulo = '';
+  if (controller.tipoDestino.value == 'pedido') {
+    subtitulo = 'Mesa ${controller.numeromesa.value} • Pedido #${controller.pedidoId.value}';
+  } else if (controller.tipoDestino.value == 'mesa') {
+    subtitulo = 'Mesa ${controller.numeromesa.value}';
+  } else if (controller.tipoDestino.value == 'grupo') {
+    subtitulo = controller.nombreOrden.value;
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'Agregar Productos',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          fontSize: 18,
+        ),
+      ),
+      if (subtitulo.isNotEmpty)
+        Text(
+          subtitulo,
+          style: TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+    ],
+  );
+}),
       backgroundColor: Color(0xFF8B4513),
       elevation: 0,
       actions: [
@@ -96,7 +105,7 @@ Widget build(BuildContext context) {
         );
       }
 
-      if (controller.pedidoId.value == 0) {
+if (controller.tipoDestino.value.isEmpty) {
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

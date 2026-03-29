@@ -550,29 +550,26 @@ class OrdersController extends GetxController {
 
             // ✅ Label para mostrar en UI
             final String displayLabel;
-            if (esGrupo) {
-              final mesasAgrupadas = mesa['mesasAgrupadas'] as List? ?? [];
-              final numeros = mesasAgrupadas
-                  .map((m) => 'M${m['numeroMesa']}')
-                  .join(', ');
-              displayLabel = 'Grupo ($numeros)';
-            } else {
+           if (esGrupo) {
+  displayLabel = mesa['nombreGrupo'] ?? 'Grupo'; // ✅ usa nombreGrupo del JSON
+}else {
               displayLabel = 'Mesa $numeroMesa';
             }
 
-            mesasConPedidos.add({
-              'numeroMesa': numeroMesa,
-              'id': idMesa,
-              'idnumeroMesa': idMesa,
-              'mesaId': idMesa,
-              'statusMesa': statusMesa,
-              'pedidos': pedidosFormateados,
-              'nombreOrden': nombreOrdenMesa,
-              'esGrupo': esGrupo,
-              'grupoId': mesa['grupoId'],
-              'mesasAgrupadas': mesa['mesasAgrupadas'], // ✅ guardar para UI
-              'displayLabel': displayLabel, // ✅ para mostrar en cards
-            });
+mesasConPedidos.add({
+  'numeroMesa': numeroMesa,
+  'id': idMesa,
+  'idnumeroMesa': idMesa,
+  'mesaId': idMesa,
+  'statusMesa': statusMesa,
+  'pedidos': pedidosFormateados,
+  'nombreOrden': nombreOrdenMesa,
+  'esGrupo': esGrupo,
+  'grupoId': mesa['grupoId'],
+  'mesasAgrupadas': mesa['mesasAgrupadas'],
+  'displayLabel': displayLabel,
+  'productosAgrupados': mesa['productosAgrupados'] ?? [], // ✅ NUEVO
+});
           }
 
           print('\n📊 RESUMEN LISTA DE MESAS:');
@@ -1018,72 +1015,67 @@ class OrdersController extends GetxController {
     }
   }
 
-  // 🔧 MÉTODO PRIVADO: Ejecutar la llamada a la API
-  Future<void> ejecutarAtenderMesa(int numeroMesa) async {
-    try {
-      // 🔍 PASO 1: Mostrar loading
+ Future<void> ejecutarAtenderMesa(int numeroMesa) async {
+  try {
+    // ✅ Buscar si es grupo
+    final mesa = mesasConPedidos.firstWhereOrNull(
+      (m) => m['numeroMesa'] == numeroMesa,
+    );
+    final esGrupo = mesa?['esGrupo'] ?? false;
+    final grupoId = mesa?['grupoId'];
 
-      // 🔍 PASO 2: Construir URL y realizar llamada POST
-      Uri uri = Uri.parse('$defaultApiServer/mesas/$numeroMesa/atender-todo/');
+    // ✅ URL y body según tipo
+    final Uri uri;
+    final Map<String, dynamic> body;
 
-      print('📡 Llamando API: $uri');
-
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        // El body puede estar vacío o contener información adicional si es necesario
-        body: jsonEncode({
-          'numeroMesa': numeroMesa,
-          'timestamp': DateTime.now().toIso8601String(),
-        }),
-      );
-
-      print('📡 Respuesta API - Código: ${response.statusCode}');
-      print('📡 Respuesta API - Body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        if (data['success'] == true || response.statusCode == 200) {
-          if (Get.isDialogOpen ?? false) {
-            Get.back();
-          }
-
-          // 🔄 PASO 5: Recargar datos para reflejar cambios
-          await refrescarDatos();
-        } else {
-          // ❌ ERROR EN RESPUESTA
-          final mensaje =
-              data['message'] ??
-              data['error'] ??
-              'Respuesta inesperada del servidor';
-          _mostrarErrorAtenderMesa('Error del servidor: $mensaje');
-        }
-      } else if (response.statusCode == 404) {
-        _mostrarErrorAtenderMesa('Mesa no encontrada en el servidor');
-      } else if (response.statusCode == 400) {
-        final data = jsonDecode(response.body);
-        final mensaje =
-            data['message'] ?? data['error'] ?? 'Solicitud inválida';
-        _mostrarErrorAtenderMesa('Error en la solicitud: $mensaje');
-      } else {
-        _mostrarErrorAtenderMesa('Error del servidor (${response.statusCode})');
-      }
-    } catch (e) {
-      // 🔍 PASO 6: Manejo de errores de conexión
-
-      // Cerrar loading si está abierto
-      if (Get.isDialogOpen ?? false) {
-        Get.back();
-      }
-
-      print('❌ Error de conexión en _ejecutarAtenderMesa: $e');
-      _mostrarErrorAtenderMesa('Error de conexión: $e');
+    if (esGrupo && grupoId != null) {
+      uri = Uri.parse('$defaultApiServer/mesas/0/atender-todo/');
+      body = {'grupoId': grupoId};
+      print('📡 Atendiendo Grupo $grupoId: $uri');
+    } else {
+      uri = Uri.parse('$defaultApiServer/mesas/$numeroMesa/atender-todo/');
+      body = {'numeroMesa': numeroMesa, 'timestamp': DateTime.now().toIso8601String()};
+      print('📡 Atendiendo Mesa $numeroMesa: $uri');
     }
+
+    print('📤 Body: ${jsonEncode(body)}');
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    print('📡 Respuesta API - Código: ${response.statusCode}');
+    print('📡 Respuesta API - Body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || response.statusCode == 200) {
+        if (Get.isDialogOpen ?? false) Get.back();
+        await refrescarDatos();
+      } else {
+        final mensaje = data['message'] ?? data['error'] ?? 'Respuesta inesperada';
+        _mostrarErrorAtenderMesa('Error del servidor: $mensaje');
+      }
+    } else if (response.statusCode == 404) {
+      _mostrarErrorAtenderMesa('Mesa no encontrada en el servidor');
+    } else if (response.statusCode == 400) {
+      final data = jsonDecode(response.body);
+      final mensaje = data['message'] ?? data['error'] ?? 'Solicitud inválida';
+      _mostrarErrorAtenderMesa('Error en la solicitud: $mensaje');
+    } else {
+      _mostrarErrorAtenderMesa('Error del servidor (${response.statusCode})');
+    }
+  } catch (e) {
+    if (Get.isDialogOpen ?? false) Get.back();
+    print('❌ Error de conexión en ejecutarAtenderMesa: $e');
+    _mostrarErrorAtenderMesa('Error de conexión: $e');
   }
+}
 
   void _mostrarErrorAtenderMesa(String mensaje) {
     QuickAlert.show(

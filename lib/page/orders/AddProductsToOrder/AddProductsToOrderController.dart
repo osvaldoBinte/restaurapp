@@ -98,6 +98,9 @@ class AddProductsToOrderController extends GetxController {
   var isLoadingProducts = false.obs;
   var isAddingProducts = false.obs;
 
+var mesaId = 0.obs;
+var grupoId = 0.obs;
+var tipoDestino = ''.obs; // 'pedido', 'mesa', 'grupo'
   // Datos del pedido actual
   var pedidoId = 0.obs;
   var numeromesa = 0.obs;
@@ -120,14 +123,40 @@ class AddProductsToOrderController extends GetxController {
   var isLoadingSearch = false.obs;
     var searchText = ''.obs;
   // ✅ Inicializar con el ID del pedido
-  void inicializarConPedido(int pedidoIdParam, int numeroMesaParam, String nombreOrdenParam) {
-    pedidoId.value = pedidoIdParam;
-    numeromesa.value = numeroMesaParam;
-    nombreOrden.value = nombreOrdenParam;
-    cartItems.clear(); // Limpiar carrito al cambiar de pedido
-    cargarDatosIniciales();
-  }
+void inicializarConPedido(int pedidoIdParam, int numeroMesaParam, String nombreOrdenParam) {
+  pedidoId.value = pedidoIdParam;
+  numeromesa.value = numeroMesaParam;
+  nombreOrden.value = nombreOrdenParam;
+  mesaId.value = 0;
+  grupoId.value = 0;
+  tipoDestino.value = 'pedido';
+  cartItems.clear();
+  cargarDatosIniciales();
+}
 
+// ✅ Inicializar por mesa simple
+void inicializarConMesa(int mesaIdParam, int numeroMesaParam) {
+  pedidoId.value = 0;
+  numeromesa.value = numeroMesaParam;
+  nombreOrden.value = 'Mesa $numeroMesaParam';
+  mesaId.value = mesaIdParam;
+  grupoId.value = 0;
+  tipoDestino.value = 'mesa';
+  cartItems.clear();
+  cargarDatosIniciales();
+}
+
+// ✅ Inicializar por grupo
+void inicializarConGrupo(int grupoIdParam, String nombreGrupoParam) {
+  pedidoId.value = 0;
+  numeromesa.value = 0;
+  nombreOrden.value = nombreGrupoParam;
+  mesaId.value = 0;
+  grupoId.value = grupoIdParam;
+  tipoDestino.value = 'grupo';
+  cartItems.clear();
+  cargarDatosIniciales();
+}
   @override
   void onInit() {
     super.onInit();
@@ -233,32 +262,34 @@ Future<void> buscarProductos(String query) async {
     }
   }
 
-  /// Cargar todos los datos necesarios
-  Future<void> cargarDatosIniciales() async {
-    if (pedidoId.value == 0) {
-      print('⚠️ No se puede cargar datos sin pedidoId');
-      return;
-    }
+Future<void> cargarDatosIniciales() async {
+  // ✅ Validar según tipo de destino, no solo pedidoId
+  final tieneDestino = tipoDestino.value == 'pedido'
+      ? pedidoId.value > 0
+      : tipoDestino.value == 'mesa'
+          ? mesaId.value > 0
+          : grupoId.value > 0;
 
-    isLoading.value = true;
-    try {
-      await Future.wait([
-        obtenerCategorias(),
-        obtenerTodosLosProductos(),
-      ]);
-      
-      // Cargar productos de la primera categoría por defecto
-      if (categorias.isNotEmpty) {
-        await obtenerProductosPorCategoria(categorias.first.id);
-      }
-    } catch (e) {
-      print('❌ Error en cargarDatosIniciales: $e');
-      _mostrarError('Error de Inicialización', 'No se pudieron cargar los datos: $e');
-    } finally {
-      isLoading.value = false;
-    }
+  if (!tieneDestino && tipoDestino.value.isEmpty) {
+    print('⚠️ No se puede cargar datos sin destino configurado');
+    return;
   }
 
+  isLoading.value = true;
+  try {
+    await Future.wait([
+      obtenerCategorias(),
+      obtenerTodosLosProductos(),
+    ]);
+    if (categorias.isNotEmpty) {
+      await obtenerProductosPorCategoria(categorias.first.id);
+    }
+  } catch (e) {
+    print('❌ Error en cargarDatosIniciales: $e');
+  } finally {
+    isLoading.value = false;
+  }
+}
   /// Obtener todas las categorías
   Future<void> obtenerCategorias() async {
     try {
@@ -524,126 +555,94 @@ Future<void> buscarProductos(String query) async {
   }
 
   /// ✅ FUNCIÓN PRINCIPAL: Agregar productos al pedido existente
-  Future<bool> agregarProductosAPedido() async {
-    try {
-      if (pedidoId.value == 0) {
-        await _mostrarAlertaAsync(
-          QuickAlertType.warning,
-          'Error de configuración',
-          'ID de pedido no válido',
-          'Entendido',
-          Color(0xFFFF9800),
-        );
-        return false;
+ Future<bool> agregarProductosAPedido() async {
+  try {
+    if (cartItems.isEmpty) {
+      await _mostrarAlertaAsync(
+        QuickAlertType.warning,
+        'Carrito vacío',
+        'Agrega productos antes de continuar',
+        'Entendido',
+        Color(0xFFFF9800),
+      );
+      return false;
+    }
+
+    isAddingProducts.value = true;
+
+    // ✅ Construir body según tipo de destino
+    final Map<String, dynamic> requestData = {
+      'productos': cartItems.map((item) => item.toJson()).toList(),
+    };
+
+    if (tipoDestino.value == 'pedido') {
+      requestData['pedidoId'] = pedidoId.value;
+    } else if (tipoDestino.value == 'mesa') {
+      requestData['mesaId'] = mesaId.value;
+    } else if (tipoDestino.value == 'grupo') {
+      requestData['grupoId'] = grupoId.value;
+    }
+
+    print('📤 Tipo destino: ${tipoDestino.value}');
+    print('📤 Body: ${jsonEncode(requestData)}');
+
+    Uri uri = Uri.parse('$defaultApiServer/ordenes/agregarProductosAPedido/');
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(requestData),
+    ).timeout(Duration(seconds: 30));
+
+    print('📡 Status: ${response.statusCode}');
+    print('📄 Body: ${response.body}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      limpiarCarrito();
+      try {
+        final OrdersController ordersController = Get.find<OrdersController>();
+        ordersController.refrescarDatos();
+      } catch (e) {
+        print('⚠️ No se pudo refrescar: $e');
       }
-
-      if (cartItems.isEmpty) {
-        await _mostrarAlertaAsync(
-          QuickAlertType.warning,
-          'Carrito vacío',
-          'Agrega productos antes de continuar',
-          'Entendido',
-          Color(0xFFFF9800),
-        );
-        return false;
-      }
-
-      isAddingProducts.value = true;
-
-      // ✅ Construir el JSON según tu especificación
-      final requestData = {
-        'pedidoId': pedidoId.value,
-        'productos': cartItems.map((item) => item.toJson()).toList(),
-      };
-
-      print('📤 Agregando productos al pedido: ${jsonEncode(requestData)}');
-
-      Uri uri = Uri.parse('$defaultApiServer/ordenes/agregarProductosAPedido/');
-      print('📡 URL: $uri');
-
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(requestData),
-      ).timeout(Duration(seconds: 30));
-
-      print('📡 Agregar productos - Código: ${response.statusCode}');
-      print('📄 Respuesta: ${response.body}');
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Limpiar carrito
-        limpiarCarrito();
-        
-        // Refrescar datos de órdenes
-        try {
-          final OrdersController ordersController = Get.find<OrdersController>();
-          ordersController.refrescarDatos();
-        } catch (e) {
-          print('⚠️ No se pudo refrescar OrdersController: $e');
+      return true;
+    } else {
+      String errorMessage = 'Error del servidor (${response.statusCode})';
+      try {
+        if (response.body.isNotEmpty) {
+          final errorData = jsonDecode(response.body);
+          errorMessage = errorData['message']?.toString() ??
+                        errorData['error']?.toString() ??
+                        errorMessage;
         }
-        
-      /*  await _mostrarAlertaAsync(
-          QuickAlertType.success,
-          '¡Productos Agregados!',
-          'Los productos han sido agregados exitosamente al pedido #${pedidoId.value}',
-          'Perfecto',
-          Color(0xFF4CAF50),
-        );*/
+      } catch (e) {}
 
-        return true;
-
-      } else {
-        String errorMessage = 'Error desconocido del servidor';
-        try {
-          if (response.body.isNotEmpty) {
-            final errorData = jsonDecode(response.body);
-            errorMessage = errorData['message']?.toString() ?? 
-                          errorData['error']?.toString() ?? 
-                          'Error del servidor (${response.statusCode})';
-          } else {
-            errorMessage = 'Error del servidor (${response.statusCode})';
-          }
-        } catch (e) {
-          errorMessage = 'Error del servidor (${response.statusCode})';
-        }
-        
-        await _mostrarAlertaAsync(
-          QuickAlertType.error,
-          'Error al agregar productos',
-          errorMessage,
-          'OK',
-          Color(0xFFE74C3C),
-        );
-        return false;
-      }
-
-    } catch (e) {
-      print('❌ Error crítico al agregar productos: $e');
-      
-      String errorMessage = 'Error de conexión desconocido';
-      if (e.toString().contains('TimeoutException')) {
-        errorMessage = 'Tiempo de espera agotado. Verifica tu conexión.';
-      } else if (e.toString().contains('SocketException')) {
-        errorMessage = 'No se puede conectar al servidor.';
-      } else {
-        errorMessage = 'Error: ${e.toString()}';
-      }
-      
       await _mostrarAlertaAsync(
         QuickAlertType.error,
-        'Error de Conexión',
+        'Error al agregar productos',
         errorMessage,
         'OK',
         Color(0xFFE74C3C),
       );
       return false;
-    } finally {
-      isAddingProducts.value = false;
     }
+  } catch (e) {
+    print('❌ Error: $e');
+    await _mostrarAlertaAsync(
+      QuickAlertType.error,
+      'Error de Conexión',
+      'Error: ${e.toString()}',
+      'OK',
+      Color(0xFFE74C3C),
+    );
+    return false;
+  } finally {
+    isAddingProducts.value = false;
   }
+}
 
   /// Mostrar alertas de forma asíncrona
   Future<void> _mostrarAlertaAsync(
@@ -693,16 +692,18 @@ Future<void> buscarProductos(String query) async {
   }
 
   /// Validar si se pueden agregar productos
-  bool get puedeAgregarProductos {
-    try {
-      return pedidoId.value > 0 && 
-             cartItems.isNotEmpty && 
-             !isAddingProducts.value;
-    } catch (e) {
-      print('❌ Error en puedeAgregarProductos: $e');
-      return false;
-    }
+bool get puedeAgregarProductos {
+  try {
+    final tieneDestino = tipoDestino.value == 'pedido'
+        ? pedidoId.value > 0
+        : tipoDestino.value == 'mesa'
+            ? mesaId.value > 0
+            : grupoId.value > 0; // grupo
+    return tieneDestino && cartItems.isNotEmpty && !isAddingProducts.value;
+  } catch (e) {
+    return false;
   }
+}
 
   /// Refrescar datos
   Future<void> refrescarDatos() async {
