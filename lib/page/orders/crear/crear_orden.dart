@@ -1126,42 +1126,38 @@ void _showCart() {
             );
           }
 
-          List<Mesa> mesasOrdenadas = List<Mesa>.from(controller.mesas);
-        mesasOrdenadas.sort((a, b) {
+List<Mesa> mesasOrdenadas = List<Mesa>.from(controller.mesas);
+mesasOrdenadas.sort((a, b) {
   if (a.esGrupo && !b.esGrupo) return 1;
   if (!a.esGrupo && b.esGrupo) return -1;
   return a.numeroMesa.compareTo(b.numeroMesa);
 });
-          return DropdownButtonHideUnderline(
-            child: DropdownButton<Mesa?>(
-              value: controller.selectedMesa.value,
-              hint: Text(
-                'Seleccionar',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
+
+return DropdownButtonHideUnderline(
+  child: DropdownButton<Mesa?>(
+    value: controller.selectedMesa.value,
+    hint: Text(
+      'Seleccionar',
+      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+    ),
+    isExpanded: true,
+    items: mesasOrdenadas
+        .map((mesa) => DropdownMenuItem<Mesa?>(
+              value: mesa,
+              child: Text(
+                mesa.displayName, // ✅ antes decía 'Mesa ${mesa.numeroMesa}'
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+                overflow: TextOverflow.ellipsis,
               ),
-              isExpanded: true,
-              items: mesasOrdenadas
-                  .map((mesa) => DropdownMenuItem<Mesa?>(
-                        value: mesa,
-                        child: Text(
-                          'Mesa ${mesa.numeroMesa}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.normal, // ✅ Menos bold
-                          ),
-                        ),
-                      ))
-                  .toList(),
-              onChanged: (mesa) {
-                if (mesa != null) {
-                  controller.seleccionarMesa(mesa);
-                }
-              },
-            ),
-          );
+            ))
+        .toList(),
+    onChanged: (mesa) {
+      if (mesa != null) {
+        controller.seleccionarMesa(mesa);
+      }
+    },
+  ),
+);
         }),
       ),
     ],

@@ -258,55 +258,60 @@ class OrdersController extends GetxController {
     print('\n🔄 Extrayendo pedidos individuales para carousel...');
     print('Pedidos pendientes a procesar: ${pedidosPendientes.length}');
 
-for (var mesaPedidos in pedidosPendientes) {
-  final esGrupo = mesaPedidos['esGrupo'] ?? false;
-  
-  // ✅ Para grupos el numeroMesa viene en cada pedido individual
-  final int numeroMesaRaiz = esGrupo
-      ? (mesaPedidos['grupoId'] as int)   // identificador del grupo
-      : (mesaPedidos['numeroMesa'] as int);
+    for (var mesaPedidos in pedidosPendientes) {
+      final esGrupo = mesaPedidos['esGrupo'] ?? false;
 
-  if (mesaPedidos['pedidos'] != null) {
-    final pedidos = mesaPedidos['pedidos'] as List;
+      // ✅ Para grupos el numeroMesa viene en cada pedido individual
+      final int numeroMesaRaiz = esGrupo
+          ? (mesaPedidos['grupoId'] as int) // identificador del grupo
+          : (mesaPedidos['numeroMesa'] as int);
 
-    for (var pedido in pedidos) {
-      final pedidoId = pedido['pedidoId'];
-      final nombreOrden = pedido['nombreOrden'] ?? 'Orden $pedidoId';
-      final fechaPedido = pedido['fecha'] ?? DateTime.now().toIso8601String();
-      
-      // ✅ Para grupos, usar mesaNumero del pedido; para simples, el de la raíz
-      final int numeroMesaDetalle = esGrupo
-          ? (pedido['mesaNumero'] as int? ?? numeroMesaRaiz)
-          : numeroMesaRaiz;
+      if (mesaPedidos['pedidos'] != null) {
+        final pedidos = mesaPedidos['pedidos'] as List;
 
-      if (pedido['detalles'] != null) {
-        final detalles = pedido['detalles'] as List;
+        for (var pedido in pedidos) {
+          final pedidoId = pedido['pedidoId'];
+          final nombreOrden = pedido['nombreOrden'] ?? 'Orden $pedidoId';
+          final fechaPedido =
+              pedido['fecha'] ?? DateTime.now().toIso8601String();
 
-        for (var detalle in detalles) {
-          final mostrarEnListado = detalle['mostrarEnListado'] ?? true;
-          if (!mostrarEnListado) continue;
+          // ✅ Para grupos, usar mesaNumero del pedido; para simples, el de la raíz
+          final int numeroMesaDetalle = esGrupo
+              ? (pedido['mesaNumero'] as int? ?? numeroMesaRaiz)
+              : numeroMesaRaiz;
 
-          detallesFlat.add({
-            'detalleId': detalle['detalleId'],
-            'menuId': detalle['productoId'] ?? 0,
-            'numeroMesa': numeroMesaDetalle, // ✅ número correcto
-            'pedidoId': pedidoId,
-            'nombreOrden': nombreOrden,
-            'nombreProducto': detalle['nombreProducto'],
-            'cantidad': detalle['cantidad'],
-            'precio': double.tryParse(detalle['precio']?.toString() ?? '0') ?? 0.0,
-            'subtotal': double.tryParse(detalle['subtotal']?.toString() ?? '0') ?? 0.0,
-            'estado': detalle['status'] ?? 'proceso',
-            'observaciones': detalle['observaciones'] ?? '',
-            'fecha': detalle['fecha'] ?? fechaPedido,
-            'mostrarEnListado': mostrarEnListado,
-            'esGrupo': esGrupo, // ✅ útil para la UI del carousel
-          });
+          if (pedido['detalles'] != null) {
+            final detalles = pedido['detalles'] as List;
+
+            for (var detalle in detalles) {
+              final mostrarEnListado = detalle['mostrarEnListado'] ?? true;
+              if (!mostrarEnListado) continue;
+
+              detallesFlat.add({
+                'detalleId': detalle['detalleId'],
+                'menuId': detalle['productoId'] ?? 0,
+                'numeroMesa': numeroMesaDetalle, // ✅ número correcto
+                'pedidoId': pedidoId,
+                'nombreOrden': nombreOrden,
+                'nombreProducto': detalle['nombreProducto'],
+                'cantidad': detalle['cantidad'],
+                'precio':
+                    double.tryParse(detalle['precio']?.toString() ?? '0') ??
+                    0.0,
+                'subtotal':
+                    double.tryParse(detalle['subtotal']?.toString() ?? '0') ??
+                    0.0,
+                'estado': detalle['status'] ?? 'proceso',
+                'observaciones': detalle['observaciones'] ?? '',
+                'fecha': detalle['fecha'] ?? fechaPedido,
+                'mostrarEnListado': mostrarEnListado,
+                'esGrupo': esGrupo, // ✅ útil para la UI del carousel
+              });
+            }
+          }
         }
       }
     }
-  }
-}
     // Ordenar por fecha (más reciente primero)
     detallesFlat.sort((a, b) {
       try {
@@ -457,103 +462,118 @@ for (var mesaPedidos in pedidosPendientes) {
           }
 
           print('\n🔍 Procesando ${mesas.length} mesas...');
-for (var mesa in mesas) {
-  final esGrupo = mesa['esGrupo'] ?? false;
+          for (var mesa in mesas) {
+            final esGrupo = mesa['esGrupo'] ?? false;
 
-  // ✅ Manejo diferente para grupos y mesas simples
-  final int numeroMesa;
-  final dynamic idMesa;
-  final bool statusMesa;
+            // ✅ Manejo diferente para grupos y mesas simples
+            final int numeroMesa;
+            final dynamic idMesa;
+            final bool statusMesa;
 
-  if (esGrupo) {
-    // Grupo: usa grupoId como identificador, numeroMesa virtual
-    final grupoId = mesa['grupoId'] as int;
-    numeroMesa = grupoId; // identificador único para el grupo
-    idMesa = grupoId;
-    statusMesa = mesa['status'] ?? false;
-  } else {
-    numeroMesa = mesa['numeroMesa'] as int;
-    idMesa = mesa['id'] ?? mesa['idMesa'] ?? mesa['mesaId'] ?? numeroMesa;
-    statusMesa = mesa['status'] ?? false;
-  }
+            if (esGrupo) {
+              // Grupo: usa grupoId como identificador, numeroMesa virtual
+              final grupoId = mesa['grupoId'] as int;
+              numeroMesa = grupoId; // identificador único para el grupo
+              idMesa = grupoId;
+              statusMesa = mesa['status'] ?? false;
+            } else {
+              numeroMesa = mesa['numeroMesa'] as int;
+              idMesa =
+                  mesa['id'] ?? mesa['idMesa'] ?? mesa['mesaId'] ?? numeroMesa;
+              statusMesa = mesa['status'] ?? false;
+            }
 
-  print('  ${esGrupo ? "Grupo" : "Mesa"} $numeroMesa (ID: $idMesa)');
+            print('  ${esGrupo ? "Grupo" : "Mesa"} $numeroMesa (ID: $idMesa)');
 
-  final pedidosMesa = mesa['pedidos'] as List;
-  List<Map<String, dynamic>> pedidosFormateados = [];
+            final pedidosMesa = mesa['pedidos'] as List;
+            List<Map<String, dynamic>> pedidosFormateados = [];
 
-  for (var pedido in pedidosMesa) {
-    final pedidoId = pedido['pedidoId'];
-    final nombreOrden = pedido['nombreOrden'];
-    final fechaPedido = pedido['fechaPedido'];
-    final detalles = pedido['detalles'] as List;
-    // ✅ Para grupos, cada pedido puede tener mesaNumero propio
-    final mesaNumeroPedido = pedido['mesaNumero'] ?? numeroMesa;
+            for (var pedido in pedidosMesa) {
+              final pedidoId = pedido['pedidoId'];
+              final nombreOrden = pedido['nombreOrden'];
+              final fechaPedido = pedido['fechaPedido'];
+              final detalles = pedido['detalles'] as List;
+              // ✅ Para grupos, cada pedido puede tener mesaNumero propio
+              final mesaNumeroPedido = pedido['mesaNumero'] ?? numeroMesa;
 
-    List<Map<String, dynamic>> detallesFormateados = [];
-    for (var detalle in detalles) {
-      String statusDetalle = detalle['statusDetalle'] ?? 'proceso';
-      if (statusDetalle == 'True') statusDetalle = 'proceso';
-      else if (statusDetalle == 'False') statusDetalle = 'proceso';
+              List<Map<String, dynamic>> detallesFormateados = [];
+              for (var detalle in detalles) {
+                String statusDetalle = detalle['statusDetalle'] ?? 'proceso';
+                if (statusDetalle == 'True')
+                  statusDetalle = 'proceso';
+                else if (statusDetalle == 'False')
+                  statusDetalle = 'proceso';
 
-      detallesFormateados.add({
-        'detalleId': detalle['detalleId'],
-        'nombreProducto': detalle['nombreProducto'],
-        'cantidad': detalle['cantidad'],
-        'precioUnitario': detalle['precioUnitario'],
-        'observaciones': detalle['observaciones'] ?? '',
-        'statusDetalle': statusDetalle,
-      });
-    }
+                detallesFormateados.add({
+                  'detalleId': detalle['detalleId'],
+                  'nombreProducto': detalle['nombreProducto'],
+                  'cantidad': detalle['cantidad'],
+                  'precioUnitario': detalle['precioUnitario'],
+                  'observaciones': detalle['observaciones'] ?? '',
+                  'statusDetalle': statusDetalle,
+                });
+              }
 
-    double totalPedido = detallesFormateados.fold(0.0,
-        (sum, d) => sum + ((d['precioUnitario'] as num) * (d['cantidad'] as int)));
+              double totalPedido = detallesFormateados.fold(
+                0.0,
+                (sum, d) =>
+                    sum +
+                    ((d['precioUnitario'] as num) * (d['cantidad'] as int)),
+              );
 
-    final statusPedido = detallesFormateados.every((d) => d['statusDetalle'] == 'cancelado')
-        ? 'cancelado'
-        : detallesFormateados.any((d) => d['statusDetalle'] == 'proceso')
-            ? 'proceso'
-            : 'completado';
+              final statusPedido =
+                  detallesFormateados.every(
+                    (d) => d['statusDetalle'] == 'cancelado',
+                  )
+                  ? 'cancelado'
+                  : detallesFormateados.any(
+                      (d) => d['statusDetalle'] == 'proceso',
+                    )
+                  ? 'proceso'
+                  : 'completado';
 
-    pedidosFormateados.add({
-      'pedidoId': pedidoId,
-      'nombreOrden': nombreOrden,
-      'fecha': fechaPedido,
-      'detalles': detallesFormateados,
-      'total': totalPedido,
-      'status': statusPedido,
-      'mesaNumero': mesaNumeroPedido, // ✅ útil para grupos
-    });
-  }
+              pedidosFormateados.add({
+                'pedidoId': pedidoId,
+                'nombreOrden': nombreOrden,
+                'fecha': fechaPedido,
+                'detalles': detallesFormateados,
+                'total': totalPedido,
+                'status': statusPedido,
+                'mesaNumero': mesaNumeroPedido, // ✅ útil para grupos
+              });
+            }
 
-  final nombreOrdenMesa = pedidosFormateados.isNotEmpty
-      ? (pedidosFormateados.first['nombreOrden'] ?? 'Mesa $numeroMesa')
-      : 'Mesa $numeroMesa';
+            final nombreOrdenMesa = pedidosFormateados.isNotEmpty
+                ? (pedidosFormateados.first['nombreOrden'] ??
+                      'Mesa $numeroMesa')
+                : 'Mesa $numeroMesa';
 
-  // ✅ Label para mostrar en UI
-  final String displayLabel;
-  if (esGrupo) {
-    final mesasAgrupadas = mesa['mesasAgrupadas'] as List? ?? [];
-    final numeros = mesasAgrupadas.map((m) => 'M${m['numeroMesa']}').join(', ');
-    displayLabel = 'Grupo ($numeros)';
-  } else {
-    displayLabel = 'Mesa $numeroMesa';
-  }
+            // ✅ Label para mostrar en UI
+            final String displayLabel;
+            if (esGrupo) {
+              final mesasAgrupadas = mesa['mesasAgrupadas'] as List? ?? [];
+              final numeros = mesasAgrupadas
+                  .map((m) => 'M${m['numeroMesa']}')
+                  .join(', ');
+              displayLabel = 'Grupo ($numeros)';
+            } else {
+              displayLabel = 'Mesa $numeroMesa';
+            }
 
-  mesasConPedidos.add({
-    'numeroMesa': numeroMesa,
-    'id': idMesa,
-    'idnumeroMesa': idMesa,
-    'mesaId': idMesa,
-    'statusMesa': statusMesa,
-    'pedidos': pedidosFormateados,
-    'nombreOrden': nombreOrdenMesa,
-    'esGrupo': esGrupo,
-    'grupoId': mesa['grupoId'],
-    'mesasAgrupadas': mesa['mesasAgrupadas'], // ✅ guardar para UI
-    'displayLabel': displayLabel,            // ✅ para mostrar en cards
-  });
-}
+            mesasConPedidos.add({
+              'numeroMesa': numeroMesa,
+              'id': idMesa,
+              'idnumeroMesa': idMesa,
+              'mesaId': idMesa,
+              'statusMesa': statusMesa,
+              'pedidos': pedidosFormateados,
+              'nombreOrden': nombreOrdenMesa,
+              'esGrupo': esGrupo,
+              'grupoId': mesa['grupoId'],
+              'mesasAgrupadas': mesa['mesasAgrupadas'], // ✅ guardar para UI
+              'displayLabel': displayLabel, // ✅ para mostrar en cards
+            });
+          }
 
           print('\n📊 RESUMEN LISTA DE MESAS:');
           print('  Mesas con pedidos activos: ${mesasConPedidos.length}\n');
@@ -1572,30 +1592,37 @@ for (var mesa in mesas) {
     List<Map<String, dynamic>> mesasCompletadas,
   ) async {
     try {
-      // Activar estado de carga
       isLiberandoTodasLasMesas.value = true;
 
       int exitosas = 0;
       int fallidas = 0;
       List<String> mesasFallidas = [];
 
-      // Procesar cada mesa
       for (var mesaInfo in mesasCompletadas) {
         final numeroMesa = mesaInfo['numeroMesa'];
         final mesa = mesaInfo['mesa'];
+        final esGrupo = mesa['esGrupo'] ?? false;
 
         try {
-          // Extraer el ID de la mesa
-          final mesaId =
-              mesa['id'] ??
-              mesa['idnumeroMesa'] ??
-              mesa['mesaId'] ??
-              numeroMesa; // Fallback
-
-          print('🏪 Liberando Mesa $numeroMesa (ID: $mesaId)...');
-
-          Uri uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/$mesaId/');
-          final statusData = {'status': true};
+          final Uri uri;
+          final Map<String, dynamic> body;
+         if (esGrupo) {
+  final grupoId = mesa['grupoId'] as int;
+  uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/0/');
+  body = {'grupoId': grupoId, 'status': true}; // ✅ grupoId en el body
+  print('🏪 Liberando Grupo $grupoId via /liberarMesa/0/');
+  print('📤 URL: $uri');
+  print('📤 Body: ${jsonEncode(body)}');
+} else {
+  final mesaId = mesa['id'] ?? mesa['idnumeroMesa'] ?? mesa['mesaId'] ?? numeroMesa;
+  uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/$mesaId/');
+  body = {'status': true};
+  print('🏪 Liberando Mesa $mesaId via /liberarMesa/$mesaId/');
+  print('📤 URL: $uri');
+  print('📤 Body: ${jsonEncode(body)}');
+}
+          print('📤 URL: $uri');
+          print('📤 Body: ${jsonEncode(body)}');
 
           final response = await http.post(
             uri,
@@ -1603,96 +1630,76 @@ for (var mesa in mesas) {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
-            body: jsonEncode(statusData),
+            body: jsonEncode(body),
           );
+
+          print('📡 Respuesta Status: ${response.statusCode}');
+          print('📡 Respuesta Body: ${response.body}');
 
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
-
             if (data['success'] == true) {
               exitosas++;
-              print('✅ Mesa $numeroMesa liberada correctamente');
+              print('✅ ${esGrupo ? "Grupo" : "Mesa"} $numeroMesa liberada');
             } else {
               fallidas++;
-              mesasFallidas.add('Mesa $numeroMesa');
-              print(
-                '❌ Error liberando Mesa $numeroMesa: ${data['message'] ?? 'Error desconocido'}',
-              );
+              mesasFallidas.add('${esGrupo ? "Grupo" : "Mesa"} $numeroMesa');
+              print('❌ Error: ${data['message'] ?? 'Error desconocido'}');
             }
           } else {
             fallidas++;
-            mesasFallidas.add('Mesa $numeroMesa');
-            print(
-              '❌ Error HTTP liberando Mesa $numeroMesa: ${response.statusCode}',
-            );
+            mesasFallidas.add('${esGrupo ? "Grupo" : "Mesa"} $numeroMesa');
+            print('❌ Error HTTP ${response.statusCode}');
           }
 
-          // Pausa entre requests
           await Future.delayed(Duration(milliseconds: 200));
         } catch (e) {
           fallidas++;
-          mesasFallidas.add('Mesa $numeroMesa');
-          print('❌ Excepción liberando Mesa $numeroMesa: $e');
+          mesasFallidas.add('${esGrupo ? "Grupo" : "Mesa"} $numeroMesa');
+          print('❌ Excepción: $e');
         }
       }
 
-      // Cerrar diálogo de progreso
-      Get.back();
-
       // Mostrar resultado
       if (fallidas == 0) {
-        // Todas las mesas fueron liberadas exitosamente
+        // todo exitoso
       } else if (exitosas > 0) {
-        // Algunas mesas fueron liberadas
         String mensajeFallidas = mesasFallidas.length <= 3
             ? mesasFallidas.join(', ')
             : '${mesasFallidas.take(3).join(', ')} y ${mesasFallidas.length - 3} más';
-
         QuickAlert.show(
           context: Get.context!,
           type: QuickAlertType.warning,
           title: 'Liberación Parcial',
           text:
-              '⚠️ Liberación completada parcialmente\n'
-              'Exitosas: $exitosas\n'
-              'Fallidas: $fallidas\n'
-              'Mesas con error: $mensajeFallidas',
+              '⚠️ Exitosas: $exitosas\nFallidas: $fallidas\nCon error: $mensajeFallidas',
           confirmBtnText: 'Entendido',
           confirmBtnColor: Color(0xFFF39C12),
         );
       } else {
-        // Ninguna mesa pudo ser liberada
         QuickAlert.show(
           context: Get.context!,
           type: QuickAlertType.error,
           title: 'Error en Liberación',
-          text:
-              '❌ No se pudo liberar ninguna mesa completada\n'
-              'Total intentadas: ${mesasCompletadas.length}\n'
-              'Verifica la conexión con el servidor.',
+          text: '❌ No se pudo liberar ninguna.\nVerifica la conexión.',
           confirmBtnText: 'Entendido',
           confirmBtnColor: Color(0xFFE74C3C),
         );
       }
 
-      // Refrescar datos
       await refrescarDatos();
     } catch (e) {
-      // Cerrar diálogo de progreso si está abierto
       if (Get.isDialogOpen ?? false) Get.back();
-
       QuickAlert.show(
         context: Get.context!,
         type: QuickAlertType.error,
         title: 'Error Crítico',
-        text: 'Error inesperado al liberar las mesas: $e',
+        text: 'Error inesperado: $e',
         confirmBtnText: 'OK',
         confirmBtnColor: Color(0xFFE74C3C),
       );
-
-      print('❌ Error crítico en _ejecutarLiberacionMesasCompletadas: $e');
+      print('❌ Error crítico: $e');
     } finally {
-      // Desactivar estado de carga
       isLiberandoTodasLasMesas.value = false;
     }
   }
