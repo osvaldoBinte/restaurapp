@@ -25,6 +25,7 @@ class TableDetailsController extends GetxController {
   int? get grupoId => _mesaActual['grupoId'] as int?;
 
   final UniversalPrinterService printerService = UniversalPrinterService();
+final mostrarVistaPedidos = true.obs; // true = tabs pedidos, false = productos agrupados
 
   // Datos actuales
   Map<String, dynamic> _mesaActual = {};
@@ -34,7 +35,72 @@ class TableDetailsController extends GetxController {
     super.onInit();
     _setupOrdersListener();
   }
+  // ✅ Obtener productos seleccionados de TODOS los pedidos (vista agrupada)
+List<Map<String, dynamic>> getProductosSeleccionadosDeTodos() {
+  if (productosSeleccionados.isEmpty) return [];
 
+  List<Map<String, dynamic>> resultado = [];
+  final productos = todosLosProductos;
+
+  for (var producto in productos) {
+    final detalleId = producto['detalleId'] as int?;
+    final status = producto['statusDetalle'] as String? ?? 'proceso';
+
+    if (detalleId != null &&
+        productosSeleccionados.contains(detalleId) &&
+        status == 'completado') {
+      resultado.add(producto);
+    }
+  }
+
+  return resultado;
+}
+
+// ✅ Total de productos seleccionados en vista agrupada
+double calcularTotalSeleccionadosDeTodos() {
+  final productos = getProductosSeleccionadosDeTodos();
+  double total = 0.0;
+  for (var p in productos) {
+    final cantidad = (p['cantidad'] as num?)?.toInt() ?? 1;
+    final precio = (p['precioUnitario'] as num?)?.toDouble() ?? 0.0;
+    total += precio * cantidad;
+  }
+  return total;
+}
+
+// ✅ Tipo de botón para vista agrupada
+String getTipoBotonPagoAgrupado() {
+  final seleccionados = getProductosSeleccionadosDeTodos();
+  if (seleccionados.isEmpty) return 'ninguno';
+
+  // Verificar si pagando estos productos se completaría TODO
+  bool completariaTodo = true;
+
+  for (var pedido in pedidos) {
+    final pedidoMap = Map<String, dynamic>.from(pedido);
+    final detalles = pedidoMap['detalles'] as List? ?? [];
+
+    for (var detalle in detalles) {
+      final detalleMap = Map<String, dynamic>.from(detalle);
+      final detalleId = detalleMap['detalleId'] as int?;
+      final status = detalleMap['statusDetalle'] as String? ?? 'proceso';
+
+      if (status != 'cancelado' && status != 'pagado') {
+        if (detalleId != null && !productosSeleccionados.contains(detalleId)) {
+          completariaTodo = false;
+          break;
+        }
+      }
+    }
+    if (!completariaTodo) break;
+  }
+
+  return completariaTodo ? 'pagar_y_liberar' : 'pagar_seleccionados';
+}
+void toggleVistaPedidos() {
+  mostrarVistaPedidos.value = !mostrarVistaPedidos.value;
+  productosSeleccionados.clear();
+}
   // ✅ Agrupar mesa
   Future<void> agruparMesa() async {
     final controller = Get.find<OrdersController>();
@@ -1087,7 +1153,7 @@ void abrirModalAgregarProductos(Map<String, dynamic> pedido) {
       confirmBtnColor: Color(0xFFE74C3C),
       onConfirmBtnTap: () async {
         Get.back();
-        await _liberarMesa();
+        await liberarMesa();
       },
     );
   }
@@ -1288,7 +1354,7 @@ void abrirModalAgregarProductos(Map<String, dynamic> pedido) {
     }
   }
 
-  Future<void> _liberarMesa() async {
+  Future<void> liberarMesa() async {
     final controller = Get.find<OrdersController>();
     final esGrupoActual = esGrupo;
     final idGrupoActual = grupoId;
