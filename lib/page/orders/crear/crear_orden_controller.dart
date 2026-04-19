@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -63,6 +65,14 @@ class Mesa {
     this.etiquetaGrupo,
     this.mesasDelGrupo,
   });
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Mesa && other.id == id && other.esGrupo == esGrupo;
+  }
+
+  @override
+  int get hashCode => id.hashCode ^ esGrupo.hashCode;
 
   factory Mesa.fromJson(Map<String, dynamic> json) {
     final esGrupo = json['esGrupo'] ?? false;
@@ -171,7 +181,8 @@ class CreateOrderController extends GetxController {
   var isCreatingOrder = false.obs;
   var searchText = ''.obs;
   var _isReloading = false;
-  
+  Timer? _mesasRefreshTimer;
+
   // ✅ NUEVO: Timestamp de la última recarga
   DateTime? _lastReload;
   var categorias = <Category>[].obs;
@@ -190,11 +201,18 @@ class CreateOrderController extends GetxController {
   var searchResults = <Producto>[].obs;
   var showSearchResults = false.obs;
   var isLoadingSearch = false.obs;
-  @override
-  void onInit() {
-    super.onInit();
-    cargarDatosIniciales();
-  }/// ✅ CORREGIDO: Buscar productos por nombre usando POST con body
+@override
+void onInit() {
+  super.onInit();
+  cargarDatosIniciales();
+  _iniciarRefreshMesas();
+}
+
+void _iniciarRefreshMesas() {
+  _mesasRefreshTimer = Timer.periodic(Duration(seconds: 1), (_) {
+    recargarMesasSilencioso();
+  });
+}
 Future<void> buscarProductos(String query) async {
   try {
     searchQuery.value = query.trim();
@@ -364,58 +382,100 @@ Future<void> buscarProductos(String query) async {
 
   /// Obtener todas las mesas
   Future<void> obtenerMesas() async {
-    try {
-      isLoadingMesas.value = true;
-      
-      Uri uri = Uri.parse('$defaultApiServer/mesas/listarMesas/');
-      
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(Duration(seconds: 30)); // ✅ Agregar timeout
+  try {
+    isLoadingMesas.value = true;
+    
+    Uri uri = Uri.parse('$defaultApiServer/mesas/listarMesas/');
+    
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    ).timeout(Duration(seconds: 30));
 
-      print('📡 Mesas - Código: ${response.statusCode}');
-      print('📄 Respuesta: ${response.body}');
+    print('📡 Mesas - Código: ${response.statusCode}');
+    print('📄 Respuesta: ${response.body}');
 
-      if (response.statusCode == 200) {
-        // ✅ Verificar que la respuesta no esté vacía
-        if (response.body.isEmpty) {
-          throw Exception('Respuesta vacía del servidor');
-        }
-        
-        final dynamic decodedData = jsonDecode(response.body);
-        
-        // ✅ Verificar que sea una lista
-        if (decodedData is! List) {
-          throw Exception('Formato de respuesta inválido - esperaba una lista');
-        }
-        
-        final List<dynamic> data = decodedData;
-        mesas.value = data
-            .map((json) {
-              try {
-                return Mesa.fromJson(json);
-              } catch (e) {
-                print('⚠️ Error al parsear mesa: $json - Error: $e');
-                return null;
-              }
-            })
-            .cast<Mesa>()
-            .toList();
-      } else {
-        throw Exception('Error del servidor: ${response.statusCode}');
+    if (response.statusCode == 200) {
+      if (response.body.isEmpty) {
+        throw Exception('Respuesta vacía del servidor');
       }
-    } catch (e) {
-      print('❌ Error al obtener mesas: $e');
-     // _mostrarError('Error al cargar mesas', 'No se pudieron cargar las mesas: $e');
-    } finally {
-      isLoadingMesas.value = false;
-    }
-  }
+      
+      final dynamic decodedData = jsonDecode(response.body);
+      
+      if (decodedData is! List) {
+        throw Exception('Formato de respuesta inválido - esperaba una lista');
+      }
+      
+      final List<dynamic> data = decodedData;
+      
+      final nuevasMesas = data
+          .map((json) {
+            try {
+              return Mesa.fromJson(json);
+            } catch (e) {
+              print('⚠️ Error al parsear mesa: $json - Error: $e');
+              return null;
+            }
+          })
+          .where((mesa) => mesa != null)
+          .cast<Mesa>()
+          .toList();
 
+      mesas.value = nuevasMesas;
+
+      // ✅ Re-sincronizar selectedMesa con la nueva lista
+      if (selectedMesa.value != null) {
+        final mesaActualizada = nuevasMesas.firstWhereOrNull(
+          (m) => m.id == selectedMesa.value!.id && m.esGrupo == selectedMesa.value!.esGrupo,
+        );
+        selectedMesa.value = mesaActualizada;
+      }
+
+    } else {
+      throw Exception('Error del servidor: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('❌ Error al obtener mesas: $e');
+  } finally {
+    isLoadingMesas.value = false;
+  }
+}
+// En CreateOrderController
+Future<void> recargarMesasSilencioso() async {
+  try {
+    Uri uri = Uri.parse('$defaultApiServer/mesas/listarMesas/');
+    
+    final response = await http.get(
+      uri,
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+    ).timeout(Duration(seconds: 1));
+
+    if (response.statusCode == 200 && response.body.isNotEmpty) {
+      final List<dynamic> data = jsonDecode(response.body);
+      
+      final nuevasMesas = data
+          .map((json) { try { return Mesa.fromJson(json); } catch (e) { return null; } })
+          .where((m) => m != null)
+          .cast<Mesa>()
+          .toList();
+
+      mesas.value = nuevasMesas;
+      print('🔄 Mesas recargadas silenciosamente: ${mesas.length} mesas disponibles');
+      // Re-sincronizar selectedMesa
+      if (selectedMesa.value != null) {
+        final mesaActualizada = nuevasMesas.firstWhereOrNull(
+          (m) => m.id == selectedMesa.value!.id && m.esGrupo == selectedMesa.value!.esGrupo,
+        );
+        selectedMesa.value = mesaActualizada;
+      }
+    }
+  } catch (e) {
+    print('❌ Error recargando mesas: $e');
+  }
+}
   /// Obtener todo el menú - 🔧 CORREGIDO para manejar null
   Future<void> obtenerTodosLosProductos() async {
     try {

@@ -721,8 +721,11 @@ double _calcularAlturaCard(bool isVerySmallScreen, bool isSmallScreen) {
     final pedidos = mesa['pedidos'] as List;
     final totalMesa = controller.calcularTotalMesa(mesa);
     final totalItems = controller.contarItemsMesa(mesa);
-final displayLabel = mesa['displayLabel'] ?? mesa['nombreOrden'] ?? 'Mesa $numeroMesa';
-
+  final displayLabel = (mesa['displayLabel']?.toString().isNotEmpty == true)
+      ? mesa['displayLabel']
+      : (mesa['nombreOrden']?.toString().isNotEmpty == true)
+          ? mesa['nombreOrden']
+          : 'Mesa $numeroMesa';
     return Container(
       margin: EdgeInsets.only(bottom: isSmallScreen ? 8 : 12),
       child: Card(

@@ -550,26 +550,27 @@ class OrdersController extends GetxController {
 
             // ✅ Label para mostrar en UI
             final String displayLabel;
-           if (esGrupo) {
-  displayLabel = mesa['nombreGrupo'] ?? 'Grupo'; // ✅ usa nombreGrupo del JSON
-}else {
-              displayLabel = 'Mesa $numeroMesa';
+            if (esGrupo) {
+              displayLabel =
+                  mesa['nombreGrupo'] ?? 'Grupo'; // ✅ usa nombreGrupo del JSON
+            } else {
+              displayLabel = nombreOrdenMesa;
             }
 
-mesasConPedidos.add({
-  'numeroMesa': numeroMesa,
-  'id': idMesa,
-  'idnumeroMesa': idMesa,
-  'mesaId': idMesa,
-  'statusMesa': statusMesa,
-  'pedidos': pedidosFormateados,
-  'nombreOrden': nombreOrdenMesa,
-  'esGrupo': esGrupo,
-  'grupoId': mesa['grupoId'],
-  'mesasAgrupadas': mesa['mesasAgrupadas'],
-  'displayLabel': displayLabel,
-  'productosAgrupados': mesa['productosAgrupados'] ?? [], // ✅ NUEVO
-});
+            mesasConPedidos.add({
+              'numeroMesa': numeroMesa,
+              'id': idMesa,
+              'idnumeroMesa': idMesa,
+              'mesaId': idMesa,
+              'statusMesa': statusMesa,
+              'pedidos': pedidosFormateados,
+              'nombreOrden': nombreOrdenMesa,
+              'esGrupo': esGrupo,
+              'grupoId': mesa['grupoId'],
+              'mesasAgrupadas': mesa['mesasAgrupadas'],
+              'displayLabel': displayLabel,
+              'productosAgrupados': mesa['productosAgrupados'] ?? [], // ✅ NUEVO
+            });
           }
 
           print('\n📊 RESUMEN LISTA DE MESAS:');
@@ -1015,67 +1016,72 @@ mesasConPedidos.add({
     }
   }
 
- Future<void> ejecutarAtenderMesa(int numeroMesa) async {
-  try {
-    // ✅ Buscar si es grupo
-    final mesa = mesasConPedidos.firstWhereOrNull(
-      (m) => m['numeroMesa'] == numeroMesa,
-    );
-    final esGrupo = mesa?['esGrupo'] ?? false;
-    final grupoId = mesa?['grupoId'];
+  Future<void> ejecutarAtenderMesa(int numeroMesa) async {
+    try {
+      // ✅ Buscar si es grupo
+      final mesa = mesasConPedidos.firstWhereOrNull(
+        (m) => m['numeroMesa'] == numeroMesa,
+      );
+      final esGrupo = mesa?['esGrupo'] ?? false;
+      final grupoId = mesa?['grupoId'];
 
-    // ✅ URL y body según tipo
-    final Uri uri;
-    final Map<String, dynamic> body;
+      // ✅ URL y body según tipo
+      final Uri uri;
+      final Map<String, dynamic> body;
 
-    if (esGrupo && grupoId != null) {
-      uri = Uri.parse('$defaultApiServer/mesas/0/atender-todo/');
-      body = {'grupoId': grupoId};
-      print('📡 Atendiendo Grupo $grupoId: $uri');
-    } else {
-      uri = Uri.parse('$defaultApiServer/mesas/$numeroMesa/atender-todo/');
-      body = {'numeroMesa': numeroMesa, 'timestamp': DateTime.now().toIso8601String()};
-      print('📡 Atendiendo Mesa $numeroMesa: $uri');
-    }
-
-    print('📤 Body: ${jsonEncode(body)}');
-
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
-
-    print('📡 Respuesta API - Código: ${response.statusCode}');
-    print('📡 Respuesta API - Body: ${response.body}');
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true || response.statusCode == 200) {
-        if (Get.isDialogOpen ?? false) Get.back();
-        await refrescarDatos();
+      if (esGrupo && grupoId != null) {
+        uri = Uri.parse('$defaultApiServer/mesas/0/atender-todo/');
+        body = {'grupoId': grupoId};
+        print('📡 Atendiendo Grupo $grupoId: $uri');
       } else {
-        final mensaje = data['message'] ?? data['error'] ?? 'Respuesta inesperada';
-        _mostrarErrorAtenderMesa('Error del servidor: $mensaje');
+        uri = Uri.parse('$defaultApiServer/mesas/$numeroMesa/atender-todo/');
+        body = {
+          'numeroMesa': numeroMesa,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        print('📡 Atendiendo Mesa $numeroMesa: $uri');
       }
-    } else if (response.statusCode == 404) {
-      _mostrarErrorAtenderMesa('Mesa no encontrada en el servidor');
-    } else if (response.statusCode == 400) {
-      final data = jsonDecode(response.body);
-      final mensaje = data['message'] ?? data['error'] ?? 'Solicitud inválida';
-      _mostrarErrorAtenderMesa('Error en la solicitud: $mensaje');
-    } else {
-      _mostrarErrorAtenderMesa('Error del servidor (${response.statusCode})');
+
+      print('📤 Body: ${jsonEncode(body)}');
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      print('📡 Respuesta API - Código: ${response.statusCode}');
+      print('📡 Respuesta API - Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true || response.statusCode == 200) {
+          if (Get.isDialogOpen ?? false) Get.back();
+          await refrescarDatos();
+        } else {
+          final mensaje =
+              data['message'] ?? data['error'] ?? 'Respuesta inesperada';
+          _mostrarErrorAtenderMesa('Error del servidor: $mensaje');
+        }
+      } else if (response.statusCode == 404) {
+        _mostrarErrorAtenderMesa('Mesa no encontrada en el servidor');
+      } else if (response.statusCode == 400) {
+        final data = jsonDecode(response.body);
+        final mensaje =
+            data['message'] ?? data['error'] ?? 'Solicitud inválida';
+        _mostrarErrorAtenderMesa('Error en la solicitud: $mensaje');
+      } else {
+        _mostrarErrorAtenderMesa('Error del servidor (${response.statusCode})');
+      }
+    } catch (e) {
+      if (Get.isDialogOpen ?? false) Get.back();
+      print('❌ Error de conexión en ejecutarAtenderMesa: $e');
+      _mostrarErrorAtenderMesa('Error de conexión: $e');
     }
-  } catch (e) {
-    if (Get.isDialogOpen ?? false) Get.back();
-    print('❌ Error de conexión en ejecutarAtenderMesa: $e');
-    _mostrarErrorAtenderMesa('Error de conexión: $e');
   }
-}
 
   void _mostrarErrorAtenderMesa(String mensaje) {
     QuickAlert.show(
@@ -1598,21 +1604,25 @@ mesasConPedidos.add({
         try {
           final Uri uri;
           final Map<String, dynamic> body;
-         if (esGrupo) {
-  final grupoId = mesa['grupoId'] as int;
-  uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/0/');
-  body = {'grupoId': grupoId, 'status': true}; // ✅ grupoId en el body
-  print('🏪 Liberando Grupo $grupoId via /liberarMesa/0/');
-  print('📤 URL: $uri');
-  print('📤 Body: ${jsonEncode(body)}');
-} else {
-  final mesaId = mesa['id'] ?? mesa['idnumeroMesa'] ?? mesa['mesaId'] ?? numeroMesa;
-  uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/$mesaId/');
-  body = {'status': true};
-  print('🏪 Liberando Mesa $mesaId via /liberarMesa/$mesaId/');
-  print('📤 URL: $uri');
-  print('📤 Body: ${jsonEncode(body)}');
-}
+          if (esGrupo) {
+            final grupoId = mesa['grupoId'] as int;
+            uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/0/');
+            body = {'grupoId': grupoId, 'status': true}; // ✅ grupoId en el body
+            print('🏪 Liberando Grupo $grupoId via /liberarMesa/0/');
+            print('📤 URL: $uri');
+            print('📤 Body: ${jsonEncode(body)}');
+          } else {
+            final mesaId =
+                mesa['id'] ??
+                mesa['idnumeroMesa'] ??
+                mesa['mesaId'] ??
+                numeroMesa;
+            uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/$mesaId/');
+            body = {'status': true};
+            print('🏪 Liberando Mesa $mesaId via /liberarMesa/$mesaId/');
+            print('📤 URL: $uri');
+            print('📤 Body: ${jsonEncode(body)}');
+          }
           print('📤 URL: $uri');
           print('📤 Body: ${jsonEncode(body)}');
 

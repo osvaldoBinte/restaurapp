@@ -430,6 +430,7 @@ Container(
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<Mesa?>(
+ 
                   value: controller.selectedMesa.value,
                   hint: Text(
                     'Seleccionar mesa',
@@ -448,10 +449,10 @@ Container(
                           ))
                       .toList(),
                   onChanged: (mesa) {
-                    if (mesa != null) {
-                      controller.seleccionarMesa(mesa);
-                    }
-                  },
+  if (mesa != null) {
+    controller.seleccionarMesa(mesa);
+  }
+},
                 ),
               ),
             );
@@ -1134,29 +1135,31 @@ mesasOrdenadas.sort((a, b) {
 });
 
 return DropdownButtonHideUnderline(
-  child: DropdownButton<Mesa?>(
-    value: controller.selectedMesa.value,
-    hint: Text(
-      'Seleccionar',
-      style: TextStyle(color: Colors.grey[600], fontSize: 14),
-    ),
-    isExpanded: true,
-    items: mesasOrdenadas
-        .map((mesa) => DropdownMenuItem<Mesa?>(
-              value: mesa,
-              child: Text(
-                mesa.displayName, // ✅ antes decía 'Mesa ${mesa.numeroMesa}'
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ))
-        .toList(),
-    onChanged: (mesa) {
-      if (mesa != null) {
-        controller.seleccionarMesa(mesa);
-      }
-    },
-  ),
+  child:DropdownButton<Mesa?>(
+    
+                  value: controller.selectedMesa.value,
+                  hint: Text(
+                    'Seleccionar mesa',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  isExpanded: true,
+                  // ✅ CAMBIO: Usar la lista ordenada en lugar de controller.mesas
+                  items: mesasOrdenadas
+                      .map((mesa) => DropdownMenuItem<Mesa?>(
+                            value: mesa,
+                            child: Text(mesa.displayName,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (mesa) {
+  if (mesa != null) {
+    controller.seleccionarMesa(mesa);
+  }
+},
+                ),
 );
         }),
       ),
