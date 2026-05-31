@@ -54,7 +54,7 @@ class Mesa {
   final int? grupoId;
   final String? etiquetaGrupo;
   final List<MesaSimple>? mesasDelGrupo;
-
+  final String? mesaNombre; 
   Mesa({
     required this.id,
     required this.numeroMesa,
@@ -63,6 +63,7 @@ class Mesa {
     this.grupoId,
     this.etiquetaGrupo,
     this.mesasDelGrupo,
+     this.mesaNombre,
   });
 
   @override
@@ -86,9 +87,7 @@ class Mesa {
         grupoId: json['grupoId'],
         etiquetaGrupo: json['etiquetaGrupo'],
         mesasDelGrupo: json['mesas'] != null
-            ? (json['mesas'] as List)
-                .map((m) => MesaSimple.fromJson(m))
-                .toList()
+            ? (json['mesas'] as List).map((m) => MesaSimple.fromJson(m)).toList()
             : null,
       );
     }
@@ -98,15 +97,21 @@ class Mesa {
       numeroMesa: json['numeroMesa'] ?? 0,
       status: json['status'] ?? false,
       esGrupo: false,
+      mesaNombre: json['mesaNombre'] as String?, // ← nuevo
     );
   }
 
-  String get displayName {
+String get displayName {
     if (esGrupo) {
       final nombres = mesasDelGrupo?.map((m) => 'M${m.numeroMesa}').join(', ') ?? '';
       return '${etiquetaGrupo ?? 'Grupo'} ($nombres)';
     }
-    return 'Mesa $numeroMesa';
+
+    // Mesa 12 (Jardin)  ó  Mesa 9  si mesaNombre es null
+    final sufijo = (mesaNombre != null && mesaNombre!.isNotEmpty)
+        ? ' ($mesaNombre)'
+        : '';
+    return 'Mesa $numeroMesa$sufijo';
   }
 }
 
