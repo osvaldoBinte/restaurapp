@@ -72,7 +72,7 @@ Obx(() => IconButton(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '"El Jobo v1.4"',
+                    '"El Jobo v1.5"',
                     style: TextStyle(
                       fontSize: isSmallWidth ? 16 : 18,
                       fontWeight: FontWeight.bold,

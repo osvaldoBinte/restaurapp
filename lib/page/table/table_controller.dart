@@ -16,23 +16,20 @@ class MesaSimple {
   MesaSimple({required this.id, required this.numeroMesa});
 
   factory MesaSimple.fromJson(Map<String, dynamic> json) {
-    return MesaSimple(
-      id: json['id'],
-      numeroMesa: json['numeroMesa'],
-    );
+    return MesaSimple(id: json['id'], numeroMesa: json['numeroMesa']);
   }
 }
 
 // Modelo principal Mesa (ahora soporta esGrupo)
 class Mesa {
-  final int? id;           // null cuando esGrupo = true
-  final int? numeroMesa;   // null cuando esGrupo = true
+  final int? id; // null cuando esGrupo = true
+  final int? numeroMesa; // null cuando esGrupo = true
   final bool status;
   final bool esGrupo;
   final int? grupoId;
   final String? etiquetaGrupo;
   final List<MesaSimple>? mesas; // solo cuando esGrupo = true
-
+  final String? mesaNombre;
   Mesa({
     this.id,
     this.numeroMesa,
@@ -41,6 +38,7 @@ class Mesa {
     this.grupoId,
     this.etiquetaGrupo,
     this.mesas,
+    this.mesaNombre,
   });
 
   factory Mesa.fromJson(Map<String, dynamic> json) {
@@ -51,12 +49,15 @@ class Mesa {
       esGrupo: json['esGrupo'] ?? false,
       grupoId: json['grupoId'],
       etiquetaGrupo: json['etiquetaGrupo'],
+      mesaNombre: json['mesaNombre'] as String?, // ← agregar
+
       mesas: json['mesas'] != null
           ? (json['mesas'] as List).map((m) => MesaSimple.fromJson(m)).toList()
           : null,
     );
   }
 }
+
 // Controller GetX para gestión de mesas
 class TablesController extends GetxController {
   var isLoading = false.obs;
@@ -75,7 +76,7 @@ class TablesController extends GetxController {
   void onInit() {
     super.onInit();
     listarMesas();
-    
+
     // Escuchar cambios en el texto de búsqueda
     ever(searchText, (_) => _filtrarMesas());
     ever(selectedFilter, (_) => _filtrarMesas());
@@ -103,12 +104,11 @@ class TablesController extends GetxController {
         final List<dynamic> data = jsonDecode(response.body);
         mesas.value = data.map((json) => Mesa.fromJson(json)).toList();
         _filtrarMesas();
-        
+
         print('✅ ${mesas.length} mesas cargadas');
       } else {
         //_mostrarError('Error al cargar mesas', 'No se pudieron cargar las mesas');
       }
-
     } catch (e) {
       print('Error al listar mesas: $e');
       _mostrarError('Error de Conexión', 'No se pudo conectar al servidor $e');
@@ -118,7 +118,7 @@ class TablesController extends GetxController {
   }
 
   /// Crear nueva mesa
-  Future<bool> crearMesa(int numeroMesa) async {
+  Future<bool> crearMesa(int numeroMesa, {String? mesaNombre}) async {
     try {
       isCreating.value = true;
 
@@ -137,8 +137,9 @@ class TablesController extends GetxController {
 
       final mesaData = {
         'numeroMesa': numeroMesa,
+        if (mesaNombre != null && mesaNombre.isNotEmpty)
+          'mesaNombre': mesaNombre, // ← solo si tiene valor
       };
-
       print('📤 Creando mesa: ${jsonEncode(mesaData)}');
 
       Uri uri = Uri.parse('$defaultApiServer/mesas/crearMesa/');
@@ -156,12 +157,11 @@ class TablesController extends GetxController {
       print('📄 Respuesta: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-
-            if (Get.isRegistered<OrdersController>()) {
-        final OrdersController controller = Get.find<OrdersController>();
-        await controller.cargarDatos();
-        print('✅ Datos del menú recargados');
-      }
+        if (Get.isRegistered<OrdersController>()) {
+          final OrdersController controller = Get.find<OrdersController>();
+          await controller.cargarDatos();
+          print('✅ Datos del menú recargados');
+        }
         QuickAlert.show(
           context: Get.context!,
           type: QuickAlertType.success,
@@ -175,16 +175,14 @@ class TablesController extends GetxController {
         // Recargar lista de mesas
         await listarMesas();
         return true;
-
       } else {
         final errorData = jsonDecode(response.body);
         _mostrarError(
           'Error al crear mesa',
-          errorData['message'] ?? 'No se pudo crear la mesa'
+          errorData['message'] ?? 'No se pudo crear la mesa',
         );
         return false;
       }
-
     } catch (e) {
       print('Error al crear mesa: $e');
       _mostrarError('Error de Conexión', 'No se pudo conectar al servidor $e');
@@ -193,73 +191,70 @@ class TablesController extends GetxController {
       isCreating.value = false;
     }
   }
-  
 
+  Future<bool> modificarStatusMesa(int mesaId) async {
+    try {
+      isUpdating.value = true; // Cambiado a true al inicio
 
-Future<bool> modificarStatusMesa(int mesaId) async {
-  try {
-    isUpdating.value = true; // Cambiado a true al inicio
+      final statusData = {'status': true};
 
-    final statusData = {
-      'status': true, 
-    };
+      print('📤 Modificando status mesa $mesaId: ${jsonEncode(statusData)}');
 
-    print('📤 Modificando status mesa $mesaId: ${jsonEncode(statusData)}');
+      // URL corregida - agregando '/restaurante/' si es necesario
+      Uri uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/$mesaId/');
 
-    // URL corregida - agregando '/restaurante/' si es necesario
-    Uri uri = Uri.parse('$defaultApiServer/mesas/liberarMesa/$mesaId/');
-    
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode(statusData),
-    );
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(statusData),
+      );
 
-    print('📡 Modificar status - Código: ${response.statusCode}');
-    print('📄 Respuesta: ${response.body}');
+      print('📡 Modificar status - Código: ${response.statusCode}');
+      print('📄 Respuesta: ${response.body}');
 
-    if (response.statusCode == 200) {
-      final mesa = mesas.firstWhereOrNull((m) => m.id == mesaId);
-      
-          if (Get.isRegistered<OrdersController>()) {
-        final OrdersController controller = Get.find<OrdersController>();
-        await controller.cargarDatos();
-        print('✅ Datos del menú recargados');
+      if (response.statusCode == 200) {
+        final mesa = mesas.firstWhereOrNull((m) => m.id == mesaId);
+
+        if (Get.isRegistered<OrdersController>()) {
+          final OrdersController controller = Get.find<OrdersController>();
+          await controller.cargarDatos();
+          print('✅ Datos del menú recargados');
+        }
+        QuickAlert.show(
+          context: Get.context!,
+          type: QuickAlertType.success,
+          title: '¡Status Actualizado!',
+          text: 'La mesa ${mesa?.numeroMesa ?? mesaId} ha sido liberada',
+          confirmBtnText: 'OK',
+          confirmBtnColor: Color(0xFF4CAF50),
+          autoCloseDuration: Duration(seconds: 2),
+        );
+
+        // Recargar lista de mesas
+        await listarMesas();
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        _mostrarError(
+          'Error al actualizar mesa',
+          errorData['error'] ??
+              errorData['message'] ??
+              'No se pudo actualizar el status',
+        );
+        return false;
       }
-      QuickAlert.show(
-        context: Get.context!,
-        type: QuickAlertType.success,
-        title: '¡Status Actualizado!',
-        text: 'La mesa ${mesa?.numeroMesa ?? mesaId} ha sido liberada',
-        confirmBtnText: 'OK',
-        confirmBtnColor: Color(0xFF4CAF50),
-        autoCloseDuration: Duration(seconds: 2),
-      );
-
-      // Recargar lista de mesas
-      await listarMesas();
-      return true;
-
-    } else {
-      final errorData = jsonDecode(response.body);
-      _mostrarError(
-        'Error al actualizar mesa',
-        errorData['error'] ?? errorData['message'] ?? 'No se pudo actualizar el status'
-      );
+    } catch (e) {
+      print('Error al modificar status: $e');
+      _mostrarError('Error de Conexión', 'No se pudo conectar al servidor: $e');
       return false;
+    } finally {
+      isUpdating.value = false;
     }
-
-  } catch (e) {
-    print('Error al modificar status: $e');
-    _mostrarError('Error de Conexión', 'No se pudo conectar al servidor: $e');
-    return false;
-  } finally {
-    isUpdating.value = false;
   }
-}
+
   /// Eliminar mesa
   Future<bool> eliminarMesa(int mesaId) async {
     try {
@@ -282,14 +277,15 @@ Future<bool> modificarStatusMesa(int mesaId) async {
 
       if (response.statusCode == 200) {
         final mesa = mesas.firstWhereOrNull((m) => m.id == mesaId);
-        
-          final controller3 = Get.find<OrdersController>();
-          controller3.cargarDatos();
+
+        final controller3 = Get.find<OrdersController>();
+        controller3.cargarDatos();
         QuickAlert.show(
           context: Get.context!,
           type: QuickAlertType.success,
           title: '¡Mesa Eliminada!',
-          text: 'La mesa ${mesa?.numeroMesa ?? mesaId} ha sido eliminada exitosamente',
+          text:
+              'La mesa ${mesa?.numeroMesa ?? mesaId} ha sido eliminada exitosamente',
           confirmBtnText: 'OK',
           confirmBtnColor: Color(0xFF4CAF50),
           autoCloseDuration: Duration(seconds: 2),
@@ -298,16 +294,14 @@ Future<bool> modificarStatusMesa(int mesaId) async {
         // Recargar lista de mesas
         await listarMesas();
         return true;
-
       } else {
         final errorData = jsonDecode(response.body);
         _mostrarError(
           'Error al eliminar mesa',
-          errorData['message'] ?? 'No se pudo eliminar la mesa'
+          errorData['message'] ?? 'No se pudo eliminar la mesa',
         );
         return false;
       }
-
     } catch (e) {
       print('Error al eliminar mesa: $e');
       _mostrarError('Error de Conexión', 'No se pudo conectar al servidor $e');
@@ -317,10 +311,12 @@ Future<bool> modificarStatusMesa(int mesaId) async {
     }
   }
 
-  /// Mostrar modal para crear mesa
   void mostrarModalCrearMesa() {
     final TextEditingController numeroController = TextEditingController();
-  final controller = Get.find<CreateOrderController>();
+    final TextEditingController nombreController =
+        TextEditingController(); // ← nuevo
+    final controller = Get.find<CreateOrderController>();
+
     Get.dialog(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -357,15 +353,11 @@ Future<bool> modificarStatusMesa(int mesaId) async {
               SizedBox(height: 8),
               Text(
                 'Ingresa el número de la nueva mesa',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 24),
 
-              // Campo número de mesa
               TextField(
                 controller: numeroController,
                 keyboardType: TextInputType.number,
@@ -385,7 +377,25 @@ Future<bool> modificarStatusMesa(int mesaId) async {
                 autofocus: true,
               ),
               SizedBox(height: 24),
-
+              TextField(
+                controller: nombreController,
+                decoration: InputDecoration(
+                  labelText: 'Nombre (opcional)',
+                  hintText: 'Ej: Jardín, Sala, Terraza...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Color(0xFF8B4513), width: 2),
+                  ),
+                  labelStyle: TextStyle(color: Color(0xFF8B4513)),
+                  prefixIcon: Icon(
+                    Icons.label_outline,
+                    color: Color(0xFF8B4513),
+                  ),
+                ),
+              ),
               // Botones
               Row(
                 children: [
@@ -408,70 +418,77 @@ Future<bool> modificarStatusMesa(int mesaId) async {
                   SizedBox(width: 12),
                   Expanded(
                     flex: 2,
-                    child: Obx(() => ElevatedButton(
-                      onPressed: isCreating.value
-                          ? null
-                          : () async {
-                              final numeroText = numeroController.text.trim();
-                              if (numeroText.isEmpty) {
-                                QuickAlert.show(
-                                  context: Get.context!,
-                                  type: QuickAlertType.warning,
-                                  title: 'Campo requerido',
-                                  text: 'Por favor ingresa el número de mesa',
-                                  confirmBtnText: 'OK',
-                                  confirmBtnColor: Color(0xFFFF9800),
-                                );
-                                return;
-                              }
+                    child: Obx(
+                      () => ElevatedButton(
+                        onPressed: isCreating.value
+                            ? null
+                            : () async {
+                                final numeroText = numeroController.text.trim();
+                                if (numeroText.isEmpty) {
+                                  QuickAlert.show(
+                                    context: Get.context!,
+                                    type: QuickAlertType.warning,
+                                    title: 'Campo requerido',
+                                    text: 'Por favor ingresa el número de mesa',
+                                    confirmBtnText: 'OK',
+                                    confirmBtnColor: Color(0xFFFF9800),
+                                  );
+                                  return;
+                                }
 
-                              final numero = int.tryParse(numeroText);
-                              if (numero == null || numero <= 0) {
-                                QuickAlert.show(
-                                  context: Get.context!,
-                                  type: QuickAlertType.warning,
-                                  title: 'Número inválido',
-                                  text: 'Por favor ingresa un número válido mayor a 0',
-                                  confirmBtnText: 'OK',
-                                  confirmBtnColor: Color(0xFFFF9800),
+                                final numero = int.tryParse(numeroText);
+                                if (numero == null || numero <= 0) {
+                                  QuickAlert.show(
+                                    context: Get.context!,
+                                    type: QuickAlertType.warning,
+                                    title: 'Número inválido',
+                                    text:
+                                        'Por favor ingresa un número válido mayor a 0',
+                                    confirmBtnText: 'OK',
+                                    confirmBtnColor: Color(0xFFFF9800),
+                                  );
+                                  return;
+                                }
+                                final success = await crearMesa(
+                                  numero,
+                                  mesaNombre: nombreController.text.trim(),
                                 );
-                                return;
-                              }
-
-                              final success = await crearMesa(numero);
-                              if (success) {
-                               controller.cargarDatosIniciales();
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF8B4513),
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                                if (success) {
+                                  controller.cargarDatosIniciales();
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF8B4513),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      ),
-                      child: isCreating.value
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    strokeWidth: 2,
+                        child: isCreating.value
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                      strokeWidth: 2,
+                                    ),
                                   ),
-                                ),
-                                SizedBox(width: 8),
-                                Text('Creando...'),
-                              ],
-                            )
-                          : Text(
-                              'Crear Mesa',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                    )),
+                                  SizedBox(width: 8),
+                                  Text('Creando...'),
+                                ],
+                              )
+                            : Text(
+                                'Crear Mesa',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -482,79 +499,86 @@ Future<bool> modificarStatusMesa(int mesaId) async {
       barrierDismissible: !isCreating.value,
     );
   }
-/// Confirmar eliminación de mesa
-void confirmarEliminarMesa(Mesa mesa) {
-  QuickAlert.show(
-    context: Get.context!,
-    type: QuickAlertType.confirm,
-    title: '¿Eliminar Mesa?',
-    text: '¿Estás seguro de que quieres eliminar la ${mesa.esGrupo ? 'Grupo "${mesa.etiquetaGrupo}"' : 'Mesa ${mesa.numeroMesa}'}? Esta acción no se puede deshacer.',
-    confirmBtnText: 'Eliminar',
-    cancelBtnText: 'Cancelar',
-    confirmBtnColor: Color(0xFFE74C3C),
-    onConfirmBtnTap: () async {
-      Get.back();
-      if (mesa.esGrupo) {
-        // si tienes endpoint para eliminar grupo, úsalo aquí
-        // await eliminarGrupo(mesa.grupoId!);
-      } else {
-        await eliminarMesa(mesa.id!); // ← ! porque id es int?
-      }
-    },
-  );
-}
 
-/// Confirmar cambio de status
-void confirmarCambioStatus(Mesa mesa) {
-  final nuevoStatus = !mesa.status;
-  final accion = nuevoStatus ? 'activar' : 'desactivar';
-  final nombre = mesa.esGrupo
-      ? 'el Grupo "${mesa.etiquetaGrupo}"'
-      : 'la Mesa ${mesa.numeroMesa}';
+  /// Confirmar eliminación de mesa
+  void confirmarEliminarMesa(Mesa mesa) {
+    QuickAlert.show(
+      context: Get.context!,
+      type: QuickAlertType.confirm,
+      title: '¿Eliminar Mesa?',
+      text:
+          '¿Estás seguro de que quieres eliminar la ${mesa.esGrupo ? 'Grupo "${mesa.etiquetaGrupo}"' : 'Mesa ${mesa.numeroMesa}'}? Esta acción no se puede deshacer.',
+      confirmBtnText: 'Eliminar',
+      cancelBtnText: 'Cancelar',
+      confirmBtnColor: Color(0xFFE74C3C),
+      onConfirmBtnTap: () async {
+        Get.back();
+        if (mesa.esGrupo) {
+          // si tienes endpoint para eliminar grupo, úsalo aquí
+          // await eliminarGrupo(mesa.grupoId!);
+        } else {
+          await eliminarMesa(mesa.id!); // ← ! porque id es int?
+        }
+      },
+    );
+  }
 
-  QuickAlert.show(
-    context: Get.context!,
-    type: QuickAlertType.confirm,
-    title: '¿Cambiar Status?',
-    text: '¿Estás seguro de que quieres $accion $nombre?',
-    confirmBtnText: accion.capitalize!,
-    cancelBtnText: 'Cancelar',
-    confirmBtnColor: nuevoStatus ? Color(0xFF4CAF50) : Color(0xFFFF9800),
-    onConfirmBtnTap: () async {
-      Get.back();
-      if (mesa.esGrupo) {
-        // await modificarStatusGrupo(mesa.grupoId!);
-      } else {
-        await modificarStatusMesa(mesa.id!); // ← ! porque id es int?
-      }
-    },
-  );
-}
+  /// Confirmar cambio de status
+  void confirmarCambioStatus(Mesa mesa) {
+    final nuevoStatus = !mesa.status;
+    final accion = nuevoStatus ? 'activar' : 'desactivar';
+    final nombre = mesa.esGrupo
+        ? 'el Grupo "${mesa.etiquetaGrupo}"'
+        : 'la Mesa ${mesa.numeroMesa}';
+
+    QuickAlert.show(
+      context: Get.context!,
+      type: QuickAlertType.confirm,
+      title: '¿Cambiar Status?',
+      text: '¿Estás seguro de que quieres $accion $nombre?',
+      confirmBtnText: accion.capitalize!,
+      cancelBtnText: 'Cancelar',
+      confirmBtnColor: nuevoStatus ? Color(0xFF4CAF50) : Color(0xFFFF9800),
+      onConfirmBtnTap: () async {
+        Get.back();
+        if (mesa.esGrupo) {
+          // await modificarStatusGrupo(mesa.grupoId!);
+        } else {
+          await modificarStatusMesa(mesa.id!); // ← ! porque id es int?
+        }
+      },
+    );
+  }
 
   /// Filtrar mesas según búsqueda y filtro
- void _filtrarMesas() {
-  var mesasFiltradas = mesas.where((mesa) {
-    final cumpleBusqueda = searchText.value.isEmpty ||
-        (mesa.numeroMesa?.toString().contains(searchText.value) ?? false) ||
-        (mesa.id?.toString().contains(searchText.value) ?? false) ||
-        (mesa.etiquetaGrupo?.toLowerCase().contains(searchText.value.toLowerCase()) ?? false);
+  void _filtrarMesas() {
+    var mesasFiltradas = mesas.where((mesa) {
+      final cumpleBusqueda =
+          searchText.value.isEmpty ||
+          (mesa.numeroMesa?.toString().contains(searchText.value) ?? false) ||
+          (mesa.id?.toString().contains(searchText.value) ?? false) ||
+          (mesa.etiquetaGrupo?.toLowerCase().contains(
+                searchText.value.toLowerCase(),
+              ) ??
+              false);
 
-    final cumpleStatus = selectedFilter.value == 'Todas' ||
-        (selectedFilter.value == 'Activas' && mesa.status) ||
-        (selectedFilter.value == 'Inactivas' && !mesa.status);
+      final cumpleStatus =
+          selectedFilter.value == 'Todas' ||
+          (selectedFilter.value == 'Activas' && mesa.status) ||
+          (selectedFilter.value == 'Inactivas' && !mesa.status);
 
-    return cumpleBusqueda && cumpleStatus;
-  }).toList();
+      return cumpleBusqueda && cumpleStatus;
+    }).toList();
 
-  // Los grupos van al final, las mesas simples ordenadas por número
-  mesasFiltradas.sort((a, b) {
-    if (a.esGrupo && !b.esGrupo) return 1;
-    if (!a.esGrupo && b.esGrupo) return -1;
-    return (a.numeroMesa ?? 0).compareTo(b.numeroMesa ?? 0);
-  });
+    // Los grupos van al final, las mesas simples ordenadas por número
+    mesasFiltradas.sort((a, b) {
+      if (a.esGrupo && !b.esGrupo) return 1;
+      if (!a.esGrupo && b.esGrupo) return -1;
+      return (a.numeroMesa ?? 0).compareTo(b.numeroMesa ?? 0);
+    });
 
-  filteredMesas.value = mesasFiltradas;
-}
+    filteredMesas.value = mesasFiltradas;
+  }
 
   /// Actualizar texto de búsqueda
   void buscarMesas(String texto) {
@@ -587,5 +611,6 @@ void confirmarCambioStatus(Mesa mesa) {
   int get totalMesas => mesas.length;
   int get mesasActivas => mesas.where((mesa) => mesa.status).length;
   int get mesasInactivas => mesas.where((mesa) => !mesa.status).length;
-  double get porcentajeActivas => totalMesas > 0 ? (mesasActivas / totalMesas) * 100 : 0;
+  double get porcentajeActivas =>
+      totalMesas > 0 ? (mesasActivas / totalMesas) * 100 : 0;
 }

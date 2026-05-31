@@ -187,7 +187,7 @@ class TableDetailsModal extends StatelessWidget {
                 return SizedBox.shrink();
               }),
               // Botón Agrupar Mesa (solo si NO es grupo)
-              Obx(() {
+            /*  Obx(() {
                 final updating =
                     controller.isUpdating.value; // ✅ observable dentro del Obx
                 if (!controller.esGrupo) {
@@ -231,7 +231,8 @@ class TableDetailsModal extends StatelessWidget {
                   );
                 }
                 return SizedBox.shrink();
-              }),
+              }),*/
+
               // Botón Imprimir Ticket
               /* Obx(() => IconButton(
               onPressed: controller.isUpdating.value

@@ -398,34 +398,46 @@ Widget _buildGrupoCard(Mesa grupo) {
           ),
           SizedBox(width: 12),
           
-          // Información de la mesa
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Mesa ${mesa.numeroMesa}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Color(0xFF3E1F08),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'ID: ${mesa.id}',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
-                ),
-                SizedBox(height: 4),
-                
-              ],
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'Mesa ${mesa.numeroMesa}',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          color: Color(0xFF3E1F08),
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      // ← NUEVO: nombre de la mesa si existe
+      if (mesa.mesaNombre != null && mesa.mesaNombre!.isNotEmpty)
+        Container(
+          margin: EdgeInsets.only(top: 2),
+          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Color(0xFF8B4513).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            mesa.mesaNombre!,
+            style: TextStyle(
+              color: Color(0xFF8B4513),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
+        ),
+      SizedBox(height: 2),
+      Text(
+        'ID: ${mesa.id}',
+        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+      ),
+    ],
+  ),
+),
           
           // Botones de acción
           Row(
