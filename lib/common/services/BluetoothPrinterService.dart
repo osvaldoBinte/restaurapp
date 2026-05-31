@@ -616,8 +616,15 @@ class UniversalPrinterService {
 
   bytes += generator.text('================================',
       styles: PosStyles(align: PosAlign.center));
-  
+ 
+  final nombreOrden = pedido['nombreOrden'] ?? 'Sin nombre';
+  bytes += generator.text(
+    nombreOrden,
+    styles: PosStyles(align: PosAlign.center, bold: true),
+  );
+
   bytes += generator.text('--------------------------------');
+
   final detalles = pedido['detalles'] as List;
   double subtotal = 0.0;
   
@@ -687,11 +694,11 @@ class UniversalPrinterService {
     final fechaStr = '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
     final horaStr = '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
     
-    ticket.writeln('TICKET DE VENTA');
-    ticket.writeln(''.padLeft(32, '-'));
-    ticket.writeln('Fecha: $fechaStr');
-    ticket.writeln('Hora: $horaStr');
-    ticket.writeln(''.padLeft(32, '='));
+ticket.writeln('TICKET DE VENTA');
+  ticket.writeln(''.padLeft(32, '-'));
+  ticket.writeln('Orden: $nombreOrden'); // ← esta línea ya existe como variable, solo agrégala
+  ticket.writeln('Fecha: $fechaStr');
+  ticket.writeln('Hora: $horaStr');
     
     // Productos
     ticket.writeln('PRODUCTO         CANT   TOTAL');

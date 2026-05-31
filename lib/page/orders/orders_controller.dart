@@ -10,8 +10,7 @@ import 'package:restaurapp/page/orders/OrderStatusModal.dart';
 import 'package:restaurapp/page/orders/modaltable/TableDetailsModal.dart';
 import 'package:restaurapp/page/orders/orders_page.dart';
 import 'package:restaurapp/page/orders/serivios/orden_service.dart';
-
-// Controller GetX para órdenes - ACTUALIZADO CON AUTO-REFRESH
+ 
 class OrdersController extends GetxController {
   var isLoading = false.obs;
   var isLoadingModal = false.obs;
@@ -23,26 +22,24 @@ class OrdersController extends GetxController {
   final OrdenService ordenService = OrdenService();
 
   String defaultApiServer = AppConstants.serverBase;
-
-  // ✅ NUEVO: Variables para el timer
+ 
   Timer? _autoRefreshTimer;
   var isAutoRefreshEnabled = true.obs;
-  final int autoRefreshInterval = 3; // segundos
+  final int autoRefreshInterval = 3; 
 
   @override
   void onInit() {
     super.onInit();
     cargarDatos();
-    _iniciarAutoRefresh(); // ✅ NUEVO: Iniciar auto-refresh
+    _iniciarAutoRefresh(); 
   }
 
   @override
   void onClose() {
-    _detenerAutoRefresh(); // ✅ NUEVO: Limpiar timer al cerrar
+    _detenerAutoRefresh(); 
     super.onClose();
   }
-
-  // ✅ NUEVO: Iniciar auto-refresh
+ 
   void _iniciarAutoRefresh() {
     _autoRefreshTimer = Timer.periodic(Duration(seconds: autoRefreshInterval), (
       timer,
@@ -54,15 +51,13 @@ class OrdersController extends GetxController {
     });
     print('✅ Auto-refresh iniciado: cada $autoRefreshInterval segundos');
   }
-
-  // ✅ NUEVO: Detener auto-refresh
+ 
   void _detenerAutoRefresh() {
     _autoRefreshTimer?.cancel();
     _autoRefreshTimer = null;
     print('🛑 Auto-refresh detenido');
   }
-
-  // ✅ NUEVO: Alternar auto-refresh (para controlar desde UI)
+ 
   void toggleAutoRefresh() {
     isAutoRefreshEnabled.value = !isAutoRefreshEnabled.value;
 

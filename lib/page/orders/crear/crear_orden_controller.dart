@@ -643,15 +643,24 @@ print(  '📡 Refrescando mesas - Código: ${response.statusCode}');
     }
   }
 
-  String _generarNombreOrdenPorDefecto() {
-    try {
-      return 'Orden Mesa ${selectedMesa.value?.numeroMesa ?? 'Sin Mesa'}';
-    } catch (e) {
-      print('❌ Error en _generarNombreOrdenPorDefecto: $e');
-      return 'Orden Sin Nombre';
-    }
-  }
+String _generarNombreOrdenPorDefecto() {
+  try {
+    final mesa = selectedMesa.value;
+    if (mesa == null) return ' Sin Mesa';
 
+    if (mesa.esGrupo) {
+      return ' ${mesa.etiquetaGrupo ?? 'Grupo'}';
+    }
+
+    final sufijo = (mesa.mesaNombre != null && mesa.mesaNombre!.isNotEmpty)
+        ? ' ${mesa.mesaNombre}'
+        : '';
+    return ' Mesa ${mesa.numeroMesa}$sufijo';
+  } catch (e) {
+    print('❌ Error en _generarNombreOrdenPorDefecto: $e');
+    return ' Sin Nombre';
+  }
+}
   Future<bool> crearOrden({String? nombreOrdenCustom}) async {
     try {
       if (selectedMesa.value == null) {
