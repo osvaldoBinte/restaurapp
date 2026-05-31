@@ -39,10 +39,7 @@ class MesaSimple {
   MesaSimple({required this.id, required this.numeroMesa});
 
   factory MesaSimple.fromJson(Map<String, dynamic> json) {
-    return MesaSimple(
-      id: json['id'],
-      numeroMesa: json['numeroMesa'],
-    );
+    return MesaSimple(id: json['id'], numeroMesa: json['numeroMesa']);
   }
 }
 
@@ -54,7 +51,7 @@ class Mesa {
   final int? grupoId;
   final String? etiquetaGrupo;
   final List<MesaSimple>? mesasDelGrupo;
-  final String? mesaNombre; 
+  final String? mesaNombre;
   Mesa({
     required this.id,
     required this.numeroMesa,
@@ -63,7 +60,7 @@ class Mesa {
     this.grupoId,
     this.etiquetaGrupo,
     this.mesasDelGrupo,
-     this.mesaNombre,
+    this.mesaNombre,
   });
 
   @override
@@ -87,7 +84,9 @@ class Mesa {
         grupoId: json['grupoId'],
         etiquetaGrupo: json['etiquetaGrupo'],
         mesasDelGrupo: json['mesas'] != null
-            ? (json['mesas'] as List).map((m) => MesaSimple.fromJson(m)).toList()
+            ? (json['mesas'] as List)
+                  .map((m) => MesaSimple.fromJson(m))
+                  .toList()
             : null,
       );
     }
@@ -101,9 +100,10 @@ class Mesa {
     );
   }
 
-String get displayName {
+  String get displayName {
     if (esGrupo) {
-      final nombres = mesasDelGrupo?.map((m) => 'M${m.numeroMesa}').join(', ') ?? '';
+      final nombres =
+          mesasDelGrupo?.map((m) => 'M${m.numeroMesa}').join(', ') ?? '';
       return '${etiquetaGrupo ?? 'Grupo'} ($nombres)';
     }
 
@@ -148,7 +148,8 @@ class Producto {
 
   double get precioDouble => double.tryParse(precio) ?? 0.0;
   bool get tieneImagen => imagen.isNotEmpty;
-  String get imagenSegura => imagen.isEmpty ? 'assets/images/no-image.png' : imagen;
+  String get imagenSegura =>
+      imagen.isEmpty ? 'assets/images/no-image.png' : imagen;
 }
 
 class CartItem {
@@ -232,7 +233,9 @@ class CreateOrderController extends GetxController {
       });
       request.body = jsonEncode(searchData);
 
-      final streamedResponse = await request.send().timeout(Duration(seconds: 15));
+      final streamedResponse = await request.send().timeout(
+        Duration(seconds: 15),
+      );
       final response = await http.Response.fromStream(streamedResponse);
 
       print('📡 Búsqueda - Código: ${response.statusCode}');
@@ -254,7 +257,9 @@ class CreateOrderController extends GetxController {
               try {
                 return Producto.fromJson(json);
               } catch (e) {
-                print('⚠️ Error al parsear producto de búsqueda: $json - Error: $e');
+                print(
+                  '⚠️ Error al parsear producto de búsqueda: $json - Error: $e',
+                );
                 return null;
               }
             })
@@ -283,7 +288,8 @@ class CreateOrderController extends GetxController {
 
   void cerrarBusqueda() {
     limpiarBusqueda();
-    if (categorias.isNotEmpty && selectedCategoryIndex.value < categorias.length) {
+    if (categorias.isNotEmpty &&
+        selectedCategoryIndex.value < categorias.length) {
       final categoria = categorias[selectedCategoryIndex.value];
       obtenerProductosPorCategoria(categoria.id);
     }
@@ -303,7 +309,10 @@ class CreateOrderController extends GetxController {
       }
     } catch (e) {
       print('❌ Error en cargarDatosIniciales: $e');
-      _mostrarError('Error de Inicialización', 'No se pudieron cargar los datos iniciales: $e');
+      _mostrarError(
+        'Error de Inicialización',
+        'No se pudieron cargar los datos iniciales: $e',
+      );
     } finally {
       isLoading.value = false;
     }
@@ -315,21 +324,25 @@ class CreateOrderController extends GetxController {
 
       Uri uri = Uri.parse('$defaultApiServer/menu/listarCategorias/');
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(Duration(seconds: 30));
 
       print('📡 Categorías - Código: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        if (response.body.isEmpty) throw Exception('Respuesta vacía del servidor');
+        if (response.body.isEmpty)
+          throw Exception('Respuesta vacía del servidor');
 
         final dynamic decodedData = jsonDecode(response.body);
-        if (decodedData is! List) throw Exception('Formato de respuesta inválido');
+        if (decodedData is! List)
+          throw Exception('Formato de respuesta inválido');
 
         categorias.value = decodedData
             .map((json) => Category.fromJson(json))
@@ -343,57 +356,76 @@ class CreateOrderController extends GetxController {
       isLoadingCategories.value = false;
     }
   }
-Future<void> refrescarMesasSilencioso() async {
-  try {
-    Uri uri = Uri.parse('$defaultApiServer/mesas/listarMesas/');
-    final response = await http.get(
-      uri,
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-    ).timeout(Duration(seconds: 10));
-print(  '📡 Refrescando mesas - Código: ${response.statusCode}');
-    if (response.statusCode == 200 && response.body.isNotEmpty) {
-      final List<dynamic> data = jsonDecode(response.body);
-      final nuevasMesas = data
-          .map((json) { try { return Mesa.fromJson(json); } catch (e) { return null; } })
-          .where((m) => m != null)
-          .cast<Mesa>()
-          .toList();
 
-      mesas.value = nuevasMesas;
+  Future<void> refrescarMesasSilencioso() async {
+    try {
+      Uri uri = Uri.parse('$defaultApiServer/mesas/listarMesas/');
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(Duration(seconds: 10));
+      print('📡 Refrescando mesas - Código: ${response.statusCode}');
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final nuevasMesas = data
+            .map((json) {
+              try {
+                return Mesa.fromJson(json);
+              } catch (e) {
+                return null;
+              }
+            })
+            .where((m) => m != null)
+            .cast<Mesa>()
+            .toList();
 
-      if (selectedMesa.value != null) {
-        final mesaActualizada = nuevasMesas.firstWhereOrNull(
-          (m) => m.id == selectedMesa.value!.id && m.esGrupo == selectedMesa.value!.esGrupo,
-        );
-        selectedMesa.value = mesaActualizada;
+        mesas.value = nuevasMesas;
+
+        if (selectedMesa.value != null) {
+          final mesaActualizada = nuevasMesas.firstWhereOrNull(
+            (m) =>
+                m.id == selectedMesa.value!.id &&
+                m.esGrupo == selectedMesa.value!.esGrupo,
+          );
+          selectedMesa.value = mesaActualizada;
+        }
       }
+    } catch (e) {
+      print('❌ Error refrescando mesas: $e');
     }
-  } catch (e) {
-    print('❌ Error refrescando mesas: $e');
+    // ✅ Sin tocar isLoadingMesas
   }
-  // ✅ Sin tocar isLoadingMesas
-}
+
   Future<void> obtenerMesas() async {
     try {
       isLoadingMesas.value = true;
 
       Uri uri = Uri.parse('$defaultApiServer/mesas/listarMesas/');
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(Duration(seconds: 30));
 
       print('📡 Mesas - Código: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        if (response.body.isEmpty) throw Exception('Respuesta vacía del servidor');
+        if (response.body.isEmpty)
+          throw Exception('Respuesta vacía del servidor');
 
         final dynamic decodedData = jsonDecode(response.body);
-        if (decodedData is! List) throw Exception('Formato de respuesta inválido');
+        if (decodedData is! List)
+          throw Exception('Formato de respuesta inválido');
 
         final nuevasMesas = decodedData
             .map((json) {
@@ -413,7 +445,9 @@ print(  '📡 Refrescando mesas - Código: ${response.statusCode}');
         // Re-sincronizar selectedMesa con la nueva lista
         if (selectedMesa.value != null) {
           final mesaActualizada = nuevasMesas.firstWhereOrNull(
-            (m) => m.id == selectedMesa.value!.id && m.esGrupo == selectedMesa.value!.esGrupo,
+            (m) =>
+                m.id == selectedMesa.value!.id &&
+                m.esGrupo == selectedMesa.value!.esGrupo,
           );
           selectedMesa.value = mesaActualizada;
         }
@@ -433,21 +467,25 @@ print(  '📡 Refrescando mesas - Código: ${response.statusCode}');
 
       Uri uri = Uri.parse('$defaultApiServer/menu/listarTodoMenu/');
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(Duration(seconds: 30));
 
       print('📡 Todo el menú - Código: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        if (response.body.isEmpty) throw Exception('Respuesta vacía del servidor');
+        if (response.body.isEmpty)
+          throw Exception('Respuesta vacía del servidor');
 
         final dynamic decodedData = jsonDecode(response.body);
-        if (decodedData is! List) throw Exception('Formato de respuesta inválido');
+        if (decodedData is! List)
+          throw Exception('Formato de respuesta inválido');
 
         todosLosProductos.value = decodedData
             .map((json) {
@@ -477,30 +515,40 @@ print(  '📡 Refrescando mesas - Código: ${response.statusCode}');
     try {
       isLoadingProducts.value = true;
 
-      Uri uri = Uri.parse('$defaultApiServer/menu/listarMenuPorCategoria/$categoriaId/');
+      Uri uri = Uri.parse(
+        '$defaultApiServer/menu/listarMenuPorCategoria/$categoriaId/',
+      );
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(Duration(seconds: 30));
 
-      print('📡 Productos por categoría $categoriaId - Código: ${response.statusCode}');
+      print(
+        '📡 Productos por categoría $categoriaId - Código: ${response.statusCode}',
+      );
 
       if (response.statusCode == 200) {
-        if (response.body.isEmpty) throw Exception('Respuesta vacía del servidor');
+        if (response.body.isEmpty)
+          throw Exception('Respuesta vacía del servidor');
 
         final dynamic decodedData = jsonDecode(response.body);
-        if (decodedData is! List) throw Exception('Formato de respuesta inválido');
+        if (decodedData is! List)
+          throw Exception('Formato de respuesta inválido');
 
         productosPorCategoria.value = decodedData
             .map((json) {
               try {
                 return Producto.fromJson(json);
               } catch (e) {
-                print('⚠️ Error al parsear producto por categoría: $json - Error: $e');
+                print(
+                  '⚠️ Error al parsear producto por categoría: $json - Error: $e',
+                );
                 return null;
               }
             })
@@ -520,10 +568,14 @@ print(  '📡 Refrescando mesas - Código: ${response.statusCode}');
 
   void _filtrarProductosPorCategoria(int categoriaId) {
     try {
-      final categoria = categorias.firstWhereOrNull((cat) => cat.id == categoriaId);
+      final categoria = categorias.firstWhereOrNull(
+        (cat) => cat.id == categoriaId,
+      );
       if (categoria != null) {
         productosPorCategoria.value = todosLosProductos
-            .where((producto) => producto.categoria == categoria.nombreCategoria)
+            .where(
+              (producto) => producto.categoria == categoria.nombreCategoria,
+            )
             .toList();
       } else {
         productosPorCategoria.value = [];
@@ -554,20 +606,28 @@ print(  '📡 Refrescando mesas - Código: ${response.statusCode}');
     }
   }
 
-  void agregarAlCarrito(Producto producto, {String observaciones = '', bool cerrarDialog = false}) {
+  void agregarAlCarrito(
+    Producto producto, {
+    String observaciones = '',
+    bool cerrarDialog = false,
+  }) {
     try {
       final existingItemIndex = cartItems.indexWhere(
-        (item) => item.producto.id == producto.id && item.observaciones == observaciones,
+        (item) =>
+            item.producto.id == producto.id &&
+            item.observaciones == observaciones,
       );
 
       if (existingItemIndex >= 0) {
         cartItems[existingItemIndex].cantidad++;
       } else {
-        cartItems.add(CartItem(
-          producto: producto,
-          cantidad: 1,
-          observaciones: observaciones,
-        ));
+        cartItems.add(
+          CartItem(
+            producto: producto,
+            cantidad: 1,
+            observaciones: observaciones,
+          ),
+        );
       }
 
       if (cerrarDialog && Get.isDialogOpen == true) {
@@ -643,24 +703,25 @@ print(  '📡 Refrescando mesas - Código: ${response.statusCode}');
     }
   }
 
-String _generarNombreOrdenPorDefecto() {
-  try {
-    final mesa = selectedMesa.value;
-    if (mesa == null) return ' Sin Mesa';
+  String _generarNombreOrdenPorDefecto() {
+    try {
+      final mesa = selectedMesa.value;
+      if (mesa == null) return ' Sin Mesa';
 
-    if (mesa.esGrupo) {
-      return ' ${mesa.etiquetaGrupo ?? 'Grupo'}';
+      if (mesa.esGrupo) {
+        return ' ${mesa.etiquetaGrupo ?? 'Grupo'}';
+      }
+
+      final sufijo = (mesa.mesaNombre != null && mesa.mesaNombre!.isNotEmpty)
+          ? ' (${mesa.mesaNombre})'
+          : '';
+      return ' Mesa ${mesa.numeroMesa}$sufijo';
+    } catch (e) {
+      print('❌ Error en _generarNombreOrdenPorDefecto: $e');
+      return ' Sin Nombre';
     }
-
-    final sufijo = (mesa.mesaNombre != null && mesa.mesaNombre!.isNotEmpty)
-        ? ' ${mesa.mesaNombre}'
-        : '';
-    return ' Mesa ${mesa.numeroMesa}$sufijo';
-  } catch (e) {
-    print('❌ Error en _generarNombreOrdenPorDefecto: $e');
-    return ' Sin Nombre';
   }
-}
+
   Future<bool> crearOrden({String? nombreOrdenCustom}) async {
     try {
       if (selectedMesa.value == null) {
@@ -717,26 +778,31 @@ String _generarNombreOrdenPorDefecto() {
 
       print('📤 Creando orden: ${jsonEncode(orderData)}');
 
-      if (defaultApiServer.isEmpty) throw Exception('URL del servidor no configurada');
+      if (defaultApiServer.isEmpty)
+        throw Exception('URL del servidor no configurada');
 
       Uri uri = Uri.parse('$defaultApiServer/ordenes/crearOrden/');
       print('📡 URL de creación: $uri');
 
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(orderData),
-      ).timeout(Duration(seconds: 30));
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(orderData),
+          )
+          .timeout(Duration(seconds: 30));
 
       print('📡 Crear orden - Código: ${response.statusCode}');
       print('📄 Respuesta: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         try {
-          final responseData = response.body.isNotEmpty ? jsonDecode(response.body) : <String, dynamic>{};
+          final responseData = response.body.isNotEmpty
+              ? jsonDecode(response.body)
+              : <String, dynamic>{};
           print('✅ Orden creada exitosamente: $responseData');
         } catch (e) {
           print('⚠️ Error decodificando respuesta exitosa: $e');
@@ -755,14 +821,17 @@ String _generarNombreOrdenPorDefecto() {
         try {
           if (response.body.isNotEmpty) {
             final errorData = jsonDecode(response.body);
-            errorMessage = errorData['message']?.toString() ??
+            errorMessage =
+                errorData['message']?.toString() ??
                 errorData['error']?.toString() ??
                 'Error del servidor (${response.statusCode})';
           } else {
-            errorMessage = 'Error del servidor (${response.statusCode}) - Sin mensaje';
+            errorMessage =
+                'Error del servidor (${response.statusCode}) - Sin mensaje';
           }
         } catch (e) {
-          errorMessage = 'Error del servidor (${response.statusCode}) - Respuesta inválida';
+          errorMessage =
+              'Error del servidor (${response.statusCode}) - Respuesta inválida';
         }
 
         await _mostrarAlertaAsync(
@@ -779,9 +848,11 @@ String _generarNombreOrdenPorDefecto() {
 
       String errorMessage = 'Error de conexión desconocido';
       if (e.toString().contains('TimeoutException')) {
-        errorMessage = 'Tiempo de espera agotado. Verifica tu conexión a internet.';
+        errorMessage =
+            'Tiempo de espera agotado. Verifica tu conexión a internet.';
       } else if (e.toString().contains('SocketException')) {
-        errorMessage = 'No se puede conectar al servidor. Verifica la conexión.';
+        errorMessage =
+            'No se puede conectar al servidor. Verifica la conexión.';
       } else if (e.toString().contains('FormatException')) {
         errorMessage = 'Error en el formato de datos del servidor.';
       } else {
@@ -848,7 +919,9 @@ String _generarNombreOrdenPorDefecto() {
           confirmBtnColor: Color(0xFFE74C3C),
         );
       } else {
-        print('⚠️ No se puede mostrar error - contexto no disponible: $titulo - $mensaje');
+        print(
+          '⚠️ No se puede mostrar error - contexto no disponible: $titulo - $mensaje',
+        );
       }
     } catch (e) {
       print('❌ Error mostrando mensaje de error: $e');
@@ -857,7 +930,9 @@ String _generarNombreOrdenPorDefecto() {
 
   bool get puedeCrearOrden {
     try {
-      return selectedMesa.value != null && cartItems.isNotEmpty && !isCreatingOrder.value;
+      return selectedMesa.value != null &&
+          cartItems.isNotEmpty &&
+          !isCreatingOrder.value;
     } catch (e) {
       print('❌ Error en puedeCrearOrden: $e');
       return false;
