@@ -1004,8 +1004,11 @@ Widget _buildMenuItemsScrollable() {
 
 
   _showAddToCartDialog(Producto producto) {
-  final TextEditingController observacionesController = TextEditingController();
-  
+   final TextEditingController observacionesController =
+        TextEditingController();
+    final RxBool paraLlevar = false.obs; // ← nuevo
+
+    
   Get.bottomSheet(
     Builder(
       builder: (context) => SingleChildScrollView(
@@ -1058,7 +1061,73 @@ Widget _buildMenuItemsScrollable() {
                 ),
               ),
               SizedBox(height: 16),
-              
+               Obx(
+                  () => GestureDetector(
+                    onTap: () {
+                      paraLlevar.value = !paraLlevar.value;
+                      if (paraLlevar.value) {
+                        final texto = observacionesController.text;
+                        if (!texto.contains('PARA LLEVAR')) {
+                          observacionesController.text = texto.isEmpty
+                              ? 'PARA LLEVAR. '
+                              : 'PARA LLEVAR. $texto';
+
+                          // ← cursor al final
+                          observacionesController.selection =
+                              TextSelection.fromPosition(
+                                TextPosition(
+                                  offset: observacionesController.text.length,
+                                ),
+                              );
+                        }
+                      } else {
+                        observacionesController.text = observacionesController
+                            .text
+                            .replaceAll('PARA LLEVAR. ', '')
+                            .replaceAll('PARA LLEVAR.', '')
+                            .trim();
+                      }
+                    },
+                    child: AnimatedContainer(
+                      duration: Duration(milliseconds: 200),
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: paraLlevar.value
+                            ? Color(0xFF8B4513)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Color(0xFF8B4513), width: 2),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.shopping_bag_outlined,
+                            color: paraLlevar.value
+                                ? Colors.white
+                                : Color(0xFF8B4513),
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            paraLlevar.value ? '✓ Para Llevar' : 'Para Llevar',
+                            style: TextStyle(
+                              color: paraLlevar.value
+                                  ? Colors.white
+                                  : Color(0xFF8B4513),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               // Info del producto
               Container(
                 width: double.infinity,

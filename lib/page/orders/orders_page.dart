@@ -708,8 +708,7 @@ double _calcularAlturaCard(bool isVerySmallScreen, bool isSmallScreen) {
       );
     });
   }
-
-  // 🏪 CARD DE MESA RESPONSIVA
+ 
   Widget _buildTableCard(
     Map<String, dynamic> mesa,
     bool isSmallScreen,
